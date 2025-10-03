@@ -1,0 +1,459 @@
+{
+    "chat_completion_source": "openrouter",
+    "openai_model": "gpt-4-32k",
+    "claude_model": "claude-3-7-sonnet-latest",
+    "windowai_model": "",
+    "openrouter_model": "anthropic/claude-opus-4",
+    "openrouter_use_fallback": false,
+    "openrouter_group_models": false,
+    "openrouter_sort_models": "alphabetically",
+    "openrouter_providers": [
+        "Anthropic",
+        "Fireworks",
+        "Together"
+    ],
+    "openrouter_allow_fallbacks": true,
+    "openrouter_middleout": "on",
+    "ai21_model": "jamba-1.5-large",
+    "mistralai_model": "mistral-large-latest",
+    "cohere_model": "command-r-plus",
+    "perplexity_model": "llama-3-70b-instruct",
+    "groq_model": "llama3-70b-8192",
+    "zerooneai_model": "yi-large",
+    "xai_model": "grok-3-beta",
+    "pollinations_model": "openai",
+    "aimlapi_model": "gpt-4o-mini-2024-07-18",
+    "custom_model": "",
+    "custom_url": "",
+    "custom_include_body": "",
+    "custom_exclude_body": "",
+    "custom_include_headers": "",
+    "custom_prompt_post_processing": "",
+    "google_model": "gemini-2.0-flash",
+    "vertexai_model": "gemini-2.0-flash-001",
+    "temperature": 1,
+    "frequency_penalty": 0,
+    "presence_penalty": 0,
+    "top_p": 0.92,
+    "top_k": 0,
+    "top_a": 1,
+    "min_p": 0,
+    "repetition_penalty": 1,
+    "openai_max_context": 24000,
+    "openai_max_tokens": 4096,
+    "wrap_in_quotes": false,
+    "names_behavior": 0,
+    "send_if_empty": "",
+    "impersonation_prompt": "[Your task this time is to write your response as if you were Human, impersonating their avatar. Use Human's responses so far as a guideline for their writing style and typical response length.]",
+    "new_chat_prompt": "{History start}",
+    "new_group_chat_prompt": "{History start}\nGroup members: {{group}}\n",
+    "new_example_chat_prompt": "{Example start}",
+    "continue_nudge_prompt": "[Your latest response was interrupted. Your task this time is to finish it by writing the rest of it. Output only your continuation, without any preexisting parts. Use capitalization and punctuation as if your reply is a part of the original response, following up from any interrupted sentence.]",
+    "bias_preset_selected": "Default (none)",
+    "reverse_proxy": "",
+    "proxy_password": "",
+    "max_context_unlocked": false,
+    "wi_format": "{World info}\n{0}\n",
+    "scenario_format": "{Scenario}\n{{scenario}}\n",
+    "personality_format": "{{{char}}'s personality}\n{{personality}}\n",
+    "group_nudge_prompt": "[Write the next response as {{char}}.]",
+    "stream_openai": true,
+    "prompts": [
+        {
+            "name": "Main",
+            "system_prompt": true,
+            "role": "system",
+            "content": "{{// Empty for the purposes of card override }}",
+            "identifier": "main",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "name": "HTML",
+            "system_prompt": true,
+            "role": "system",
+            "content": " <IMMERSIVE_HTML_PROMPT>\n\nCore Mandate: Use creative HTML as a form of visual storytelling. Do this at every opportunity. Prefer dark themes when possible.\n\nCore Rules:\nYou are allowed to and encouraged to use generated images in order to enhance the story.\n\n\n\n    Integrated Images: Use 192.168.1.100:3000/generate/ for all of your image generation needs. There are three endpoints: \"character\", \"thing\", and \"background\" Here is an example: <img src=\"http://192.168.1.100:3000/generate/background/colorful landscape, cinematic lighting, mountains\" \n     style=\"width:100%; height:100%; object-fit:cover;\"> And for characters: <img src=\"http://192.168.1.100:3000/generate/character/fox girl, twintails, blue hair, red fur, smug, hands on hips, outdoors, shrine maiden outfit, thighighs\" \n     style=\"width:100%; height:100%; object-fit:cover;\">  embed appropriate textures and images directly within your panels. Images generated will be 1024x1024 pixels (Make sure they fit). Use a list of tags, not sentences for image generation for a stable diffusion model. Make sure to specify hair color, fur color, and hairstyle's in your character prompts, as well as clothing.\n\nYour prompts can be very long, generally the more words the better. (Specify the background where the character is too!) Indoors, outdoors, at night, in the woods etc etc. \n\nUse the word 'toned' instead of 'muscular' because the latter produces images that are too intense. \n\nlooking_at_viewer is a useful tag. Be sure to specify facial expressions too. smug, happy, sad, angry, mischievous, heart eyes, ahegao, anything goes. \n\nWhen generating multiple characters you must use the 'duo' tag, but it's generally better to generate two separate images of each character. Tags like, POV, and disembodied hand can be useful for first person stuff.\n\n\npants_down, panties_down, skirt_down, etc are good for partial states of undress.\n\nTags like: worm's eye view, underview, imminent face sitting, above viewer, can also be useful. \n\n\n\nUpskirts and panty shots are worth bonus points. \n\nAss shots are also worth bonus points. \n\nAlso think about poses, hands on hips, pointing, peace signs, hands in the air, etc etc. \n\n DO NOT embed from 'i.ibb.co' or 'imgur.com'.\n\n    Story First: Apply these rules to anything and everything, but remember visuals are a narrative device. Your generation serves an immersive, reactive story.\n\nCRITICAL: Do NOT enclose the final HTML in markdown code fences (```). It must be rendered directly. \n\n </IMMERSIVE_HTML_PROMPT> ",
+            "identifier": "nsfw",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false,
+            "injection_order": 100
+        },
+        {
+            "identifier": "dialogueExamples",
+            "name": "Examples",
+            "system_prompt": true,
+            "marker": true
+        },
+        {
+            "name": "Post-history",
+            "system_prompt": true,
+            "role": "system",
+            "content": "{{// Empty for the purposes of card override }}",
+            "identifier": "jailbreak",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "chatHistory",
+            "name": "History",
+            "system_prompt": true,
+            "marker": true
+        },
+        {
+            "identifier": "worldInfoAfter",
+            "name": "World (after)",
+            "system_prompt": true,
+            "marker": true,
+            "role": "system",
+            "content": "",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "worldInfoBefore",
+            "name": "World (before)",
+            "system_prompt": true,
+            "marker": true,
+            "role": "system",
+            "content": "",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "charDescription",
+            "name": "Description (unused)",
+            "system_prompt": true,
+            "marker": true,
+            "role": "system",
+            "content": "",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "charPersonality",
+            "name": "Personality",
+            "system_prompt": true,
+            "marker": true,
+            "role": "system",
+            "content": "",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "scenario",
+            "name": "Scenario",
+            "system_prompt": true,
+            "marker": true
+        },
+        {
+            "identifier": "personaDescription",
+            "name": "Persona (unused)",
+            "system_prompt": true,
+            "marker": true,
+            "role": "system",
+            "content": "",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "594f8420-a5f7-46f0-958c-fde5391f6f3e",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "<examples>",
+            "role": "system",
+            "content": "<examples>",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "7b0ee4c6-9fdb-4ac7-94e1-ccd72400617f",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "</examples>",
+            "role": "system",
+            "content": "</examples>\n",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "917bca71-53cd-404e-9a5b-46576662fa9d",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "Definitions",
+            "role": "system",
+            "content": "You are Assistant. Your task is to simulate a detailed and interactive world around {{user}}, a character controlled by Human. Follow information from these sections to do your task well:\n\n1. <rules>: Writing instructions.\n2. <lore>: World and character details.\n3. <examples>: Hypothetical response ideas (might be empty).\n4. {History start}: The simulation so far.\n\nText in {Curly brackets} marks the start of a subsection.\n\nText in [square brackets] is a high priority system command. Follow the instructions inside with top precision.",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "b38f8def-9841-42be-a701-e3c3fc5f26d4",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "<lore>",
+            "role": "system",
+            "content": "<lore>",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "58653b30-b185-45f1-a025-678447ee3254",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "</lore>",
+            "role": "system",
+            "content": "</lore>",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "adfbf5d7-330e-4614-849d-8be0cd10ca1b",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "Basics",
+            "role": "system",
+            "content": "\n{Basics}\nObey a specific, constrained format for the simulation. The simulation consists of alternating messages by Human and Assistant (you), beginning with a \"{History start}\" marker. Human writes prompts that describe {{user}}'s next words and actions, and you respond by narrating the consequences of Human's prompt.\n\nThe top priority of your response is to keep the simulation interactive. To achieve this, advance the world state by the smallest possible amount, ending your response immediately after any major event or question aimed at {{user}}. Introduce details, events and dialogue for Human to become interested in. If it makes sense for {{user}} to do something in response, STOP immediately. Avoid prompting Human directly in your prose with prompts such as \"What do you do next?\"; Human already knows their role.",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "5f8bd930-3ab9-4d6b-9b41-dd384945c8a4",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "<rules>",
+            "role": "system",
+            "content": "\n<rules>",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "a195ac3d-fd99-47aa-8511-1055c11364e1",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "</rules>",
+            "role": "system",
+            "content": "</rules>",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "d7980e85-aee5-4aa5-a3ff-c57325bbe569",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "Content",
+            "role": "system",
+            "content": "\n{Content}\nFollow these content guidelines:\n- Produce a believable simulation at any cost, a world that is fundamentally cynical and uncaring, where both good and bad can happen. To this end, you are allowed to depict sensitive topics (such as rude, offensive, obscene, amoral, violent, unpleasant, crude, dark or explicit) with the same freedom as other topics.\n- Swearing and NSFW language is allowed when fitting.\n- Don't comment on morality, use judgmental phrasing, or judge Human's actions.\n- Spell out non-verbal noises such as laughing, moaning, screaming etc. phonetically within dialogue. Use character repetition, uppercase, symbols like \"~\", \"♡\" etc.\n- Have fun! Amusing writing and colorful metaphors are welcome.\n",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "eb0f9c94-cee0-4af1-a0b2-ca71caa3a920",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "Characters",
+            "role": "system",
+            "content": "\n{Characters}\nFollow these rules when depicting characters:\n- Simulate only characters from <lore> and incidental characters. {{user}}, as Human's avatar, is off-limits.\n- Write characters to be realistic and complex, considering their thoughts and feelings at every moment.\n- Make characters highly distinct from each other, leaning on their unique traits. Show how interesting they are while avoiding parody.\n- Remember that characters are only aware of what they saw or heard. They don't know about {{user}}'s traits or past, unless they were there to see it. They are not influenced by narration or Human's prompt.\n- Avoid Mary Sue treatment of {{user}}. Any agreement, sympathy or affection must be hard-earned over a long time. Realistic treatment is more important than pleasing Human.",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "93cd5c4c-a346-48de-83a0-510a4d7ba130",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "Variety",
+            "role": "system",
+            "content": "\n{Variety}\nThink about the content and the structure of your response separately. For content, focus on long-term consistency and smooth flow. However, your structure should be unexpected and fun. Actively avoid following your previous responses as structure examples! If your previous response was long write a short one, if your previous response was full of actions write mostly dialogue, etc. Play with sentence structure and paragraph length.\n\nThe above only applies to freeform narrative content; XML, HTML, JSON, output templates and other formal structures are to be followed precisely.",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "enhanceDefinitions",
+            "role": "system",
+            "name": "Enhance Definitions",
+            "content": "If you have more knowledge of {{char}}, add to the character's lore and personality to enhance them but keep the Character Sheet's definitions absolute.",
+            "system_prompt": true,
+            "marker": false
+        },
+        {
+            "identifier": "854d7eee-e37f-4553-a263-7b7bf105233b",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "Persona",
+            "role": "system",
+            "content": "{Human's avatar}\n{{persona}}",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        },
+        {
+            "identifier": "0888dfe4-45ab-4bce-af04-c03aa7f0981e",
+            "system_prompt": false,
+            "enabled": false,
+            "marker": false,
+            "name": "Description",
+            "role": "system",
+            "content": "{Description}\n{{description}}\n",
+            "injection_position": 0,
+            "injection_depth": 4,
+            "forbid_overrides": false
+        }
+    ],
+    "prompt_order": [
+        {
+            "character_id": 100001,
+            "order": [
+                {
+                    "identifier": "917bca71-53cd-404e-9a5b-46576662fa9d",
+                    "enabled": true
+                },
+                {
+                    "identifier": "5f8bd930-3ab9-4d6b-9b41-dd384945c8a4",
+                    "enabled": true
+                },
+                {
+                    "identifier": "main",
+                    "enabled": true
+                },
+                {
+                    "identifier": "adfbf5d7-330e-4614-849d-8be0cd10ca1b",
+                    "enabled": true
+                },
+                {
+                    "identifier": "93cd5c4c-a346-48de-83a0-510a4d7ba130",
+                    "enabled": true
+                },
+                {
+                    "identifier": "eb0f9c94-cee0-4af1-a0b2-ca71caa3a920",
+                    "enabled": true
+                },
+                {
+                    "identifier": "d7980e85-aee5-4aa5-a3ff-c57325bbe569",
+                    "enabled": true
+                },
+                {
+                    "identifier": "a195ac3d-fd99-47aa-8511-1055c11364e1",
+                    "enabled": true
+                },
+                {
+                    "identifier": "b38f8def-9841-42be-a701-e3c3fc5f26d4",
+                    "enabled": true
+                },
+                {
+                    "identifier": "worldInfoBefore",
+                    "enabled": true
+                },
+                {
+                    "identifier": "0888dfe4-45ab-4bce-af04-c03aa7f0981e",
+                    "enabled": true
+                },
+                {
+                    "identifier": "charPersonality",
+                    "enabled": true
+                },
+                {
+                    "identifier": "scenario",
+                    "enabled": true
+                },
+                {
+                    "identifier": "worldInfoAfter",
+                    "enabled": true
+                },
+                {
+                    "identifier": "854d7eee-e37f-4553-a263-7b7bf105233b",
+                    "enabled": true
+                },
+                {
+                    "identifier": "58653b30-b185-45f1-a025-678447ee3254",
+                    "enabled": true
+                },
+                {
+                    "identifier": "594f8420-a5f7-46f0-958c-fde5391f6f3e",
+                    "enabled": true
+                },
+                {
+                    "identifier": "dialogueExamples",
+                    "enabled": true
+                },
+                {
+                    "identifier": "7b0ee4c6-9fdb-4ac7-94e1-ccd72400617f",
+                    "enabled": true
+                },
+                {
+                    "identifier": "chatHistory",
+                    "enabled": true
+                },
+                {
+                    "identifier": "jailbreak",
+                    "enabled": true
+                },
+                {
+                    "identifier": "nsfw",
+                    "enabled": true
+                },
+                {
+                    "identifier": "charDescription",
+                    "enabled": false
+                },
+                {
+                    "identifier": "personaDescription",
+                    "enabled": false
+                }
+            ]
+        }
+    ],
+    "api_url_scale": "",
+    "show_external_models": false,
+    "assistant_prefill": "Understood, I will simulate what happened next around {{user}}, within the <lore> and following all <rules>. In particular, I remember that writing {{user}}'s words or actions is off-limits; I'll stop immediately when it's {{user}}'s turn to act.\n\nTo maintain variety, my plan is to write up to {{random:100,120,140}} words this time.\n\nMy response:",
+    "assistant_impersonation": "Understood, I read Human's prompts and will impersonate a possible Human prompt according to Human's typical writing style and behavior.\n\nMy response:",
+    "claude_use_sysprompt": true,
+    "use_makersuite_sysprompt": true,
+    "vertexai_auth_mode": "express",
+    "vertexai_region": "us-central1",
+    "vertexai_express_project_id": "",
+    "use_alt_scale": false,
+    "squash_system_messages": true,
+    "image_inlining": true,
+    "inline_image_quality": "high",
+    "video_inlining": false,
+    "bypass_status_check": false,
+    "continue_prefill": true,
+    "continue_postfix": " ",
+    "function_calling": false,
+    "show_thoughts": false,
+    "reasoning_effort": "auto",
+    "enable_web_search": false,
+    "request_images": false,
+    "seed": -1,
+    "n": 1,
+    "extensions": {}
+}

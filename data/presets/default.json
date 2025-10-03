@@ -1,0 +1,54 @@
+{
+  "name": "Default",
+  "model": "anthropic/claude-opus-4",
+  "temperature": 1,
+  "top_p": 0.92,
+  "top_k": 0,
+  "frequency_penalty": 0,
+  "presence_penalty": 0,
+  "repetition_penalty": 1,
+  "max_tokens": 4096,
+  "max_context": 24000,
+  "prompts": [
+    {
+      "identifier": "main",
+      "name": "Main System Prompt",
+      "role": "system",
+      "content": "",
+      "enabled": true,
+      "injection_order": 0
+    },
+    {
+      "identifier": "charDescription",
+      "name": "Character Description",
+      "role": "system",
+      "content": "{{description}}",
+      "enabled": true,
+      "injection_order": 100
+    },
+    {
+      "identifier": "charPersonality",
+      "name": "Character Personality",
+      "role": "system",
+      "content": "{{personality}}",
+      "enabled": true,
+      "injection_order": 200
+    },
+    {
+      "identifier": "scenario",
+      "name": "Scenario",
+      "role": "system",
+      "content": "{{scenario}}",
+      "enabled": true,
+      "injection_order": 300
+    },
+    {
+      "identifier": "jailbreak",
+      "name": "Post-History Instructions",
+      "role": "system",
+      "content": "",
+      "enabled": false,
+      "injection_order": 1000
+    }
+  ]
+}
