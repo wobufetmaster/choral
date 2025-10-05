@@ -3,10 +3,12 @@ import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
 import CharacterList from './components/CharacterList.vue'
 import ChatView from './components/ChatView.vue'
+import LorebookManager from './components/LorebookManager.vue'
 
 const routes = [
   { path: '/', component: CharacterList },
-  { path: '/chat/:id?', component: ChatView, name: 'chat' }
+  { path: '/chat/:id?', component: ChatView, name: 'chat' },
+  { path: '/lorebooks', component: LorebookManager, name: 'lorebooks' }
 ]
 
 const router = createRouter({

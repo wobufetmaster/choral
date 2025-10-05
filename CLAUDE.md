@@ -331,9 +331,7 @@ The core chat system is fully functional:
 - Streaming responses work smoothly
 
 ### 🎯 Next Priorities
-1. **Lorebook System**: Entry scanning, token budgets, V3 decorators
-2. **Chat Branching**: Tree-based conversation navigation
-3. **Persona Management**: User persona creation and selection
+1. **Chat Branching**: Tree-based conversation navigation
 
 ---
 

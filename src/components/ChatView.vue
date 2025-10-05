@@ -2,13 +2,17 @@
   <div class="chat-view">
     <div class="chat-header">
       <button @click="$router.push('/')" class="back-button">← Back</button>
-      <h2>{{ characterName }}</h2>
+      <h2>{{ chatTitle }}</h2>
       <div class="header-actions">
         <button @click="newChat">New Chat</button>
+        <button v-if="!isGroupChat" @click="convertToGroupChat" title="Convert to Group Chat">👥</button>
+        <button v-if="isGroupChat" @click="showGroupManager = !showGroupManager" :class="{ 'active': showGroupManager }">Group</button>
         <button @click="showChatHistory = !showChatHistory">History</button>
         <button @click="showPersonas = true">Persona</button>
+        <button @click="showLorebooks = true">Lorebook</button>
         <button @click="showPresets = true">Presets</button>
         <button @click="showSettings = !showSettings">Settings</button>
+        <button @click="showDebug = !showDebug" :class="{ 'active': showDebug }">🐛 Debug</button>
       </div>
     </div>
 
@@ -46,7 +50,290 @@
       @close="showPresets = false"
     />
 
-    <div class="chat-container">
+    <GroupChatManager
+      v-if="showGroupManager && isGroupChat"
+      :characters="groupChatCharacters"
+      :strategy="groupChatStrategy"
+      :explicitMode="groupChatExplicitMode"
+      :allCharacters="allCharacters"
+      @close="showGroupManager = false"
+      @update:strategy="updateGroupStrategy"
+      @update:explicit-mode="updateExplicitMode"
+      @trigger-response="triggerCharacterResponse"
+      @move-up="moveCharacterUp"
+      @move-down="moveCharacterDown"
+      @remove-character="removeCharacterFromGroup"
+      @add-character="addCharacterToGroup"
+    />
+
+    <div v-if="showLorebooks" class="lorebook-selector-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Lorebooks</h3>
+          <button @click="showLorebooks = false" class="close-button">×</button>
+        </div>
+        <div class="lorebook-list">
+          <div
+            v-for="lorebook in lorebooks"
+            :key="lorebook.filename"
+            class="lorebook-option"
+            :class="{ 'auto-selected': isAutoSelected(lorebook.filename) }"
+          >
+            <input
+              type="checkbox"
+              :id="'lorebook-' + lorebook.filename"
+              :value="lorebook.filename"
+              v-model="selectedLorebookFilenames"
+              class="lorebook-checkbox"
+            />
+            <label :for="'lorebook-' + lorebook.filename" class="lorebook-checkbox-label">
+              <div class="lorebook-info-wrapper">
+                <div class="lorebook-name">
+                  {{ lorebook.name }}
+                  <span v-if="isAutoSelected(lorebook.filename)" class="auto-tag">AUTO</span>
+                </div>
+                <div class="lorebook-meta">{{ lorebook.entries?.length || 0 }} entries</div>
+              </div>
+            </label>
+            <button @click="editLorebook(lorebook)" class="edit-button" title="Edit">✏️</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inline Lorebook Editor -->
+    <div v-if="editingLorebook" class="lorebook-editor-modal">
+      <div class="modal-content large">
+        <div class="modal-header">
+          <h3>Edit: {{ editingLorebook.name }}</h3>
+          <button @click="closeLorebookEditor" class="close-button">×</button>
+        </div>
+        <div class="lorebook-editor-content">
+          <div class="editor-field">
+            <label>Lorebook Name:</label>
+            <input v-model="editingLorebook.name" type="text" class="lorebook-name-input" />
+          </div>
+
+          <div class="lorebook-settings">
+            <label>
+              <input type="checkbox" v-model="editingLorebook.autoSelect" />
+              Auto-select for characters with matching tags
+            </label>
+            <label v-if="editingLorebook.autoSelect">
+              Tags to match:
+              <input
+                v-model="editingLorebook.matchTags"
+                type="text"
+                placeholder="tag1, tag2, tag3"
+                class="tag-input"
+              />
+            </label>
+            <label>
+              Scan depth (0 = all messages):
+              <input v-model.number="editingLorebook.scanDepth" type="number" min="0" class="scan-depth-input" />
+            </label>
+          </div>
+
+          <div class="entries-section">
+            <div class="entries-header">
+              <h4>Entries</h4>
+              <button @click="addEntryToEditing" class="btn-primary">Add Entry</button>
+            </div>
+
+            <div
+              v-for="(entry, index) in editingLorebook.entries"
+              :key="index"
+              class="entry-item"
+            >
+              <div class="entry-header">
+                <input
+                  v-model="entry.name"
+                  type="text"
+                  placeholder="Entry Name"
+                  class="entry-name-input"
+                />
+                <div class="entry-controls">
+                  <label class="checkbox-label">
+                    <input type="checkbox" v-model="entry.enabled" />
+                    Enabled
+                  </label>
+                  <label class="checkbox-label">
+                    <input type="checkbox" v-model="entry.constant" />
+                    Always On
+                  </label>
+                  <button @click="removeEntryFromEditing(index)" class="btn-delete">Delete</button>
+                </div>
+              </div>
+
+              <div class="entry-matching">
+                <div class="match-section">
+                  <label>Keywords (case-insensitive):</label>
+                  <input
+                    v-model="entry.keysInput"
+                    @input="updateEntryKeys(entry)"
+                    type="text"
+                    placeholder="keyword1, keyword2, keyword3"
+                    class="keys-input"
+                  />
+                </div>
+
+                <div class="match-section">
+                  <label>Regex Pattern:</label>
+                  <input
+                    v-model="entry.regex"
+                    type="text"
+                    placeholder="^pattern.*"
+                    class="regex-input"
+                  />
+                </div>
+              </div>
+
+              <div class="entry-content">
+                <label>Content:</label>
+                <textarea
+                  v-model="entry.content"
+                  placeholder="Information to inject when matched..."
+                  rows="4"
+                  class="content-textarea"
+                ></textarea>
+              </div>
+
+              <div class="entry-settings">
+                <label>
+                  Priority (higher = injected first):
+                  <input v-model.number="entry.priority" type="number" class="priority-input" />
+                </label>
+              </div>
+            </div>
+
+            <div v-if="!editingLorebook.entries || editingLorebook.entries.length === 0" class="no-entries">
+              No entries yet. Click "Add Entry" to create one.
+            </div>
+          </div>
+
+          <div class="editor-actions">
+            <button @click="saveEditingLorebook" class="btn-primary">Save Changes</button>
+            <button @click="closeLorebookEditor" class="btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Debug Panel -->
+    <div v-if="showDebug" class="debug-panel">
+      <div class="debug-header">
+        <h3>🐛 Debug Information</h3>
+        <button @click="showDebug = false" class="close-debug">×</button>
+      </div>
+
+      <div class="debug-content">
+        <!-- Token Information -->
+        <div class="debug-section">
+          <h4>📊 Token Usage</h4>
+          <div class="debug-info">
+            <div class="debug-row">
+              <span class="debug-label">Estimated Tokens Sent:</span>
+              <span class="debug-value">{{ debugInfo.estimatedTokens || 'N/A' }}</span>
+            </div>
+            <div class="debug-row">
+              <span class="debug-label">Model Max Tokens:</span>
+              <span class="debug-value">{{ settings.max_tokens || 'N/A' }}</span>
+            </div>
+            <div class="debug-row">
+              <span class="debug-label">Model:</span>
+              <span class="debug-value">{{ settings.model }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Preset -->
+        <div class="debug-section">
+          <h4>⚙️ Active Preset</h4>
+          <div class="debug-info">
+            <div class="debug-row">
+              <span class="debug-label">Temperature:</span>
+              <span class="debug-value">{{ settings.temperature }}</span>
+            </div>
+            <div class="debug-row">
+              <span class="debug-label">Top P:</span>
+              <span class="debug-value">{{ settings.top_p }}</span>
+            </div>
+            <div class="debug-row">
+              <span class="debug-label">Top K:</span>
+              <span class="debug-value">{{ settings.top_k }}</span>
+            </div>
+            <div class="debug-row">
+              <span class="debug-label">Prompt Processing:</span>
+              <span class="debug-value">{{ settings.prompt_processing || 'merge_system' }}</span>
+            </div>
+            <div class="debug-row">
+              <span class="debug-label">System Prompts:</span>
+              <span class="debug-value">{{ settings.systemPrompts?.length || 0 }} prompts</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Lorebooks -->
+        <div class="debug-section" v-if="selectedLorebookFilenames.length > 0">
+          <h4>📚 Active Lorebooks ({{ selectedLorebookFilenames.length }})</h4>
+          <div class="debug-lorebook-list">
+            <div v-for="filename in selectedLorebookFilenames" :key="filename" class="debug-lorebook-item">
+              <div class="debug-lorebook-header">
+                <span class="debug-lorebook-name">{{ getLorebook(filename)?.name || filename }}</span>
+                <span v-if="isAutoSelected(filename)" class="auto-badge">AUTO</span>
+              </div>
+              <div v-if="debugInfo.matchedEntries && debugInfo.matchedEntries[filename]" class="matched-entries">
+                <div class="matched-entries-title">Matched Entries ({{ debugInfo.matchedEntries[filename].length }}):</div>
+                <div v-for="(entry, idx) in debugInfo.matchedEntries[filename]" :key="idx" class="matched-entry">
+                  <div class="matched-entry-header">
+                    <span class="entry-name">{{ entry.name }}</span>
+                    <span class="entry-priority">Priority: {{ entry.priority || 0 }}</span>
+                  </div>
+                  <div class="matched-keywords" v-if="entry.matchedKeys && entry.matchedKeys.length > 0">
+                    <span class="keywords-label">Matched Keywords:</span>
+                    <span v-for="key in entry.matchedKeys" :key="key" class="matched-keyword">{{ key }}</span>
+                  </div>
+                  <div class="entry-content-preview">{{ entry.content?.substring(0, 100) }}{{ entry.content?.length > 100 ? '...' : '' }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Message Structure -->
+        <div class="debug-section">
+          <h4>📝 Message Structure</h4>
+          <div class="debug-info">
+            <div class="debug-row">
+              <span class="debug-label">Total Messages:</span>
+              <span class="debug-value">{{ debugInfo.messageCount || messages.length }}</span>
+            </div>
+            <div class="debug-row">
+              <span class="debug-label">System Messages:</span>
+              <span class="debug-value">{{ debugInfo.systemMessageCount || 0 }}</span>
+            </div>
+            <div class="debug-row">
+              <span class="debug-label">User Messages:</span>
+              <span class="debug-value">{{ debugInfo.userMessageCount || 0 }}</span>
+            </div>
+            <div class="debug-row">
+              <span class="debug-label">Assistant Messages:</span>
+              <span class="debug-value">{{ debugInfo.assistantMessageCount || 0 }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Last Request Details -->
+        <div class="debug-section" v-if="debugInfo.lastRequest">
+          <h4>🔍 Last Request</h4>
+          <div class="debug-code">
+            <pre>{{ JSON.stringify(debugInfo.lastRequest, null, 2) }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-container" :class="{ 'with-debug': showDebug }">
       <div class="messages" ref="messagesContainer">
         <div
           v-for="(message, index) in messages"
@@ -55,8 +342,8 @@
         >
           <img
             v-if="message.role === 'assistant'"
-            :src="`/api/characters/${$route.query.character}/image`"
-            :alt="characterName"
+            :src="getMessageAvatar(message)"
+            :alt="getMessageCharacterName(message)"
             class="message-avatar"
           />
           <img
@@ -71,35 +358,41 @@
           <div class="message-bubble">
             <div class="message-actions">
               <button @click="editMessage(index)" title="Edit">✏️</button>
-              <button @click="copyMessage(message.content)" title="Copy">📋</button>
+              <button @click="copyMessage(getCurrentContent(message))" title="Copy">📋</button>
               <button @click="deleteMessage(index)" title="Delete">🗑️</button>
-              <button @click="branch(index)" title="Branch (Coming Soon)">🌿</button>
             </div>
             <div v-if="editingMessage === index" class="message-edit-container">
-              <textarea
-                v-model="editedContent"
-                class="message-edit-textarea"
+              <div
                 :ref="'editTextarea' + index"
+                class="message-edit-textarea"
+                contenteditable="true"
                 @keydown.escape="cancelEdit"
-                @input="autoResizeTextarea"
-              ></textarea>
+                @input="updateEditedContent"
+              ></div>
               <div class="edit-inline-actions">
                 <button @click="saveEdit" class="edit-confirm" title="Save">✓</button>
                 <button @click="cancelEdit" class="edit-cancel" title="Cancel">✕</button>
               </div>
             </div>
-            <div v-else class="message-content" v-html="sanitizeHtml(message.content)"></div>
+            <div v-else class="message-content" v-html="sanitizeHtml(isGeneratingSwipe && generatingSwipeIndex === index ? streamingContent : getCurrentContent(message), message)"></div>
+
+            <!-- Swipe navigation for assistant messages -->
+            <div v-if="message.role === 'assistant' && getTotalSwipes(message) > 0" class="swipe-controls">
+              <button @click="swipeLeft(index)" :disabled="!canSwipeLeft(message)" class="swipe-button">←</button>
+              <span class="swipe-counter">{{ getCurrentSwipeIndex(message) + 1 }}/{{ getTotalSwipes(message) }}</span>
+              <button @click="swipeRight(index)" :disabled="isStreaming" class="swipe-button">→</button>
+            </div>
           </div>
         </div>
 
-        <div v-if="isStreaming" class="message assistant">
+        <div v-if="isStreaming && !isGeneratingSwipe" class="message assistant">
           <img
-            :src="`/api/characters/${$route.query.character}/image`"
-            :alt="characterName"
+            :src="getStreamingAvatar()"
+            :alt="getStreamingCharacterName()"
             class="message-avatar"
           />
           <div class="message-bubble">
-            <div class="message-content" v-html="sanitizeHtml(streamingContent)"></div>
+            <div class="message-content" v-html="sanitizeHtml(streamingContent, { characterFilename: currentSpeaker })"></div>
           </div>
         </div>
       </div>
@@ -142,12 +435,14 @@ import DOMPurify from 'dompurify';
 import { processMacrosForDisplay } from '../utils/macros';
 import PresetSelector from './PresetSelector.vue';
 import PersonaManager from './PersonaManager.vue';
+import GroupChatManager from './GroupChatManager.vue';
 
 export default {
   name: 'ChatView',
   components: {
     PresetSelector,
-    PersonaManager
+    PersonaManager,
+    GroupChatManager
   },
   data() {
     return {
@@ -158,11 +453,29 @@ export default {
       userInput: '',
       isStreaming: false,
       streamingContent: '',
+      isGeneratingSwipe: false,
+      generatingSwipeIndex: null,
       showSettings: false,
       showPresets: false,
       showPersonas: false,
       showChatHistory: false,
+      showLorebooks: false,
+      showDebug: false,
+      showGroupManager: false,
       chatHistory: [],
+      lorebooks: [],
+      selectedLorebookFilenames: [],
+      autoSelectedLorebookFilenames: [],
+      editingLorebook: null,
+      debugInfo: {
+        estimatedTokens: 0,
+        messageCount: 0,
+        systemMessageCount: 0,
+        userMessageCount: 0,
+        assistantMessageCount: 0,
+        matchedEntries: {},
+        lastRequest: null
+      },
       settings: {
         model: 'anthropic/claude-opus-4',
         temperature: 1.0,
@@ -173,7 +486,30 @@ export default {
       },
       chatId: null,
       editingMessage: null,
-      editedContent: ''
+      editedContent: '',
+      // Group chat specific
+      isGroupChat: false,
+      groupChatId: null,
+      groupChatCharacters: [],
+      groupChatStrategy: 'join',
+      groupChatExplicitMode: false,
+      groupChatName: '',
+      groupChatTags: [],
+      allCharacters: [],
+      currentSpeaker: null, // Track who's currently generating
+      nextSpeaker: null // Track who should speak next
+    }
+  },
+  computed: {
+    chatTitle() {
+      if (this.isGroupChat) {
+        if (this.groupChatName) {
+          return this.groupChatName;
+        }
+        const names = this.groupChatCharacters.map(c => c.name).join(', ');
+        return `Group: ${names}`;
+      }
+      return this.characterName;
     }
   },
   watch: {
@@ -181,12 +517,36 @@ export default {
       if (newVal) {
         await this.loadChatHistory();
       }
+    },
+    async showLorebooks(newVal) {
+      if (newVal) {
+        await this.loadLorebooks();
+      }
+    },
+    selectedLorebookFilenames: {
+      handler(newVal) {
+        // Save manually selected lorebooks to localStorage
+        const manuallySelected = newVal.filter(
+          filename => !this.autoSelectedLorebookFilenames.includes(filename)
+        );
+        localStorage.setItem('manuallySelectedLorebooks', JSON.stringify(manuallySelected));
+      },
+      deep: true
     }
   },
   async mounted() {
     const characterFilename = this.$route.query.character;
+    const groupChatId = this.$route.query.groupChat;
 
-    if (characterFilename) {
+    // Load all characters for group chat management
+    await this.loadAllCharacters();
+
+    // Check if this is a group chat
+    if (groupChatId) {
+      this.isGroupChat = true;
+      this.groupChatId = groupChatId;
+      await this.loadGroupChat(groupChatId);
+    } else if (characterFilename) {
       await this.loadCharacter(characterFilename);
     }
 
@@ -198,11 +558,26 @@ export default {
 
     // Load existing chat if ID provided, or load most recent for character
     const chatId = this.$route.params.id;
-    if (chatId && chatId !== 'new') {
-      await this.loadChat(chatId);
-    } else if (characterFilename) {
-      // Try to load most recent chat for this character
-      await this.loadMostRecentChat(characterFilename);
+    if (!this.isGroupChat) {
+      if (chatId && chatId !== 'new') {
+        await this.loadChat(chatId);
+      } else if (characterFilename) {
+        // Try to load most recent chat for this character
+        await this.loadMostRecentChat(characterFilename);
+      }
+    }
+
+    // Load manually selected lorebooks from localStorage
+    try {
+      const manuallySelected = JSON.parse(localStorage.getItem('manuallySelectedLorebooks') || '[]');
+      this.selectedLorebookFilenames = [...manuallySelected];
+    } catch (err) {
+      console.error('Failed to load manually selected lorebooks:', err);
+    }
+
+    // Auto-select lorebook based on character tags (will add to existing manual selections)
+    if (!this.isGroupChat) {
+      await this.autoSelectLorebook();
     }
   },
   methods: {
@@ -221,11 +596,19 @@ export default {
         const personas = await response.json();
 
         if (personas.length > 0) {
-          // Check if any persona is bound to current character
           const characterFilename = this.$route.query.character;
-          const boundPersona = personas.find(p =>
+
+          // Priority 1: Check if any persona is bound to current character directly
+          let boundPersona = personas.find(p =>
             p.characterBindings?.includes(characterFilename)
           );
+
+          // Priority 2: Check if any persona is bound via character tags
+          if (!boundPersona && this.character?.tags) {
+            boundPersona = personas.find(p =>
+              p.tagBindings?.some(tag => this.character.tags.includes(tag))
+            );
+          }
 
           // Use bound persona if found, otherwise use first persona
           this.persona = boundPersona || personas[0];
@@ -233,6 +616,7 @@ export default {
           // Ensure persona has all fields
           if (!this.persona.description) this.persona.description = '';
           if (!this.persona.characterBindings) this.persona.characterBindings = [];
+          if (!this.persona.tagBindings) this.persona.tagBindings = [];
         }
       } catch (error) {
         console.error('Failed to load persona:', error);
@@ -268,27 +652,56 @@ export default {
       if (!this.character) return;
 
       const firstMessage = this.character.data.first_mes || 'Hello!';
+      const alternateGreetings = this.character.data.alternate_greetings || [];
+
+      // Combine first message with alternate greetings
+      const allGreetings = [firstMessage, ...alternateGreetings];
+
       this.messages = [{
         role: 'assistant',
-        content: firstMessage
+        swipes: allGreetings,
+        swipeIndex: 0,
+        isFirstMessage: true  // Mark this as the opening message
       }];
     },
     async loadChat(chatId) {
       try {
         const response = await fetch(`/api/chats/${chatId}`);
         const chat = await response.json();
-        this.messages = chat.messages || [];
+        this.messages = this.normalizeMessages(chat.messages || []);
         this.chatId = chatId;
       } catch (error) {
         console.error('Failed to load chat:', error);
       }
+    },
+    normalizeMessages(messages) {
+      // Convert old format messages to new swipe format
+      return messages.map(msg => {
+        if (msg.role === 'assistant') {
+          // If already has swipes, use as-is
+          if (msg.swipes) {
+            return {
+              ...msg,
+              swipeIndex: msg.swipeIndex ?? 0
+            };
+          }
+          // Convert old format
+          return {
+            role: 'assistant',
+            swipes: [msg.content],
+            swipeIndex: 0
+          };
+        }
+        // User messages stay as-is
+        return msg;
+      });
     },
     async loadMostRecentChat(characterFilename) {
       try {
         const response = await fetch(`/api/chats/character/${characterFilename}`);
         if (response.ok) {
           const chat = await response.json();
-          this.messages = chat.messages || [];
+          this.messages = this.normalizeMessages(chat.messages || []);
           this.chatId = chat.filename;
         } else {
           // No existing chat, initialize new one
@@ -328,8 +741,41 @@ export default {
       }
     },
     async sendMessage() {
-      if (!this.userInput.trim() || this.isStreaming) return;
+      if (this.isStreaming) return;
 
+      // If input is empty, just trigger a response without adding a user message
+      if (!this.userInput.trim()) {
+        // For group chats in explicit mode, require character selection
+        if (this.isGroupChat && this.groupChatExplicitMode) {
+          this.$root.$notify('Select a character to respond.', 'info');
+          return;
+        }
+
+        // For group chats in auto mode, pick a random character to respond
+        if (this.isGroupChat && this.groupChatCharacters.length > 0) {
+          const randomIndex = Math.floor(Math.random() * this.groupChatCharacters.length);
+          this.currentSpeaker = this.groupChatCharacters[randomIndex].filename;
+          console.log('Random character selected:', this.currentSpeaker);
+        }
+
+        // Build context for API
+        const context = this.buildContext();
+
+        // Start streaming
+        this.isStreaming = true;
+        this.streamingContent = '';
+
+        try {
+          await this.streamResponse(context);
+        } catch (error) {
+          console.error('Error streaming response:', error);
+          this.isStreaming = false;
+          this.$root.$notify('Failed to get response', 'error');
+        }
+        return;
+      }
+
+      // Normal flow: add user message first
       const userMessage = {
         role: 'user',
         content: this.userInput.trim()
@@ -337,6 +783,21 @@ export default {
 
       this.messages.push(userMessage);
       this.userInput = '';
+
+      // For group chats in explicit mode, just add the message without generating response
+      if (this.isGroupChat && this.groupChatExplicitMode) {
+        // Save the group chat with the new user message
+        await this.saveGroupChat();
+        this.$root.$notify('Message added. Select a character to respond.', 'info');
+        return;
+      }
+
+      // For group chats in auto mode, pick a random character to respond
+      if (this.isGroupChat && this.groupChatCharacters.length > 0) {
+        const randomIndex = Math.floor(Math.random() * this.groupChatCharacters.length);
+        this.currentSpeaker = this.groupChatCharacters[randomIndex].filename;
+        console.log('Random character selected:', this.currentSpeaker);
+      }
 
       // Build context for API
       const context = this.buildContext();
@@ -353,7 +814,12 @@ export default {
         this.$root.$notify('Failed to get response', 'error');
       }
     },
-    buildContext() {
+    buildContext(upToMessageIndex = null) {
+      // Use group chat context builder if in group chat mode
+      if (this.isGroupChat) {
+        return this.buildGroupChatContext(upToMessageIndex);
+      }
+
       const context = [];
 
       // If we have system prompts from preset, use those
@@ -363,9 +829,13 @@ export default {
           .filter(p => p.enabled)
           .sort((a, b) => (a.injection_order || 0) - (b.injection_order || 0));
 
+        // Track if any placeholder was used
+        let hasCharacterInfo = false;
+
         // Process each prompt and replace placeholders
         for (const prompt of sortedPrompts) {
           let content = prompt.content || '';
+          const originalContent = content;
 
           // Replace template placeholders
           content = content.replace(/\{\{description\}\}/g, this.character?.data.description || '');
@@ -373,11 +843,37 @@ export default {
           content = content.replace(/\{\{scenario\}\}/g, this.character?.data.scenario || '');
           content = content.replace(/\{\{system_prompt\}\}/g, this.character?.data.system_prompt || '');
 
+          // Check if any placeholders were replaced
+          if (content !== originalContent) {
+            hasCharacterInfo = true;
+          }
+
           // Only add if there's actual content
           if (content.trim()) {
             context.push({
               role: prompt.role || 'system',
               content: content.trim()
+            });
+          }
+        }
+
+        // If no placeholders were used, add character info separately
+        if (!hasCharacterInfo) {
+          const systemPrompt = this.character?.data.system_prompt || '';
+          const description = this.character?.data.description || '';
+          const personality = this.character?.data.personality || '';
+          const scenario = this.character?.data.scenario || '';
+
+          if (systemPrompt || description || personality || scenario) {
+            let systemContent = '';
+            if (systemPrompt) systemContent += systemPrompt + '\n\n';
+            if (description) systemContent += `Character: ${description}\n\n`;
+            if (personality) systemContent += `Personality: ${personality}\n\n`;
+            if (scenario) systemContent += `Scenario: ${scenario}\n\n`;
+
+            context.push({
+              role: 'system',
+              content: systemContent.trim()
             });
           }
         }
@@ -410,8 +906,26 @@ export default {
         });
       }
 
-      // Add conversation history
-      context.push(...this.messages);
+      // Add conversation history (optionally up to a certain index)
+      const messagesToInclude = upToMessageIndex !== null
+        ? this.messages.slice(0, upToMessageIndex)
+        : this.messages;
+
+      // Convert messages to context format (handling swipes)
+      for (const msg of messagesToInclude) {
+        if (msg.role === 'user') {
+          context.push({
+            role: 'user',
+            content: msg.content
+          });
+        } else {
+          // For assistant messages, use current swipe
+          context.push({
+            role: 'assistant',
+            content: msg.swipes?.[msg.swipeIndex] || msg.content || ''
+          });
+        }
+      }
 
       return context;
     },
@@ -423,21 +937,31 @@ export default {
         userName: this.persona?.name || 'User'
       };
 
+      const requestBody = {
+        messages,
+        model: this.settings.model,
+        options: {
+          temperature: this.settings.temperature,
+          max_tokens: this.settings.max_tokens,
+          top_p: this.settings.top_p,
+          top_k: this.settings.top_k
+        },
+        context: macroContext,
+        promptProcessing: this.settings.prompt_processing || 'merge_system',
+        lorebookFilenames: this.selectedLorebookFilenames,
+        debug: this.showDebug
+      };
+
+      // Update basic debug info before sending
+      this.updateBasicDebugInfo(messages);
+
+      // Store last request for debugging
+      this.debugInfo.lastRequest = requestBody;
+
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages,
-          model: this.settings.model,
-          options: {
-            temperature: this.settings.temperature,
-            max_tokens: this.settings.max_tokens,
-            top_p: this.settings.top_p,
-            top_k: this.settings.top_k
-          },
-          context: macroContext,
-          promptProcessing: this.settings.prompt_processing || 'merge_system'
-        })
+        body: JSON.stringify(requestBody)
       });
 
       const reader = response.body.getReader();
@@ -455,22 +979,62 @@ export default {
             const data = line.slice(6);
 
             if (data === '[DONE]') {
-              this.messages.push({
-                role: 'assistant',
-                content: this.streamingContent
-              });
+              // Add new assistant message with swipe
+              if (this.isGeneratingSwipe && this.generatingSwipeIndex !== null) {
+                // Add to existing message's swipes
+                const message = this.messages[this.generatingSwipeIndex];
+                message.swipes.push(this.streamingContent);
+                message.swipeIndex = message.swipes.length - 1;
+
+                // Track character for group chat swipes
+                if (this.isGroupChat && this.currentSpeaker) {
+                  if (!message.swipeCharacters) {
+                    message.swipeCharacters = new Array(message.swipes.length - 1).fill(message.characterFilename || null);
+                  }
+                  message.swipeCharacters.push(this.currentSpeaker);
+                }
+              } else {
+                // Create new message
+                const newMessage = {
+                  role: 'assistant',
+                  swipes: [this.streamingContent],
+                  swipeIndex: 0
+                };
+
+                // Track character for group chats
+                if (this.isGroupChat && this.currentSpeaker) {
+                  newMessage.characterFilename = this.currentSpeaker;
+                  newMessage.swipeCharacters = [this.currentSpeaker];
+                }
+
+                this.messages.push(newMessage);
+              }
+
               this.streamingContent = '';
               this.isStreaming = false;
+              this.isGeneratingSwipe = false;
+              this.generatingSwipeIndex = null;
+              this.currentSpeaker = null;
+              this.nextSpeaker = null;
               this.$nextTick(() => this.scrollToBottom());
 
               // Auto-save after AI response
-              await this.saveChat();
+              if (this.isGroupChat) {
+                await this.saveGroupChat();
+              } else {
+                await this.saveChat();
+              }
               return;
             }
 
             try {
               const parsed = JSON.parse(data);
-              if (parsed.content) {
+              if (parsed.type === 'debug') {
+                // Handle debug information from server
+                console.log('Received debug info:', parsed.debug);
+                this.debugInfo.matchedEntries = parsed.debug.matchedEntriesByLorebook || {};
+                console.log('Updated debugInfo.matchedEntries:', this.debugInfo.matchedEntries);
+              } else if (parsed.content) {
                 this.streamingContent += parsed.content;
                 this.$nextTick(() => this.scrollToBottom());
               }
@@ -485,11 +1049,23 @@ export default {
         }
       }
     },
-    sanitizeHtml(html) {
-      // Process macros first
+    sanitizeHtml(html, message = null) {
+      // Process macros first - use the specific character for group chats
+      let charName = this.character?.data?.name || 'Character';
+      let charNickname = this.character?.data?.nickname || '';
+
+      // For group chats, use the message's specific character
+      if (this.isGroupChat && message?.characterFilename) {
+        const char = this.groupChatCharacters.find(c => c.filename === message.characterFilename);
+        if (char) {
+          charName = char.name;
+          charNickname = char.data?.data?.nickname || '';
+        }
+      }
+
       const macroContext = {
-        charName: this.character?.data.name || 'Character',
-        charNickname: this.character?.data.nickname || '',
+        charName: charName,
+        charNickname: charNickname,
         userName: this.persona?.name || 'User'
       };
       const processed = processMacrosForDisplay(html, macroContext);
@@ -500,26 +1076,143 @@ export default {
         ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style']
       });
     },
+    getCurrentContent(message) {
+      if (message.role === 'user') {
+        return message.content;
+      }
+      // Assistant message with swipes
+      return message.swipes?.[message.swipeIndex] || message.content || '';
+    },
+    hasMultipleSwipes(message) {
+      return message.swipes && message.swipes.length > 1;
+    },
+    getCurrentSwipeIndex(message) {
+      return message.swipeIndex ?? 0;
+    },
+    getTotalSwipes(message) {
+      return message.swipes?.length || 1;
+    },
+    canSwipeLeft(message) {
+      return (message.swipeIndex ?? 0) > 0;
+    },
+    canSwipeRight(message) {
+      const currentIndex = message.swipeIndex ?? 0;
+      const totalSwipes = message.swipes?.length || 1;
+      return currentIndex < totalSwipes - 1;
+    },
+    async swipeLeft(index) {
+      const message = this.messages[index];
+      if (this.canSwipeLeft(message)) {
+        message.swipeIndex--;
+
+        // Update character filename for group chats
+        if (this.isGroupChat && message.swipeCharacters) {
+          message.characterFilename = message.swipeCharacters[message.swipeIndex];
+        }
+
+        if (this.isGroupChat) {
+          await this.saveGroupChat();
+        } else {
+          await this.saveChat();
+        }
+      }
+    },
+    async swipeRight(index) {
+      const message = this.messages[index];
+      const currentIndex = message.swipeIndex ?? 0;
+      const totalSwipes = message.swipes?.length || 1;
+
+      if (message.isFirstMessage) {
+        // For the first message, cycle back to the beginning
+        if (currentIndex < totalSwipes - 1) {
+          message.swipeIndex++;
+        } else {
+          message.swipeIndex = 0; // Cycle back to first greeting
+        }
+
+        // Update character filename for group chats
+        if (this.isGroupChat && message.swipeCharacters) {
+          message.characterFilename = message.swipeCharacters[message.swipeIndex];
+        }
+
+        if (this.isGroupChat) {
+          await this.saveGroupChat();
+        } else {
+          await this.saveChat();
+        }
+      } else {
+        // For other messages, normal swipe behavior
+        if (currentIndex < totalSwipes - 1) {
+          // Navigate to existing swipe
+          message.swipeIndex++;
+
+          // Update character filename for group chats
+          if (this.isGroupChat && message.swipeCharacters) {
+            message.characterFilename = message.swipeCharacters[message.swipeIndex];
+          }
+
+          if (this.isGroupChat) {
+            await this.saveGroupChat();
+          } else {
+            await this.saveChat();
+          }
+        } else if (currentIndex === totalSwipes - 1) {
+          // At the last swipe, generate a new one
+          await this.generateNewSwipe(index);
+        }
+      }
+    },
+    async generateNewSwipe(index) {
+      if (this.isStreaming) return;
+
+      // Build context up to (but not including) this message
+      const context = this.buildContext(index);
+
+      // Mark that we're generating a swipe and store the index
+      this.isGeneratingSwipe = true;
+      this.generatingSwipeIndex = index;
+      this.isStreaming = true;
+      this.streamingContent = '';
+
+      try {
+        await this.streamResponse(context);
+      } catch (error) {
+        console.error('Error generating swipe:', error);
+        this.isStreaming = false;
+        this.isGeneratingSwipe = false;
+        this.generatingSwipeIndex = null;
+        this.$root.$notify('Failed to generate swipe', 'error');
+      }
+    },
     editMessage(index) {
       this.editingMessage = index;
-      this.editedContent = this.messages[index].content;
+      this.editedContent = this.getCurrentContent(this.messages[index]);
       this.$nextTick(() => {
-        const textarea = this.$refs['editTextarea' + index];
-        if (textarea && textarea[0]) {
-          const el = textarea[0];
-          // Auto-resize to fit content
-          el.style.height = 'auto';
-          el.style.height = el.scrollHeight + 'px';
-
+        const editDiv = this.$refs['editTextarea' + index];
+        if (editDiv && editDiv[0]) {
+          const el = editDiv[0];
+          el.textContent = this.editedContent;
           el.focus();
+
           // Place cursor at end
-          el.selectionStart = el.selectionEnd = el.value.length;
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.selectNodeContents(el);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
         }
       });
     },
     async saveEdit() {
       if (this.editingMessage !== null && this.editedContent.trim()) {
-        this.messages[this.editingMessage].content = this.editedContent;
+        const message = this.messages[this.editingMessage];
+        if (message.role === 'user') {
+          message.content = this.editedContent;
+        } else {
+          // Update current swipe for assistant messages
+          message.swipes[message.swipeIndex] = this.editedContent;
+        }
         await this.saveChat();
         this.cancelEdit();
       }
@@ -528,10 +1221,8 @@ export default {
       this.editingMessage = null;
       this.editedContent = '';
     },
-    autoResizeTextarea(event) {
-      const textarea = event.target;
-      textarea.style.height = 'auto';
-      textarea.style.height = textarea.scrollHeight + 'px';
+    updateEditedContent(event) {
+      this.editedContent = event.target.textContent;
     },
     async copyMessage(content) {
       try {
@@ -589,29 +1280,63 @@ export default {
       this.persona = persona;
       this.$root.$notify(`Now using persona: ${persona.name}`, 'success');
     },
-    newChat() {
+    async newChat() {
       this.messages = [];
-      this.chatId = null;
-      this.initializeChat();
+
+      if (this.isGroupChat) {
+        // Don't create a new group chat file, just reset messages
+        await this.initializeGroupChat();
+        // Don't save yet - let it save on first message
+      } else {
+        this.chatId = null;
+        this.initializeChat();
+      }
+
       this.$root.$notify('Started new chat', 'info');
     },
     async loadChatHistory() {
       try {
-        const characterFilename = this.$route.query.character;
-        const response = await fetch('/api/chats');
-        const allChats = await response.json();
+        if (this.isGroupChat) {
+          // Load group chat history
+          const response = await fetch('/api/group-chats');
+          const allGroupChats = await response.json();
 
-        // Filter chats for current character and sort by timestamp
-        this.chatHistory = allChats
-          .filter(c => c.characterFilename === characterFilename)
-          .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          // For now, show all group chats (could filter by same character set later)
+          this.chatHistory = allGroupChats
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+            .map(gc => ({
+              ...gc,
+              isGroupChat: true
+            }));
+        } else {
+          // Load regular character chat history
+          const characterFilename = this.$route.query.character;
+          const response = await fetch('/api/chats');
+          const allChats = await response.json();
+
+          // Filter chats for current character and sort by timestamp
+          this.chatHistory = allChats
+            .filter(c => c.characterFilename === characterFilename)
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        }
       } catch (error) {
         console.error('Failed to load chat history:', error);
       }
     },
     async loadChatFromHistory(chat) {
-      this.messages = chat.messages || [];
-      this.chatId = chat.filename;
+      this.messages = this.normalizeMessages(chat.messages || []);
+
+      if (chat.isGroupChat) {
+        this.groupChatId = chat.filename;
+        this.groupChatCharacters = chat.characters || [];
+        this.groupChatStrategy = chat.strategy || 'join';
+        this.groupChatExplicitMode = chat.explicitMode || false;
+        this.groupChatName = chat.name || '';
+        this.groupChatTags = chat.tags || [];
+      } else {
+        this.chatId = chat.filename;
+      }
+
       this.showChatHistory = false;
       this.$nextTick(() => this.scrollToBottom());
     },
@@ -619,11 +1344,18 @@ export default {
       if (!confirm('Delete this chat?')) return;
 
       try {
-        await fetch(`/api/chats/${filename}`, { method: 'DELETE' });
+        if (this.isGroupChat) {
+          await fetch(`/api/group-chats/${filename}`, { method: 'DELETE' });
+        } else {
+          await fetch(`/api/chats/${filename}`, { method: 'DELETE' });
+        }
+
         await this.loadChatHistory();
-        if (filename === this.chatId) {
+
+        if (filename === this.chatId || filename === this.groupChatId) {
           this.newChat();
         }
+
         this.$root.$notify('Chat deleted', 'success');
       } catch (error) {
         console.error('Failed to delete chat:', error);
@@ -643,16 +1375,471 @@ export default {
       }
     },
     getPreview(chat) {
+      if (chat.isGroupChat) {
+        const names = chat.characters?.map(c => c.name).join(', ') || 'Group';
+        const messageCount = chat.messages?.length || 0;
+        return `${names} (${messageCount} messages)`;
+      }
+
       const lastMessage = chat.messages?.[chat.messages.length - 1];
       if (!lastMessage) return 'Empty chat';
-      const preview = lastMessage.content.substring(0, 50);
-      return preview + (lastMessage.content.length > 50 ? '...' : '');
+
+      // Handle both old format (content) and new format (swipes)
+      let content = '';
+      if (lastMessage.role === 'user') {
+        content = lastMessage.content || '';
+      } else {
+        // Assistant message - get current swipe or fall back to content
+        const swipeIndex = lastMessage.swipeIndex ?? 0;
+        content = lastMessage.swipes?.[swipeIndex] || lastMessage.content || '';
+      }
+
+      const preview = content.substring(0, 50);
+      return preview + (content.length > 50 ? '...' : '');
     },
     scrollToBottom() {
       const container = this.$refs.messagesContainer;
       if (container) {
         container.scrollTop = container.scrollHeight;
       }
+    },
+    async loadLorebooks() {
+      try {
+        const response = await fetch('/api/lorebooks');
+        this.lorebooks = await response.json();
+      } catch (error) {
+        console.error('Failed to load lorebooks:', error);
+      }
+    },
+    isAutoSelected(filename) {
+      return this.autoSelectedLorebookFilenames.includes(filename);
+    },
+    getLorebook(filename) {
+      return this.lorebooks.find(l => l.filename === filename);
+    },
+    estimateTokens(text) {
+      // Rough estimation: ~4 characters per token
+      return Math.ceil(text.length / 4);
+    },
+    updateBasicDebugInfo(messages) {
+      // Count messages by type
+      this.debugInfo.messageCount = messages.length;
+      this.debugInfo.systemMessageCount = messages.filter(m => m.role === 'system').length;
+      this.debugInfo.userMessageCount = messages.filter(m => m.role === 'user').length;
+      this.debugInfo.assistantMessageCount = messages.filter(m => m.role === 'assistant').length;
+
+      // Estimate total tokens
+      const allText = messages.map(m => m.content).join(' ');
+      this.debugInfo.estimatedTokens = this.estimateTokens(allText);
+
+      // matched entries will be populated by the server response
+    },
+    editLorebook(lorebook) {
+      // Deep clone to avoid mutations
+      this.editingLorebook = JSON.parse(JSON.stringify(lorebook));
+
+      // Initialize keysInput for display
+      if (this.editingLorebook.entries) {
+        this.editingLorebook.entries.forEach(entry => {
+          if (!entry.keysInput && entry.keys) {
+            entry.keysInput = entry.keys.join(', ');
+          }
+          if (entry.enabled === undefined) {
+            entry.enabled = true;
+          }
+        });
+      }
+
+      this.showLorebooks = false;
+    },
+    closeLorebookEditor() {
+      this.editingLorebook = null;
+    },
+    async saveEditingLorebook() {
+      try {
+        const response = await fetch('/api/lorebooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.editingLorebook)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          await this.loadLorebooks();
+          this.editingLorebook = null;
+          this.$root.$notify('Lorebook saved successfully', 'success');
+        }
+      } catch (error) {
+        console.error('Failed to save lorebook:', error);
+        this.$root.$notify('Failed to save lorebook', 'error');
+      }
+    },
+    addEntryToEditing() {
+      if (!this.editingLorebook.entries) {
+        this.editingLorebook.entries = [];
+      }
+
+      this.editingLorebook.entries.push({
+        name: 'New Entry',
+        enabled: true,
+        constant: false,
+        keys: [],
+        keysInput: '',
+        regex: '',
+        content: '',
+        priority: 0
+      });
+    },
+    removeEntryFromEditing(index) {
+      this.editingLorebook.entries.splice(index, 1);
+    },
+    updateEntryKeys(entry) {
+      // Convert comma-separated string to array
+      entry.keys = entry.keysInput
+        .split(',')
+        .map(k => k.trim())
+        .filter(k => k.length > 0);
+    },
+    async autoSelectLorebook() {
+      try {
+        const response = await fetch('/api/lorebooks');
+        const lorebooks = await response.json();
+
+        if (!lorebooks || lorebooks.length === 0) return;
+
+        const characterTags = this.character?.data?.tags || [];
+        this.autoSelectedLorebookFilenames = [];
+
+        // Find all lorebooks with autoSelect enabled and matching tags
+        for (const lorebook of lorebooks) {
+          if (lorebook.autoSelect && lorebook.matchTags) {
+            const lorebookTags = lorebook.matchTags
+              .split(',')
+              .map(t => t.trim().toLowerCase())
+              .filter(t => t.length > 0);
+
+            // Check if any character tag matches lorebook tags
+            const hasMatch = characterTags.some(charTag =>
+              lorebookTags.includes(charTag.toLowerCase())
+            );
+
+            if (hasMatch) {
+              this.autoSelectedLorebookFilenames.push(lorebook.filename);
+              if (!this.selectedLorebookFilenames.includes(lorebook.filename)) {
+                this.selectedLorebookFilenames.push(lorebook.filename);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to auto-select lorebook:', error);
+      }
+    },
+
+    // ===== Group Chat Methods =====
+    async loadAllCharacters() {
+      try {
+        const response = await fetch('/api/characters');
+        const chars = await response.json();
+        this.allCharacters = chars;
+      } catch (error) {
+        console.error('Failed to load all characters:', error);
+      }
+    },
+
+    async loadGroupChat(groupChatId) {
+      try {
+        const response = await fetch(`/api/group-chats/${groupChatId}`);
+        const groupChat = await response.json();
+
+        this.groupChatCharacters = groupChat.characters || [];
+        this.groupChatStrategy = groupChat.strategy || 'join';
+        this.groupChatExplicitMode = groupChat.explicitMode || false;
+        this.groupChatName = groupChat.name || '';
+        this.groupChatTags = groupChat.tags || [];
+        this.messages = this.normalizeMessages(groupChat.messages || []);
+
+        // If no messages, initialize with swipeable greetings
+        if (this.messages.length === 0) {
+          await this.initializeGroupChat();
+        }
+      } catch (error) {
+        console.error('Failed to load group chat:', error);
+        // If group chat doesn't exist, initialize new one
+        await this.initializeGroupChat();
+      }
+    },
+
+    async initializeGroupChat() {
+      if (this.groupChatCharacters.length === 0) return;
+
+      console.log('Initializing group chat with characters:', this.groupChatCharacters);
+
+      // Create separate messages for each character with their greetings as swipes
+      const messages = [];
+
+      for (const char of this.groupChatCharacters) {
+        try {
+          const response = await fetch(`/api/characters/${char.filename}`);
+          const charData = await response.json();
+
+          console.log(`Loaded character data for ${char.filename}:`, charData);
+
+          const firstMessage = charData.data.first_mes || 'Hello!';
+          const alternateGreetings = charData.data.alternate_greetings || [];
+
+          // Create all greetings for this character (first message + alternates)
+          const characterGreetings = [firstMessage, ...alternateGreetings];
+
+          // Create a message for this character with all their greetings as swipes
+          messages.push({
+            role: 'assistant',
+            swipes: characterGreetings,
+            swipeCharacters: new Array(characterGreetings.length).fill(char.filename),
+            swipeIndex: 0,
+            isFirstMessage: true,
+            characterFilename: char.filename
+          });
+
+          console.log(`Added message for ${char.name} with ${characterGreetings.length} greetings`);
+        } catch (err) {
+          console.error(`Failed to load greetings for ${char.filename}:`, err);
+        }
+      }
+
+      this.messages = messages;
+      console.log('Initialized messages:', this.messages);
+    },
+
+    async saveGroupChat() {
+      try {
+        const groupChat = {
+          filename: this.groupChatId || `group_chat_${Date.now()}.json`,
+          characters: this.groupChatCharacters,
+          strategy: this.groupChatStrategy,
+          explicitMode: this.groupChatExplicitMode,
+          name: this.groupChatName,
+          tags: this.groupChatTags,
+          messages: this.messages,
+          timestamp: Date.now()
+        };
+
+        const response = await fetch('/api/group-chats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(groupChat)
+        });
+
+        const result = await response.json();
+        this.groupChatId = result.filename;
+      } catch (error) {
+        console.error('Failed to save group chat:', error);
+      }
+    },
+
+    async convertToGroupChat() {
+      if (!this.character) return;
+
+      // Convert current character chat to group chat
+      this.isGroupChat = true;
+      this.groupChatCharacters = [{
+        filename: this.$route.query.character,
+        name: this.character.data.name,
+        data: this.character.data
+      }];
+      this.groupChatStrategy = 'join';
+
+      // Mark all existing messages with character
+      this.messages.forEach(msg => {
+        if (msg.role === 'assistant' && !msg.characterFilename) {
+          msg.characterFilename = this.$route.query.character;
+        }
+      });
+
+      // Save as new group chat
+      await this.saveGroupChat();
+
+      // Update URL
+      this.$router.replace({
+        name: 'chat',
+        params: { id: 'new' },
+        query: { groupChat: this.groupChatId }
+      });
+
+      this.$root.$notify('Converted to group chat', 'success');
+    },
+
+    updateGroupStrategy(strategy) {
+      this.groupChatStrategy = strategy;
+      this.saveGroupChat();
+    },
+
+    updateExplicitMode(mode) {
+      this.groupChatExplicitMode = mode;
+      this.saveGroupChat();
+    },
+
+    async triggerCharacterResponse(characterFilename) {
+      if (this.isStreaming) return;
+
+      this.nextSpeaker = characterFilename;
+      this.currentSpeaker = characterFilename;
+
+      const context = this.buildGroupChatContext();
+      this.isStreaming = true;
+      this.streamingContent = '';
+
+      try {
+        await this.streamResponse(context);
+      } catch (error) {
+        console.error('Error generating response:', error);
+        this.isStreaming = false;
+        this.$root.$notify('Failed to generate response', 'error');
+      }
+    },
+
+    moveCharacterUp(index) {
+      if (index > 0) {
+        const temp = this.groupChatCharacters[index];
+        this.groupChatCharacters[index] = this.groupChatCharacters[index - 1];
+        this.groupChatCharacters[index - 1] = temp;
+        this.saveGroupChat();
+      }
+    },
+
+    moveCharacterDown(index) {
+      if (index < this.groupChatCharacters.length - 1) {
+        const temp = this.groupChatCharacters[index];
+        this.groupChatCharacters[index] = this.groupChatCharacters[index + 1];
+        this.groupChatCharacters[index + 1] = temp;
+        this.saveGroupChat();
+      }
+    },
+
+    async removeCharacterFromGroup(index) {
+      if (confirm('Remove this character from the group chat?')) {
+        this.groupChatCharacters.splice(index, 1);
+        if (this.groupChatCharacters.length === 0) {
+          this.$root.$notify('Cannot have empty group chat', 'error');
+          return;
+        }
+        await this.saveGroupChat();
+      }
+    },
+
+    async addCharacterToGroup(characterFilename) {
+      const char = this.allCharacters.find(c => c.filename === characterFilename);
+      if (!char) return;
+
+      this.groupChatCharacters.push({
+        filename: char.filename,
+        name: char.name,
+        data: char.data
+      });
+
+      await this.saveGroupChat();
+      this.$root.$notify(`Added ${char.name} to group`, 'success');
+    },
+
+    buildGroupChatContext(upToMessageIndex = null) {
+      const context = [];
+
+      // Add system prompts from preset
+      if (this.settings.systemPrompts && this.settings.systemPrompts.length > 0) {
+        const sortedPrompts = [...this.settings.systemPrompts]
+          .filter(p => p.enabled)
+          .sort((a, b) => (a.injection_order || 0) - (b.injection_order || 0));
+
+        for (const prompt of sortedPrompts) {
+          let content = prompt.content || '';
+
+          // For group chats, we'll handle character info differently based on strategy
+          if (this.groupChatStrategy === 'join') {
+            // Replace with combined character info
+            const allDescriptions = this.groupChatCharacters.map(c =>
+              `${c.name}: ${c.data?.data?.description || ''}`
+            ).join('\n\n');
+
+            content = content.replace(/\{\{description\}\}/g, allDescriptions);
+            content = content.replace(/\{\{personality\}\}/g,
+              this.groupChatCharacters.map(c =>
+                `${c.name}: ${c.data?.data?.personality || ''}`
+              ).join('\n\n')
+            );
+            content = content.replace(/\{\{scenario\}\}/g,
+              this.groupChatCharacters.map(c => c.data?.data?.scenario || '').join('\n\n')
+            );
+          }
+
+          if (content.trim()) {
+            context.push({
+              role: prompt.role || 'system',
+              content: content.trim()
+            });
+          }
+        }
+      }
+
+      // Add persona description if present
+      if (this.persona?.description?.trim()) {
+        context.push({
+          role: 'system',
+          content: `User persona: ${this.persona.description.trim()}`
+        });
+      }
+
+      // Add conversation history
+      const messagesToInclude = upToMessageIndex !== null
+        ? this.messages.slice(0, upToMessageIndex)
+        : this.messages;
+
+      for (const msg of messagesToInclude) {
+        if (msg.role === 'user') {
+          context.push({
+            role: 'user',
+            content: msg.content
+          });
+        } else {
+          // For assistant messages in group chat
+          context.push({
+            role: 'assistant',
+            content: msg.swipes?.[msg.swipeIndex] || msg.content || ''
+          });
+        }
+      }
+
+      return context;
+    },
+
+    getMessageAvatar(message) {
+      if (this.isGroupChat && message.characterFilename) {
+        return `/api/characters/${message.characterFilename}/image`;
+      }
+      return `/api/characters/${this.$route.query.character}/image`;
+    },
+
+    getMessageCharacterName(message) {
+      if (this.isGroupChat && message.characterFilename) {
+        const char = this.groupChatCharacters.find(c => c.filename === message.characterFilename);
+        return char?.name || 'Unknown';
+      }
+      return this.characterName;
+    },
+
+    getStreamingAvatar() {
+      if (this.isGroupChat && this.currentSpeaker) {
+        return `/api/characters/${this.currentSpeaker}/image`;
+      }
+      return `/api/characters/${this.$route.query.character}/image`;
+    },
+
+    getStreamingCharacterName() {
+      if (this.isGroupChat && this.currentSpeaker) {
+        const char = this.groupChatCharacters.find(c => c.filename === this.currentSpeaker);
+        return char?.name || 'Unknown';
+      }
+      return this.characterName;
     }
   }
 }
@@ -665,6 +1852,11 @@ export default {
   height: 100vh;
   background: var(--bg-primary);
   color: var(--text-primary);
+}
+
+button.active {
+  background-color: var(--accent-color);
+  color: white;
 }
 
 .chat-header {
@@ -953,25 +2145,40 @@ export default {
 
 .message-edit-container {
   position: relative;
-  padding: 12px 16px;
   border-radius: 18px;
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   border: 2px solid var(--accent-color);
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.message.user .message-edit-container {
+  background: var(--accent-color);
+  border-radius: 18px 18px 4px 18px;
+}
+
+.message.assistant .message-edit-container {
+  background: var(--bg-secondary);
+  border-radius: 18px 18px 18px 4px;
 }
 
 .message-edit-textarea {
-  width: 100%;
-  min-height: auto;
-  resize: vertical;
-  padding: 8px;
-  padding-right: 72px; /* Space for buttons */
+  min-height: 40px;
+  padding: 12px 16px;
+  padding-right: 88px;
   border: none;
   background: transparent;
-  color: var(--text-primary);
+  color: inherit;
   font-family: inherit;
   font-size: 14px;
   line-height: 1.5;
-  overflow-y: hidden;
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.message.user .message-edit-textarea {
+  color: white;
 }
 
 .message-edit-textarea:focus {
@@ -1018,5 +2225,614 @@ export default {
 
 .edit-cancel:hover {
   background: var(--bg-tertiary);
+}
+
+.swipe-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.swipe-button {
+  padding: 4px 12px;
+  font-size: 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 32px;
+}
+
+.swipe-button:hover:not(:disabled) {
+  background: var(--hover-color);
+  border-color: var(--accent-color);
+}
+
+.swipe-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.swipe-counter {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 40px;
+  text-align: center;
+}
+
+.lorebook-selector-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1.5rem;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.close-button:hover {
+  background-color: var(--hover-color);
+}
+
+.lorebook-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lorebook-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  transition: all 0.2s;
+}
+
+.lorebook-option:hover {
+  background-color: var(--hover-color);
+}
+
+.lorebook-option.auto-selected {
+  background-color: rgba(90, 159, 212, 0.15);
+  border-color: var(--accent-color);
+}
+
+.lorebook-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  flex: 1;
+  margin: 0;
+}
+
+.lorebook-checkbox {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.lorebook-info-wrapper {
+  flex: 1;
+}
+
+.lorebook-name {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.auto-tag {
+  background-color: var(--accent-color);
+  color: white;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.lorebook-meta {
+  font-size: 0.875rem;
+  opacity: 0.7;
+}
+
+.edit-button {
+  padding: 0.25rem 0.5rem;
+  font-size: 1rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.edit-button:hover {
+  background: var(--hover-color);
+  border-color: var(--accent-color);
+}
+
+.lorebook-editor-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+}
+
+.modal-content.large {
+  max-width: 800px;
+  width: 95%;
+  max-height: 90vh;
+}
+
+.lorebook-editor-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: calc(90vh - 120px);
+  overflow-y: auto;
+}
+
+.editor-field label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.lorebook-name-input {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+.lorebook-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+.lorebook-settings label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tag-input,
+.scan-depth-input {
+  flex: 1;
+  padding: 0.375rem;
+}
+
+.entries-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.entries-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.entries-header h4 {
+  margin: 0;
+}
+
+.entry-item {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1rem;
+  background-color: var(--bg-tertiary);
+}
+
+.entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  gap: 1rem;
+}
+
+.entry-name-input {
+  flex: 1;
+  font-weight: 600;
+  padding: 0.375rem;
+}
+
+.entry-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  margin: 0;
+  cursor: pointer;
+}
+
+.entry-matching {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.match-section label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.keys-input,
+.regex-input {
+  width: 100%;
+  padding: 0.375rem;
+}
+
+.entry-content label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.content-textarea {
+  width: 100%;
+  padding: 0.5rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.entry-settings {
+  margin-top: 0.75rem;
+}
+
+.priority-input {
+  width: 80px;
+  padding: 0.375rem;
+}
+
+.no-entries {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-primary {
+  padding: 0.5rem 1rem;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: var(--hover-color);
+}
+
+.btn-delete {
+  padding: 0.25rem 0.5rem;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.btn-delete:hover {
+  background-color: #b91c1c;
+}
+
+/* Debug Panel */
+.debug-panel {
+  position: fixed;
+  right: 0;
+  top: 60px;
+  bottom: 0;
+  width: 400px;
+  background-color: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  overflow-y: auto;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.debug-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.debug-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.close-debug {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.close-debug:hover {
+  background-color: var(--hover-color);
+}
+
+.debug-content {
+  padding: 1rem;
+  flex: 1;
+}
+
+.debug-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.debug-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: var(--accent-color);
+}
+
+.debug-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.debug-row:last-child {
+  border-bottom: none;
+}
+
+.debug-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.debug-value {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-family: monospace;
+}
+
+.debug-lorebook-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.debug-lorebook-item {
+  padding: 0.75rem;
+  background-color: var(--bg-primary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.debug-lorebook-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.debug-lorebook-name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.matched-entries {
+  margin-top: 0.75rem;
+}
+
+.matched-entries-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.matched-entry {
+  padding: 0.625rem;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  border-left: 3px solid var(--accent-color);
+}
+
+.matched-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.375rem;
+}
+
+.entry-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.entry-priority {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.matched-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.keywords-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.matched-keyword {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  background-color: var(--accent-color);
+  color: white;
+  border-radius: 12px;
+  font-family: monospace;
+}
+
+.entry-content-preview {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.debug-code {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.75rem;
+  max-height: 400px;
+  overflow: auto;
+}
+
+.debug-code pre {
+  margin: 0;
+  font-size: 0.75rem;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.chat-container.with-debug {
+  margin-right: 400px;
+}
+
+@media (max-width: 768px) {
+  .debug-panel {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .chat-container.with-debug {
+    margin-right: 0;
+    display: none;
+  }
 }
 </style>

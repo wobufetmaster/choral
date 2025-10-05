@@ -1,0 +1,533 @@
+<template>
+  <div v-if="isOpen" class="modal-overlay" @click.self="close">
+    <div class="modal-content character-editor">
+      <div class="modal-header">
+        <h2>{{ isEditMode ? 'Edit Character' : 'Create Character' }}</h2>
+        <button @click="close" class="close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="editor-grid">
+          <!-- Left Column: Image -->
+          <div class="image-section">
+            <div class="image-preview" @click="triggerImageUpload">
+              <img v-if="imagePreview" :src="imagePreview" alt="Character preview" />
+              <div v-else class="image-placeholder">
+                <span>Click to upload image</span>
+              </div>
+            </div>
+            <input
+              ref="imageInput"
+              type="file"
+              accept="image/png,image/jpeg,image/jpg"
+              @change="handleImageUpload"
+              style="display: none"
+            />
+            <button @click="triggerImageUpload" class="upload-btn">
+              {{ imagePreview ? 'Change Image' : 'Upload Image' }}
+            </button>
+          </div>
+
+          <!-- Right Column: Form Fields -->
+          <div class="form-section">
+            <div class="form-group">
+              <label>Name *</label>
+              <input v-model="editedCard.data.name" type="text" required />
+            </div>
+
+            <div class="form-group">
+              <label>Nickname (optional)</label>
+              <input v-model="editedCard.data.nickname" type="text" />
+            </div>
+
+            <div class="form-group">
+              <label>Description *</label>
+              <textarea v-model="editedCard.data.description" rows="4" required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Personality</label>
+              <textarea v-model="editedCard.data.personality" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Scenario</label>
+              <textarea v-model="editedCard.data.scenario" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>First Message *</label>
+              <textarea v-model="editedCard.data.first_mes" rows="4" required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Alternate Greetings</label>
+              <div v-for="(greeting, index) in editedCard.data.alternate_greetings" :key="index" class="greeting-item">
+                <textarea v-model="editedCard.data.alternate_greetings[index]" rows="2"></textarea>
+                <button @click="removeGreeting(index)" class="remove-btn">Remove</button>
+              </div>
+              <button @click="addGreeting" class="add-btn">+ Add Greeting</button>
+            </div>
+
+            <div class="form-group">
+              <label>System Prompt</label>
+              <textarea v-model="editedCard.data.system_prompt" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Post History Instructions</label>
+              <textarea v-model="editedCard.data.post_history_instructions" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Tags (comma-separated)</label>
+              <input v-model="tagsString" type="text" placeholder="tag1, tag2, tag3" />
+            </div>
+
+            <div class="form-group">
+              <label>Creator</label>
+              <input v-model="editedCard.data.creator" type="text" />
+            </div>
+
+            <div class="form-group">
+              <label>Character Version</label>
+              <input v-model="editedCard.data.character_version" type="text" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button @click="close" class="cancel-btn">Cancel</button>
+        <button @click="save" class="save-btn" :disabled="!isValid">
+          {{ isEditMode ? 'Save Changes' : 'Create Character' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch } from 'vue'
+
+const props = defineProps({
+  isOpen: Boolean,
+  character: Object // If provided, edit mode; otherwise create mode
+})
+
+const emit = defineEmits(['close', 'save'])
+
+const imageInput = ref(null)
+const imagePreview = ref('')
+const imageFile = ref(null)
+const tagsString = ref('')
+
+const editedCard = ref({
+  spec: 'chara_card_v3',
+  spec_version: '3.0',
+  data: {
+    name: '',
+    nickname: '',
+    description: '',
+    personality: '',
+    scenario: '',
+    first_mes: '',
+    mes_example: '',
+    system_prompt: '',
+    post_history_instructions: '',
+    alternate_greetings: [],
+    tags: [],
+    creator: '',
+    character_version: '',
+    extensions: {}
+  }
+})
+
+const isEditMode = computed(() => !!props.character)
+
+const isValid = computed(() => {
+  return editedCard.value.data.name.trim() !== '' &&
+         editedCard.value.data.description.trim() !== '' &&
+         editedCard.value.data.first_mes.trim() !== ''
+})
+
+// Watch for character prop changes (when opening in edit mode)
+watch(() => props.character, (newChar) => {
+  if (newChar) {
+    // Use the character's data card structure
+    if (newChar.data) {
+      editedCard.value = {
+        spec: newChar.spec || 'chara_card_v3',
+        spec_version: newChar.spec_version || '3.0',
+        data: {
+          name: newChar.data.name || '',
+          nickname: newChar.data.nickname || '',
+          description: newChar.data.description || '',
+          personality: newChar.data.personality || '',
+          scenario: newChar.data.scenario || '',
+          first_mes: newChar.data.first_mes || '',
+          mes_example: newChar.data.mes_example || '',
+          system_prompt: newChar.data.system_prompt || '',
+          post_history_instructions: newChar.data.post_history_instructions || '',
+          alternate_greetings: newChar.data.alternate_greetings || [],
+          tags: newChar.data.tags || [],
+          creator: newChar.data.creator || '',
+          character_version: newChar.data.character_version || '',
+          extensions: newChar.data.extensions || {}
+        }
+      }
+    } else {
+      editedCard.value = JSON.parse(JSON.stringify(newChar))
+    }
+
+    // Set image preview from character
+    if (newChar.image) {
+      imagePreview.value = newChar.image
+    }
+
+    // Set tags string
+    if (editedCard.value.data.tags && editedCard.value.data.tags.length > 0) {
+      tagsString.value = editedCard.value.data.tags.join(', ')
+    } else {
+      tagsString.value = ''
+    }
+  } else {
+    // Reset for create mode
+    resetForm()
+  }
+}, { immediate: true })
+
+// Watch for modal opening/closing
+watch(() => props.isOpen, (isOpen) => {
+  if (isOpen && !props.character) {
+    resetForm()
+  }
+})
+
+function resetForm() {
+  editedCard.value = {
+    spec: 'chara_card_v3',
+    spec_version: '3.0',
+    data: {
+      name: '',
+      nickname: '',
+      description: '',
+      personality: '',
+      scenario: '',
+      first_mes: '',
+      mes_example: '',
+      system_prompt: '',
+      post_history_instructions: '',
+      alternate_greetings: [],
+      tags: [],
+      creator: '',
+      character_version: '',
+      extensions: {}
+    }
+  }
+  imagePreview.value = ''
+  imageFile.value = null
+  tagsString.value = ''
+}
+
+function triggerImageUpload() {
+  imageInput.value.click()
+}
+
+function handleImageUpload(event) {
+  const file = event.target.files[0]
+  if (file) {
+    imageFile.value = file
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      imagePreview.value = e.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
+function addGreeting() {
+  editedCard.value.data.alternate_greetings.push('')
+}
+
+function removeGreeting(index) {
+  editedCard.value.data.alternate_greetings.splice(index, 1)
+}
+
+function close() {
+  emit('close')
+}
+
+async function save() {
+  if (!isValid.value) return
+
+  // Parse tags from string
+  editedCard.value.data.tags = tagsString.value
+    .split(',')
+    .map(tag => tag.trim())
+    .filter(tag => tag !== '')
+
+  // Prepare data to save
+  const characterData = {
+    card: editedCard.value,
+    imageFile: imageFile.value,
+    originalFilename: props.character?.filename
+  }
+
+  emit('save', characterData)
+}
+</script>
+
+<style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  max-width: 1200px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 30px;
+}
+
+.image-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.image-preview {
+  width: 100%;
+  aspect-ratio: 2/3;
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.image-preview:hover {
+  border-color: var(--accent-color);
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 20px;
+}
+
+.upload-btn {
+  padding: 10px 20px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.upload-btn:hover {
+  opacity: 0.9;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-group label {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea {
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.greeting-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.greeting-item textarea {
+  flex: 1;
+}
+
+.remove-btn {
+  padding: 8px 12px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.remove-btn:hover {
+  background: #c82333;
+}
+
+.add-btn {
+  padding: 8px 16px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  align-self: flex-start;
+}
+
+.add-btn:hover {
+  opacity: 0.9;
+}
+
+.modal-footer {
+  padding: 20px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.cancel-btn,
+.save-btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cancel-btn {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.cancel-btn:hover {
+  background: var(--border-color);
+}
+
+.save-btn {
+  background: var(--accent-color);
+  color: white;
+}
+
+.save-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .image-section {
+    max-width: 300px;
+    margin: 0 auto;
+  }
+}
+</style>

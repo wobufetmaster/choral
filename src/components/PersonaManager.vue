@@ -72,8 +72,38 @@
           </div>
 
           <div class="form-group">
+            <label>Tag Bindings</label>
+            <p class="hint">Auto-select this persona for characters with specific tags</p>
+            <div class="tag-bindings">
+              <div class="current-tags">
+                <span v-for="(tag, index) in selectedPersona.tagBindings" :key="index" class="tag">
+                  {{ tag }}
+                  <button @click="removeTagBinding(index)" class="remove-tag">×</button>
+                </span>
+              </div>
+              <input
+                v-model="newTagBinding"
+                @keydown.enter="addTagBinding"
+                @input="updateTagBindingSuggestions"
+                placeholder="Add tag binding (press Enter)"
+                class="tag-input"
+              />
+              <div v-if="tagBindingSuggestions.length > 0" class="tag-suggestions">
+                <div
+                  v-for="suggestion in tagBindingSuggestions"
+                  :key="suggestion"
+                  @click="addSuggestedTagBinding(suggestion)"
+                  class="tag-suggestion"
+                >
+                  {{ suggestion }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
             <label>Character Bindings</label>
-            <p class="hint">Auto-select this persona for specific characters</p>
+            <p class="hint">Auto-select this persona for specific characters (overrides tag bindings)</p>
             <div class="bindings-list">
               <div
                 v-for="char in availableCharacters"
@@ -112,7 +142,18 @@ export default {
     return {
       personas: [],
       selectedPersona: null,
-      availableCharacters: []
+      availableCharacters: [],
+      newTagBinding: '',
+      tagBindingSuggestions: []
+    }
+  },
+  computed: {
+    allCharacterTags() {
+      const tags = new Set();
+      this.availableCharacters.forEach(char => {
+        char.tags?.forEach(tag => tags.add(tag));
+      });
+      return Array.from(tags).sort();
     }
   },
   async mounted() {
@@ -132,6 +173,7 @@ export default {
           // Ensure all personas have required fields
           if (!this.selectedPersona.description) this.selectedPersona.description = '';
           if (!this.selectedPersona.characterBindings) this.selectedPersona.characterBindings = [];
+          if (!this.selectedPersona.tagBindings) this.selectedPersona.tagBindings = [];
         }
       } catch (error) {
         console.error('Failed to load personas:', error);
@@ -153,7 +195,8 @@ export default {
         name: 'New Persona',
         avatar: null,
         description: '',
-        characterBindings: []
+        characterBindings: [],
+        tagBindings: []
       };
     },
     isCharacterBound(filename) {
@@ -184,6 +227,38 @@ export default {
     },
     removeAvatar() {
       this.selectedPersona.avatar = null;
+    },
+    addTagBinding() {
+      const tag = this.newTagBinding.trim();
+      if (tag && !this.selectedPersona.tagBindings.includes(tag)) {
+        this.selectedPersona.tagBindings.push(tag);
+        this.newTagBinding = '';
+        this.tagBindingSuggestions = [];
+      }
+    },
+    addSuggestedTagBinding(tag) {
+      if (!this.selectedPersona.tagBindings.includes(tag)) {
+        this.selectedPersona.tagBindings.push(tag);
+        this.newTagBinding = '';
+        this.tagBindingSuggestions = [];
+      }
+    },
+    removeTagBinding(index) {
+      this.selectedPersona.tagBindings.splice(index, 1);
+    },
+    updateTagBindingSuggestions() {
+      if (!this.newTagBinding.trim()) {
+        this.tagBindingSuggestions = [];
+        return;
+      }
+
+      const query = this.newTagBinding.toLowerCase();
+      this.tagBindingSuggestions = this.allCharacterTags
+        .filter(tag =>
+          tag.toLowerCase().includes(query) &&
+          !this.selectedPersona.tagBindings.includes(tag)
+        )
+        .slice(0, 5);
     },
     async savePersona() {
       try {
@@ -454,6 +529,80 @@ export default {
   color: var(--accent-color);
   font-weight: 600;
   font-size: 18px;
+}
+
+.tag-bindings {
+  position: relative;
+}
+
+.current-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--accent-color);
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.remove-tag {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-tag:hover {
+  opacity: 0.8;
+}
+
+.tag-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+
+.tag-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.tag-suggestion {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tag-suggestion:hover {
+  background: var(--hover-color);
 }
 
 @media (max-width: 768px) {
