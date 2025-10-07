@@ -122,8 +122,13 @@
 export default {
   name: 'PresetSelector',
   props: {
-    currentSettings: Object
+    currentSettings: Object,
+    tabData: {
+      type: Object,
+      default: () => ({}),
+    },
   },
+  emits: ['apply', 'close', 'update-tab'],
   data() {
     return {
       presets: [],

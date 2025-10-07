@@ -62,10 +62,12 @@ export default {
   align-items: center;
   gap: 12px;
   padding: 12px 20px;
-  border-radius: 8px;
-  background: var(--bg-secondary);
+  border-radius: 12px;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border: 1px solid var(--border-color);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
   min-width: 300px;
   max-width: 400px;
   pointer-events: auto;

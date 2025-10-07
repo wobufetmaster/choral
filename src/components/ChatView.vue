@@ -1,18 +1,41 @@
 <template>
   <div class="chat-view">
     <div class="chat-header">
-      <button @click="$router.push('/')" class="back-button">← Back</button>
+      <button v-if="!tabData" @click="$router.push('/')" class="back-button">← Back</button>
       <h2>{{ chatTitle }}</h2>
       <div class="header-actions">
-        <button @click="newChat">New Chat</button>
-        <button v-if="!isGroupChat" @click="convertToGroupChat" title="Convert to Group Chat">👥</button>
-        <button v-if="isGroupChat" @click="showGroupManager = !showGroupManager" :class="{ 'active': showGroupManager }">Group</button>
-        <button @click="showChatHistory = !showChatHistory">History</button>
-        <button @click="showPersonas = true">Persona</button>
-        <button @click="showLorebooks = true">Lorebook</button>
-        <button @click="showPresets = true">Presets</button>
-        <button @click="showSettings = !showSettings">Settings</button>
+        <button @click="sidebarOpen = !sidebarOpen">{{ sidebarOpen ? '◀' : '▶' }}</button>
+        <button v-if="isGroupChat" @click="showGroupManager = !showGroupManager" :class="{ 'active': showGroupManager }">👥 Group</button>
         <button @click="showDebug = !showDebug" :class="{ 'active': showDebug }">🐛 Debug</button>
+      </div>
+    </div>
+
+    <!-- Chat Sidebar -->
+    <div v-if="sidebarOpen" class="chat-sidebar">
+      <div class="sidebar-header">
+        <h3>Chat Controls</h3>
+        <button @click="sidebarOpen = false" class="close-sidebar">×</button>
+      </div>
+
+      <!-- Model/Preset Info -->
+      <div class="sidebar-info">
+        <div class="info-row">
+          <span class="info-label">Model:</span>
+          <span class="info-value">{{ settings.model || 'Not set' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Preset:</span>
+          <span class="info-value">{{ currentPresetName || 'None' }}</span>
+        </div>
+      </div>
+
+      <!-- Sidebar Actions -->
+      <div class="sidebar-actions">
+        <button @click="newChat" class="sidebar-btn">📝 New Chat</button>
+        <button @click="showChatHistory = !showChatHistory" :class="{ 'active': showChatHistory }" class="sidebar-btn">📜 History</button>
+        <button @click="showPersonas = true" class="sidebar-btn">👤 Persona</button>
+        <button @click="showLorebooks = true" class="sidebar-btn">📚 Lorebook</button>
+        <button @click="showPresets = true" class="sidebar-btn">⚙️ Presets</button>
       </div>
     </div>
 
@@ -392,7 +415,10 @@
             class="message-avatar"
           />
           <div class="message-bubble">
-            <div class="message-content" v-html="sanitizeHtml(streamingContent, { characterFilename: currentSpeaker })"></div>
+            <div v-if="streamingContent" class="message-content" v-html="sanitizeHtml(streamingContent, { characterFilename: currentSpeaker })"></div>
+            <div v-else class="message-content typing-indicator">
+              <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
+            </div>
           </div>
         </div>
       </div>
@@ -405,7 +431,10 @@
           :disabled="isStreaming"
         ></textarea>
         <button @click="sendMessage" :disabled="isStreaming || !userInput.trim()">
-          {{ isStreaming ? 'Generating...' : 'Send' }}
+          <span v-if="isStreaming">
+            Generating<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
+          </span>
+          <span v-else>Send</span>
         </button>
       </div>
     </div>
@@ -444,6 +473,13 @@ export default {
     PersonaManager,
     GroupChatManager
   },
+  props: {
+    tabData: {
+      type: Object,
+      default: () => ({}),
+    },
+  },
+  emits: ['open-tab', 'update-tab'],
   data() {
     return {
       character: null,
@@ -455,6 +491,7 @@ export default {
       streamingContent: '',
       isGeneratingSwipe: false,
       generatingSwipeIndex: null,
+      sidebarOpen: true,
       showSettings: false,
       showPresets: false,
       showPersonas: false,
@@ -462,6 +499,7 @@ export default {
       showLorebooks: false,
       showDebug: false,
       showGroupManager: false,
+      currentPresetName: null,
       chatHistory: [],
       lorebooks: [],
       selectedLorebookFilenames: [],
@@ -535,8 +573,9 @@ export default {
     }
   },
   async mounted() {
-    const characterFilename = this.$route.query.character;
-    const groupChatId = this.$route.query.groupChat;
+    // Support both tab data and route query params (for backward compatibility)
+    const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
+    const groupChatId = this.tabData?.groupChatId || this.$route?.query?.groupChat;
 
     // Load all characters for group chat management
     await this.loadAllCharacters();
@@ -557,7 +596,7 @@ export default {
     await this.loadPersona();
 
     // Load existing chat if ID provided, or load most recent for character
-    const chatId = this.$route.params.id;
+    const chatId = this.tabData?.chatId || this.$route?.params?.id;
     if (!this.isGroupChat) {
       if (chatId && chatId !== 'new') {
         await this.loadChat(chatId);
@@ -596,7 +635,7 @@ export default {
         const personas = await response.json();
 
         if (personas.length > 0) {
-          const characterFilename = this.$route.query.character;
+          const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
 
           // Priority 1: Check if any persona is bound to current character directly
           let boundPersona = personas.find(p =>
@@ -717,7 +756,7 @@ export default {
         const chat = {
           filename: this.chatId || `chat_${Date.now()}.json`,
           character: this.character?.data.name || 'Unknown',
-          characterFilename: this.$route.query.character,
+          characterFilename: this.tabData?.characterId || this.$route?.query?.character,
           messages: this.messages,
           timestamp: Date.now()
         };
@@ -1274,6 +1313,7 @@ export default {
         top_k: preset.top_k,
         systemPrompts: preset.prompts || []
       };
+      this.currentPresetName = preset.name;
       this.$root.$notify(`Applied preset: ${preset.name}`, 'success');
     },
     onPersonaSaved(persona) {
@@ -1310,7 +1350,7 @@ export default {
             }));
         } else {
           // Load regular character chat history
-          const characterFilename = this.$route.query.character;
+          const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
           const response = await fetch('/api/chats');
           const allChats = await response.json();
 
@@ -1642,9 +1682,10 @@ export default {
       if (!this.character) return;
 
       // Convert current character chat to group chat
+      const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
       this.isGroupChat = true;
       this.groupChatCharacters = [{
-        filename: this.$route.query.character,
+        filename: characterFilename,
         name: this.character.data.name,
         data: this.character.data
       }];
@@ -1653,19 +1694,21 @@ export default {
       // Mark all existing messages with character
       this.messages.forEach(msg => {
         if (msg.role === 'assistant' && !msg.characterFilename) {
-          msg.characterFilename = this.$route.query.character;
+          msg.characterFilename = characterFilename;
         }
       });
 
       // Save as new group chat
       await this.saveGroupChat();
 
-      // Update URL
-      this.$router.replace({
-        name: 'chat',
-        params: { id: 'new' },
-        query: { groupChat: this.groupChatId }
-      });
+      // Update URL (only in router mode)
+      if (!this.tabData && this.$router) {
+        this.$router.replace({
+          name: 'chat',
+          params: { id: 'new' },
+          query: { groupChat: this.groupChatId }
+        });
+      }
 
       this.$root.$notify('Converted to group chat', 'success');
     },
@@ -1816,7 +1859,8 @@ export default {
       if (this.isGroupChat && message.characterFilename) {
         return `/api/characters/${message.characterFilename}/image`;
       }
-      return `/api/characters/${this.$route.query.character}/image`;
+      const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
+      return `/api/characters/${characterFilename}/image`;
     },
 
     getMessageCharacterName(message) {
@@ -1831,7 +1875,8 @@ export default {
       if (this.isGroupChat && this.currentSpeaker) {
         return `/api/characters/${this.currentSpeaker}/image`;
       }
-      return `/api/characters/${this.$route.query.character}/image`;
+      const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
+      return `/api/characters/${characterFilename}/image`;
     },
 
     getStreamingCharacterName() {
@@ -1849,14 +1894,15 @@ export default {
 .chat-view {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background: var(--bg-primary);
+  height: 100%;
+  background: transparent;
   color: var(--text-primary);
 }
 
 button.active {
   background-color: var(--accent-color);
   color: white;
+  box-shadow: var(--shadow-sm);
 }
 
 .chat-header {
@@ -1864,7 +1910,11 @@ button.active {
   align-items: center;
   gap: 16px;
   padding: 16px 20px;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
 }
 
 .back-button {
@@ -1880,6 +1930,114 @@ button.active {
 .header-actions {
   display: flex;
   gap: 8px;
+}
+
+/* Chat Sidebar */
+.chat-sidebar {
+  position: fixed;
+  left: 0;
+  top: 73px;
+  bottom: 0;
+  width: 280px;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
+  border-right: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.close-sidebar {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-info {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.info-row:last-child {
+  margin-bottom: 0;
+}
+
+.info-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.info-value {
+  color: var(--text-primary);
+  font-weight: 600;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-actions {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.sidebar-btn {
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.sidebar-btn:hover {
+  background: var(--hover-color);
+}
+
+.sidebar-btn.active {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.chat-container {
+  margin-left: 0;
+  transition: margin-left 0.3s ease;
+}
+
+.chat-view:has(.chat-sidebar) .chat-container {
+  margin-left: 280px;
 }
 
 .chat-container {
@@ -1922,9 +2080,9 @@ button.active {
 }
 
 .message-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   object-fit: cover;
   flex-shrink: 0;
   background: var(--bg-tertiary);
@@ -1953,18 +2111,21 @@ button.active {
   border-radius: 18px;
   line-height: 1.5;
   word-wrap: break-word;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
 }
 
 .message.user .message-content {
-  background: var(--accent-color);
+  background: var(--user-bubble, var(--accent-color));
   color: white;
-  border-radius: 18px 18px 4px 18px;
+  border-radius: 18px 6px 18px 18px;
 }
 
 .message.assistant .message-content {
-  background: var(--bg-secondary);
+  background: var(--assistant-bubble, var(--bg-secondary));
   border: 1px solid var(--border-color);
-  border-radius: 18px 18px 18px 4px;
+  border-radius: 6px 18px 18px 18px;
 }
 
 .message-actions {
@@ -2003,7 +2164,10 @@ button.active {
   gap: 8px;
   padding: 16px 20px;
   border-top: 1px solid var(--border-color);
-  background: var(--bg-secondary);
+  background: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .input-area textarea {
@@ -2032,10 +2196,13 @@ button.active {
   top: 0;
   bottom: 0;
   width: 300px;
-  background: var(--bg-secondary);
+  background: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border-left: 1px solid var(--border-color);
   padding: 20px;
   overflow-y: auto;
+  box-shadow: var(--shadow-lg);
 }
 
 .settings-panel h3 {
@@ -2063,13 +2230,16 @@ button.active {
   top: 0;
   bottom: 0;
   width: 350px;
-  background: var(--bg-secondary);
+  background: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border-left: 1px solid var(--border-color);
   padding: 20px;
   overflow-y: auto;
   z-index: 999;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-lg);
 }
 
 .chat-history-sidebar h3 {
@@ -2154,12 +2324,12 @@ button.active {
 
 .message.user .message-edit-container {
   background: var(--accent-color);
-  border-radius: 18px 18px 4px 18px;
+  border-radius: 18px 4px 18px 18px;
 }
 
 .message.assistant .message-edit-container {
   background: var(--bg-secondary);
-  border-radius: 18px 18px 18px 4px;
+  border-radius: 4px 18px 18px 18px;
 }
 
 .message-edit-textarea {
@@ -2277,13 +2447,17 @@ button.active {
 }
 
 .modal-content {
-  background-color: var(--bg-secondary);
-  border-radius: 8px;
+  background-color: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
   padding: 1.5rem;
   max-width: 500px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
+  box-shadow: var(--shadow-lg);
 }
 
 .modal-header {
@@ -2619,12 +2793,15 @@ button.active {
   top: 60px;
   bottom: 0;
   width: 400px;
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border-left: 1px solid var(--border-color);
   overflow-y: auto;
   z-index: 100;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-lg);
 }
 
 .debug-header {
@@ -2822,6 +2999,42 @@ button.active {
 
 .chat-container.with-debug {
   margin-right: 400px;
+}
+
+/* Typing indicator animation */
+.typing-indicator {
+  padding: 12px 16px;
+  font-size: 24px;
+}
+
+.typing-dots {
+  display: inline-block;
+}
+
+.typing-dots span {
+  animation: typing-dot 1.4s infinite;
+  opacity: 0;
+}
+
+.typing-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing-dot {
+  0%, 60%, 100% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 768px) {

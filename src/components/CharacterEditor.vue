@@ -1,12 +1,15 @@
 <template>
-  <div v-if="isOpen" class="modal-overlay" @click.self="close">
-    <div class="modal-content character-editor">
-      <div class="modal-header">
+  <div v-if="isOpen || tabData" :class="[tabData ? 'tab-editor' : 'modal-overlay']" @click.self="!tabData && close()">
+    <div :class="[tabData ? 'tab-content-wrapper' : 'modal-content', 'character-editor']">
+      <div :class="tabData ? 'tab-header' : 'modal-header'">
         <h2>{{ isEditMode ? 'Edit Character' : 'Create Character' }}</h2>
-        <button @click="close" class="close-btn">&times;</button>
+        <button v-if="!tabData" @click="close" class="close-btn">&times;</button>
+        <button v-else @click="save" class="save-btn" :disabled="!isValid">
+          {{ isEditMode ? 'Save Changes' : 'Create Character' }}
+        </button>
       </div>
 
-      <div class="modal-body">
+      <div :class="tabData ? 'tab-body' : 'modal-body'">
         <div class="editor-grid">
           <!-- Left Column: Image -->
           <div class="image-section">
@@ -97,7 +100,7 @@
         </div>
       </div>
 
-      <div class="modal-footer">
+      <div v-if="!tabData" class="modal-footer">
         <button @click="close" class="cancel-btn">Cancel</button>
         <button @click="save" class="save-btn" :disabled="!isValid">
           {{ isEditMode ? 'Save Changes' : 'Create Character' }}
@@ -112,10 +115,11 @@ import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   isOpen: Boolean,
-  character: Object // If provided, edit mode; otherwise create mode
+  character: Object, // If provided, edit mode; otherwise create mode
+  tabData: Object // If provided, tab mode; otherwise modal mode
 })
 
-const emit = defineEmits(['close', 'save'])
+const emit = defineEmits(['close', 'save', 'update-tab', 'open-tab'])
 
 const imageInput = ref(null)
 const imagePreview = ref('')
@@ -271,11 +275,23 @@ async function save() {
   const characterData = {
     card: editedCard.value,
     imageFile: imageFile.value,
-    originalFilename: props.character?.filename
+    originalFilename: props.character?.filename || props.tabData?.characterId
+  }
+
+  // In tab mode, update tab label when name changes
+  if (props.tabData) {
+    emit('update-tab', { label: editedCard.value.data.name })
   }
 
   emit('save', characterData)
 }
+
+// Watch for character name changes in tab mode
+watch(() => editedCard.value.data.name, (newName) => {
+  if (props.tabData && newName) {
+    emit('update-tab', { label: newName })
+  }
+})
 </script>
 
 <style scoped>
@@ -529,5 +545,41 @@ async function save() {
     max-width: 300px;
     margin: 0 auto;
   }
+}
+
+/* Tab mode styles */
+.tab-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-primary);
+}
+
+.tab-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.tab-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-secondary);
+}
+
+.tab-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.tab-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
 }
 </style>

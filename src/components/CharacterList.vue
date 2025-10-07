@@ -11,12 +11,13 @@
           style="display: none"
         />
         <button @click="$refs.fileInput.click()">Import Character</button>
-        <button @click="createNewCharacter" class="create-btn">Create New</button>
-        <button @click="showGroupChatCreator = true" class="group-btn">Create Group Chat</button>
-        <button @click="autoTagAll" class="autotag-btn" :disabled="isAutoTaggingAll">
+        <button @click="createNewCharacter">Create New</button>
+        <button @click="showGroupChatCreator = true">Create Group Chat</button>
+        <button @click="autoTagAll" :disabled="isAutoTaggingAll">
           {{ isAutoTaggingAll ? 'Auto-tagging...' : '✨ Auto-tag All' }}
         </button>
-        <button @click="$router.push('/lorebooks')" class="lorebook-btn">Lorebooks</button>
+        <button @click="$emit('open-tab', 'lorebooks', {}, 'Lorebooks', false)">Lorebooks</button>
+        <button @click="$emit('open-tab', 'settings', {}, 'Settings', false)">⚙️ Settings</button>
       </div>
     </div>
 
@@ -296,6 +297,13 @@ export default {
   components: {
     CharacterEditor
   },
+  props: {
+    tabData: {
+      type: Object,
+      default: () => ({}),
+    },
+  },
+  emits: ['open-tab', 'update-tab'],
   data() {
     return {
       characters: [],
@@ -431,11 +439,10 @@ export default {
       }
     },
     startChat(character) {
-      this.$router.push({
-        name: 'chat',
-        params: { id: 'new' },
-        query: { character: character.filename }
-      });
+      this.$emit('open-tab', 'chat', {
+        characterId: character.filename,
+        characterName: character.name
+      }, character.name);
     },
     createNewCharacter() {
       this.characterBeingEdited = null;
@@ -668,11 +675,10 @@ export default {
     },
 
     startGroupChat(group) {
-      this.$router.push({
-        name: 'chat',
-        params: { id: 'new' },
-        query: { groupChat: group.filename }
-      });
+      this.$emit('open-tab', 'group-chat', {
+        groupChatId: group.filename,
+        groupChatName: this.getGroupChatName(group)
+      }, `👥 ${this.getGroupChatName(group)}`);
     },
 
     deleteGroupChat(group) {
@@ -755,11 +761,13 @@ export default {
         const result = await response.json();
 
         // Navigate to the new group chat
-        this.$router.push({
-          name: 'chat',
-          params: { id: 'new' },
-          query: { groupChat: result.filename }
-        });
+        const groupName = selectedCharacters.map(c => c.name).join(', ');
+        const displayName = groupName.length > 30 ? groupName.substring(0, 30) + '...' : groupName;
+
+        this.$emit('open-tab', 'group-chat', {
+          groupChatId: result.filename,
+          groupChatName: displayName
+        }, `👥 ${displayName}`, false);
 
         this.$root.$notify('Group chat created', 'success');
       } catch (error) {
@@ -1053,7 +1061,7 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--bg-primary);
+  background: transparent;
   color: var(--text-primary);
 }
 
@@ -1062,7 +1070,11 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 20px;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
 }
 
 .header h1 {
@@ -1072,6 +1084,9 @@ export default {
 
 .search-bar {
   padding: 16px 20px;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -1165,15 +1180,21 @@ export default {
   gap: 12px;
   padding: 16px;
   background: var(--bg-secondary);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  transition: all 0.2s;
+  border-radius: 12px;
+  transition: all 0.2s ease;
   position: relative;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
 }
 
 .character-card:hover {
   background: var(--bg-tertiary);
+  border-color: var(--border-color-hover, var(--border-color));
   transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .character-actions {
@@ -1258,14 +1279,6 @@ export default {
   color: var(--text-secondary);
 }
 
-.create-btn {
-  background: var(--accent-color);
-  color: white;
-}
-
-.create-btn:hover {
-  opacity: 0.9;
-}
 
 /* Tag Editor Modal */
 .tag-editor-modal {
@@ -1553,30 +1566,7 @@ export default {
   text-align: center;
 }
 
-/* Auto-tag All Button */
-.autotag-btn {
-  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
-  color: white;
-}
-
-.autotag-btn:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-.autotag-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 /* Group Chat Styles */
-.group-btn {
-  background: #22c55e;
-  color: white;
-}
-
-.group-btn:hover {
-  opacity: 0.9;
-}
 
 .group-chat-card {
   border: 2px solid var(--accent-color);

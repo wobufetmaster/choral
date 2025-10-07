@@ -282,6 +282,63 @@ choral/
 - Console output shows truncated preview for quick debugging
 - Stream chunks are accumulated and logged only in final response
 
+### Browser Debugging (MCP Extensions)
+
+#### browser-tools MCP extension
+- Available for passive frontend debugging
+- Tools:
+  - `getConsoleLogs` - Retrieve browser console logs
+  - `getConsoleErrors` - Retrieve browser console errors
+  - `getNetworkErrors` - Retrieve network errors
+  - `getNetworkLogs` - Retrieve all network activity
+  - `takeScreenshot` - Capture current browser state
+  - `runAccessibilityAudit` - Check accessibility issues
+  - `runPerformanceAudit` - Analyze performance
+  - `runSEOAudit` - Check SEO compliance
+  - `wipeLogs` - Clear all captured logs from memory
+- Useful for debugging Vue component issues, API calls, and UI behavior
+
+#### Playwright MCP extension
+- **Interactive browser automation** for testing and debugging
+- Can navigate, click, fill forms, and interact with the UI
+- Core navigation tools:
+  - `browser_navigate` - Navigate to a URL
+  - `browser_navigate_back` - Go back to previous page
+  - `browser_snapshot` - Get accessibility tree snapshot (better than screenshot for actions)
+  - `browser_take_screenshot` - Take visual screenshot (PNG/JPEG)
+  - `browser_close` - Close the current page/tab
+- Interaction tools:
+  - `browser_click` - Click elements (requires element description and ref from snapshot)
+  - `browser_type` - Type text into fields
+  - `browser_fill_form` - Fill multiple form fields at once
+  - `browser_select_option` - Select dropdown options
+  - `browser_hover` - Hover over elements
+  - `browser_drag` - Drag and drop between elements
+  - `browser_press_key` - Press keyboard keys
+- Inspection tools:
+  - `browser_evaluate` - Run JavaScript in browser context
+  - `browser_console_messages` - Get console output
+  - `browser_network_requests` - View all network requests
+- Usage pattern:
+  1. Navigate to the page: `browser_navigate(url: "http://localhost:5173")`
+  2. Get page state: `browser_snapshot()` returns element refs
+  3. Interact: `browser_click(element: "Settings button", ref: "e22")`
+  4. Verify: `browser_evaluate()` to check DOM state or `browser_take_screenshot()`
+- Screenshots saved to `.playwright-mcp/` directory
+- Example workflow: Testing the theme switcher
+  ```
+  1. browser_navigate("http://localhost:5173")
+  2. browser_snapshot() → find Settings button ref
+  3. browser_click(element: "Settings", ref: "e22")
+  4. browser_select_option(element: "Theme dropdown", ref: "e137", values: ["Midnight Library"])
+  5. browser_take_screenshot(filename: "theme-test.png")
+  ```
+- **Common Issues & Solutions**:
+  - **"Browser is already in use" error**: If you get an error about the browser already being in use, use `browser_close()` first, or add the `--isolated` flag to the Playwright MCP configuration to run with an in-memory profile
+  - **Configuration**: Can be customized with flags in MCP config (e.g., `--isolated`, `--headless`, `--viewport-size`, `--browser chrome`)
+  - **Persistent vs Isolated**: By default uses a persistent profile (saves login state). Use `--isolated` flag for ephemeral sessions
+- Complements server-side logging for full-stack debugging
+
 ## Development Commands
 
 ```bash
@@ -331,10 +388,15 @@ The core chat system is fully functional:
 - Streaming responses work smoothly
 
 ### 🎯 Next Priorities
-1. **Chat Branching**: Tree-based conversation navigation
+1. ** UI improvements**
+2. **Chat Branching**: Tree-based conversation navigation
+
 
 ---
 
-*Last Updated: 2025-10-03*
+Note: The server can be started with ./run.sh, but the user is probably running that in another terminal, so if you need to restart the server, just ask them.
+
+If you need images, there is a stable diffusion endpoint running on a remote server, you can access it like: http://192.168.1.100:3000/generate/background_hq/forest,lake,beautiful,autumn,leaves and it will return an image, there is also an endpoint for characters, http://192.168.1.100:3000/generate/character/ if that's something you need.
+
 
 
