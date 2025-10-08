@@ -18,12 +18,12 @@ A lightweight, drop-in replacement for SillyTavern. Choral is a Vue 3 + Express 
 - **HTML Rendering**: Sandboxed DOMPurify rendering for rich content
 - **Clean UI**: Responsive Vue 3 interface with theming support
 - **Debug Logging**: JSON-formatted API request/response logs
+- **PWA Support**: Install as a progressive web app on mobile and desktop
+- **Tab System**: Multiple chat tabs (desktop)
 
 ### 🚧 Planned
 - **Chat Branching**: Explore different conversation paths with tree view
 - **Split View**: Side-by-side panels for chat + character editor
-- **PWA Support**: Install as a progressive web app
-- **Tab System**: Multiple chat tabs (desktop)
 
 ## Quick Start
 
@@ -59,6 +59,34 @@ This will start:
 - Vite dev server on http://localhost:5173
 
 Open http://localhost:5173 in your browser to use Choral.
+
+### Installing as a PWA
+
+Choral can be installed as a Progressive Web App for a native app experience:
+
+**Desktop (Chrome/Edge):**
+1. Open Choral in your browser
+2. Click the install icon in the address bar (or menu → "Install Choral")
+3. Confirm installation
+
+**Android (Chrome):**
+1. Open Choral in Chrome
+2. Tap the menu (⋮) → "Add to Home screen" or "Install app"
+3. Confirm installation
+
+**iOS (Safari):**
+1. Open Choral in Safari
+2. Tap the Share button
+3. Select "Add to Home Screen"
+4. Confirm installation
+
+Once installed, Choral will:
+- Launch in its own window/app
+- Work offline for previously loaded content
+- Cache assets for faster loading
+- Appear in your app drawer/home screen
+
+**Note:** Firefox on Android may have issues with PWA installation. Use Chrome for best results.
 
 ### Production Build
 
@@ -221,4 +249,4 @@ npm run server     # Run production server
 
 ## License
 
-ISC
+MIT License - see [LICENSE](LICENSE) for details
