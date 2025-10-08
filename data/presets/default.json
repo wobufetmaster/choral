@@ -43,6 +43,14 @@
       "injection_order": 300
     },
     {
+      "identifier": "dialogueExamples",
+      "name": "Example Dialogue",
+      "role": "system",
+      "content": "{{dialogue_examples}}",
+      "enabled": true,
+      "injection_order": 400
+    },
+    {
       "identifier": "jailbreak",
       "name": "Post-History Instructions",
       "role": "system",

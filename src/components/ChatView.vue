@@ -410,7 +410,7 @@
     </div>
 
     <div class="chat-container" :class="{ 'with-debug': showDebug }">
-      <div class="messages" ref="messagesContainer">
+      <div class="messages" ref="messagesContainer" @scroll="handleScroll">
         <div
           v-for="(message, index) in messages"
           :key="index"
@@ -557,6 +557,7 @@ export default {
       showDebug: false,
       showGroupManager: false,
       currentPresetName: null,
+      userHasScrolledUp: false,
       avatarMenu: {
         show: false,
         x: 0,
@@ -673,14 +674,17 @@ export default {
     // Load default persona
     await this.loadPersona();
 
-    // Load existing chat if ID provided, or load most recent for character
+    // Load existing chat if ID provided
     const chatId = this.tabData?.chatId || this.$route?.params?.id;
     if (!this.isGroupChat) {
       if (chatId && chatId !== 'new') {
         await this.loadChat(chatId);
-      } else if (characterFilename) {
-        // Try to load most recent chat for this character
+      } else if (this.$route?.params?.id && characterFilename) {
+        // Only auto-load most recent chat in router mode (not tab mode)
         await this.loadMostRecentChat(characterFilename);
+      } else if (this.tabData && characterFilename) {
+        // In tab mode without chatId, start a new chat with greeting
+        this.initializeChat();
       }
     }
 
@@ -698,6 +702,17 @@ export default {
     }
   },
   methods: {
+    updateTabData() {
+      // Update tab data when chat state changes (only in tab mode)
+      if (this.tabData) {
+        const data = {
+          characterId: this.tabData.characterId,
+          chatId: this.chatId,
+          groupChatId: this.groupChatId,
+        };
+        this.$emit('update-tab', { data });
+      }
+    },
     async loadCharacter(filename) {
       try {
         const response = await fetch(`/api/characters/${filename}`);
@@ -882,6 +897,7 @@ export default {
         // Start streaming
         this.isStreaming = true;
         this.streamingContent = '';
+        this.userHasScrolledUp = false; // Reset scroll lock when AI starts responding
 
         try {
           await this.streamResponse(context);
@@ -901,6 +917,10 @@ export default {
 
       this.messages.push(userMessage);
       this.userInput = '';
+
+      // Reset scroll lock when user sends a message (they want to see it)
+      this.userHasScrolledUp = false;
+      this.$nextTick(() => this.scrollToBottom(true));
 
       // For group chats in explicit mode, just add the message without generating response
       if (this.isGroupChat && this.groupChatExplicitMode) {
@@ -923,6 +943,7 @@ export default {
       // Start streaming
       this.isStreaming = true;
       this.streamingContent = '';
+      this.userHasScrolledUp = false; // Reset scroll lock when AI starts responding
 
       try {
         await this.streamResponse(context);
@@ -960,6 +981,7 @@ export default {
           content = content.replace(/\{\{personality\}\}/g, this.character?.data.personality || '');
           content = content.replace(/\{\{scenario\}\}/g, this.character?.data.scenario || '');
           content = content.replace(/\{\{system_prompt\}\}/g, this.character?.data.system_prompt || '');
+          content = content.replace(/\{\{dialogue_examples\}\}/g, this.character?.data.mes_example || '');
 
           // Check if any placeholders were replaced
           if (content !== originalContent) {
@@ -981,13 +1003,15 @@ export default {
           const description = this.character?.data.description || '';
           const personality = this.character?.data.personality || '';
           const scenario = this.character?.data.scenario || '';
+          const dialogueExamples = this.character?.data.mes_example || '';
 
-          if (systemPrompt || description || personality || scenario) {
+          if (systemPrompt || description || personality || scenario || dialogueExamples) {
             let systemContent = '';
             if (systemPrompt) systemContent += systemPrompt + '\n\n';
             if (description) systemContent += `Character: ${description}\n\n`;
             if (personality) systemContent += `Personality: ${personality}\n\n`;
             if (scenario) systemContent += `Scenario: ${scenario}\n\n`;
+            if (dialogueExamples) systemContent += `Example Dialogue:\n${dialogueExamples}\n\n`;
 
             context.push({
               role: 'system',
@@ -1001,13 +1025,15 @@ export default {
         const description = this.character?.data.description || '';
         const personality = this.character?.data.personality || '';
         const scenario = this.character?.data.scenario || '';
+        const dialogueExamples = this.character?.data.mes_example || '';
 
-        if (systemPrompt || description || personality || scenario) {
+        if (systemPrompt || description || personality || scenario || dialogueExamples) {
           let systemContent = '';
           if (systemPrompt) systemContent += systemPrompt + '\n\n';
           if (description) systemContent += `Character: ${description}\n\n`;
           if (personality) systemContent += `Personality: ${personality}\n\n`;
           if (scenario) systemContent += `Scenario: ${scenario}\n\n`;
+          if (dialogueExamples) systemContent += `Example Dialogue:\n${dialogueExamples}\n\n`;
 
           context.push({
             role: 'system',
@@ -1486,10 +1512,14 @@ export default {
         // Don't create a new group chat file, just reset messages
         await this.initializeGroupChat();
         // Don't save yet - let it save on first message
+        this.groupChatId = null;
       } else {
         this.chatId = null;
         this.initializeChat();
       }
+
+      // Update tab data to reflect new chat state
+      this.updateTabData();
 
       this.$root.$notify('Started new chat', 'info');
     },
@@ -1535,6 +1565,9 @@ export default {
       } else {
         this.chatId = chat.filename;
       }
+
+      // Update tab data to reflect loaded chat
+      this.updateTabData();
 
       this.showChatHistory = false;
       this.$nextTick(() => this.scrollToBottom());
@@ -1596,11 +1629,26 @@ export default {
       const preview = content.substring(0, 50);
       return preview + (content.length > 50 ? '...' : '');
     },
-    scrollToBottom() {
+    scrollToBottom(force = false) {
       const container = this.$refs.messagesContainer;
-      if (container) {
-        container.scrollTop = container.scrollHeight;
+      if (!container) return;
+
+      // If user has scrolled up and we're not forcing, don't auto-scroll
+      if (this.userHasScrolledUp && !force) {
+        return;
       }
+
+      container.scrollTop = container.scrollHeight;
+    },
+    handleScroll() {
+      const container = this.$refs.messagesContainer;
+      if (!container) return;
+
+      // Check if user is near the bottom (within 100px)
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+
+      // Update flag based on scroll position
+      this.userHasScrolledUp = !isNearBottom;
     },
     async loadLorebooks() {
       try {

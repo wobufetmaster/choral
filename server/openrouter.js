@@ -1,13 +1,31 @@
 const https = require('https');
-const config = require('../config.json');
+const fs = require('fs');
+const path = require('path');
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+/**
+ * Load config.json safely (returns empty object if not found)
+ */
+function loadConfig() {
+  try {
+    const configPath = path.join(__dirname, '../config.json');
+    if (fs.existsSync(configPath)) {
+      return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    }
+  } catch (error) {
+    console.warn('Could not load config.json:', error.message);
+  }
+  return {};
+}
+
+const config = loadConfig();
 
 /**
  * Get API key from config or environment
  */
 function getApiKey() {
-  return process.env.OPENROUTER_API_KEY || config.openRouterApiKey;
+  return process.env.OPENROUTER_API_KEY || config.openRouterApiKey || '';
 }
 
 /**

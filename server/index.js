@@ -11,8 +11,45 @@ const { logRequest, logResponse, logStreamChunk } = require('./logger');
 const { processPrompt, MODES } = require('./promptProcessor');
 const { processLorebook, injectEntries } = require('./lorebook');
 
-// Load config
-const config = require('../config.json');
+// Load config safely, creating if it doesn't exist
+function loadConfig() {
+  const configPath = path.join(__dirname, '../config.json');
+  const examplePath = path.join(__dirname, '../config.example.json');
+
+  try {
+    if (require('fs').existsSync(configPath)) {
+      return require(configPath);
+    } else if (require('fs').existsSync(examplePath)) {
+      // Copy example config to config.json
+      const exampleConfig = require('fs').readFileSync(examplePath, 'utf-8');
+      require('fs').writeFileSync(configPath, exampleConfig);
+      console.log('Created config.json from config.example.json');
+      return JSON.parse(exampleConfig);
+    } else {
+      // Create minimal default config
+      const defaultConfig = {
+        port: 3000,
+        dataDir: './data',
+        openRouterApiKey: '',
+        activePreset: 'default.json'
+      };
+      require('fs').writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
+      console.log('Created default config.json');
+      return defaultConfig;
+    }
+  } catch (error) {
+    console.error('Error loading config:', error);
+    // Return defaults if all else fails
+    return {
+      port: 3000,
+      dataDir: './data',
+      openRouterApiKey: '',
+      activePreset: 'default.json'
+    };
+  }
+}
+
+const config = loadConfig();
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
@@ -20,7 +57,7 @@ const upload = multer({ dest: 'uploads/' });
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-const DATA_DIR = path.resolve(config.dataDir);
+const DATA_DIR = path.resolve(config.dataDir || './data');
 const CHARACTERS_DIR = path.join(DATA_DIR, 'characters');
 const CHATS_DIR = path.join(DATA_DIR, 'chats');
 const LOREBOOKS_DIR = path.join(DATA_DIR, 'lorebooks');
@@ -958,8 +995,8 @@ app.post('/api/tags', async (req, res) => {
 
 app.get('/api/config', (req, res) => {
   res.json({
-    port: config.port,
-    hasApiKey: !!config.openRouterApiKey || !!process.env.OPENROUTER_API_KEY,
+    port: config.port || 3000,
+    hasApiKey: !!(config.openRouterApiKey || process.env.OPENROUTER_API_KEY),
     activePreset: config.activePreset || 'default.json'
   });
 });
@@ -1155,8 +1192,13 @@ app.post('/api/chat', async (req, res) => {
 });
 
 // Start server
+const PORT = config.port || process.env.PORT || 3000;
 ensureDirectories().then(() => {
-  app.listen(config.port, () => {
-    console.log(`Choral server running on port ${config.port}`);
+  app.listen(PORT, () => {
+    console.log(`Choral server running on port ${PORT}`);
+    if (!config.openRouterApiKey && !process.env.OPENROUTER_API_KEY) {
+      console.warn('\nWARNING: No OpenRouter API key configured!');
+      console.warn('Set OPENROUTER_API_KEY environment variable or add it to config.json\n');
+    }
   });
 });
