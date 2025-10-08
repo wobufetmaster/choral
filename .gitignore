@@ -1,14 +1,20 @@
 # Dependencies
 node_modules/
-package-lock.json
 
 # Build output
 dist/
 
-# Data directory
-data/chats/
-data/personas/
-data/lorebooks/
+# User data - keep directory structure but ignore user files
+data/chats/*
+data/personas/*
+data/lorebooks/*
+data/group_chats/*
+data/characters/*
+data/presets/*
+!data/presets/default.json
+data/tags.json
+
+# Uploads
 uploads/
 
 # Environment
@@ -17,7 +23,6 @@ uploads/
 .claude
 .playwright-mcp
 
-data/
 # Editor
 .vscode/
 .idea/
@@ -34,5 +39,13 @@ Thumbs.db
 npm-debug.log*
 logs/
 
+# Development docs
 CLAUDE.md
 
+# User-specific config overrides
+config.json
+
+# Root-level user files
+/*.json
+!package.json
+!package-lock.json
