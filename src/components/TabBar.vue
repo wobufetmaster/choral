@@ -1,23 +1,22 @@
 <template>
   <div class="tab-bar">
     <div class="tabs-container" ref="tabsContainer">
-      <button
+      <div
         v-for="tab in tabs"
         :key="tab.id"
         class="tab"
         :class="{ active: tab.id === activeTabId }"
-        @click="$emit('switch-tab', tab.id)"
         :title="tab.label"
       >
-        <span class="tab-label">{{ tab.label }}</span>
-        <button
+        <span class="tab-label" @click="$emit('switch-tab', tab.id)">{{ tab.label }}</span>
+        <span
           class="tab-close"
           @click.stop="$emit('close-tab', tab.id)"
           title="Close tab"
         >
           ×
-        </button>
-      </button>
+        </span>
+      </div>
     </div>
     <button class="new-tab-btn" @click="$emit('new-tab')" title="New tab">
       +

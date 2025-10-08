@@ -3438,5 +3438,45 @@ button.active {
     margin-right: 0;
     display: none;
   }
+
+  /* Make sidebar overlay instead of pushing content */
+  .chat-sidebar {
+    z-index: 100;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .chat-sidebar.collapsed {
+    transform: translateX(-100%);
+    width: 0;
+  }
+
+  .chat-container {
+    margin-left: 0 !important;
+  }
+
+  .chat-view:has(.chat-sidebar.collapsed) .chat-container {
+    margin-left: 0 !important;
+  }
+
+  /* Make sidebar toggle more accessible on mobile */
+  .sidebar-toggle {
+    right: -32px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .collapsed .sidebar-toggle {
+    right: auto;
+    left: 16px;
+    top: 16px;
+    transform: none;
+    position: fixed;
+  }
+
+  /* Increase message width on mobile */
+  .message {
+    max-width: 95%;
+  }
 }
 </style>

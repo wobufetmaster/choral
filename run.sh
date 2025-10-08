@@ -15,5 +15,9 @@ if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
     sleep 1
 fi
 
+# Clear Vite cache to ensure fresh builds
+echo "Clearing Vite cache..."
+rm -rf node_modules/.vite 2>/dev/null
+
 echo "Starting Choral server..."
 npm run dev

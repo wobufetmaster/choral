@@ -1082,6 +1082,29 @@ export default {
   font-weight: 600;
 }
 
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+}
+
 .search-bar {
   padding: 16px 20px;
   background: var(--bg-overlay);
