@@ -10,6 +10,7 @@ data/personas/*
 data/lorebooks/*
 data/group_chats/*
 data/characters/*
+!data/characters/Default-chan.png
 data/presets/*
 !data/presets/default.json
 data/tags.json
