@@ -123,6 +123,7 @@
           </div>
 
           <div class="actions">
+            <button @click="usePersona" class="use-btn">Use This Persona</button>
             <button @click="savePersona" class="save-btn">Save Persona</button>
             <button @click="deletePersona" class="delete-btn" v-if="personas.length > 1">Delete</button>
           </div>
@@ -260,6 +261,11 @@ export default {
         )
         .slice(0, 5);
     },
+    usePersona() {
+      // Emit the persona immediately without saving
+      this.$emit('persona-saved', JSON.parse(JSON.stringify(this.selectedPersona)));
+      this.$root.$notify(`Switched to persona: ${this.selectedPersona.name}`, 'success');
+    },
     async savePersona() {
       try {
         if (!this.selectedPersona.name.trim()) {
@@ -279,7 +285,7 @@ export default {
 
         await this.loadPersonas();
         this.$root.$notify('Persona saved successfully', 'success');
-        this.$emit('persona-saved', this.selectedPersona);
+        this.$emit('persona-saved', JSON.parse(JSON.stringify(this.selectedPersona)));
       } catch (error) {
         console.error('Failed to save persona:', error);
         this.$root.$notify('Failed to save persona', 'error');
@@ -460,6 +466,13 @@ export default {
   display: flex;
   gap: 12px;
   margin-top: 16px;
+}
+
+.use-btn {
+  flex: 1;
+  background: #4caf50;
+  color: white;
+  border-color: #4caf50;
 }
 
 .save-btn {

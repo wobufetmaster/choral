@@ -1,6 +1,6 @@
 {
   "filename": "spaghetti2.json",
-  "name": "Spaghetti 2",
+  "name": "Spaghetti 2 - Deepseek",
   "model": "deepseek/deepseek-v3.1-terminus",
   "temperature": 1,
   "top_p": 1,

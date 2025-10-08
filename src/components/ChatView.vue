@@ -4,38 +4,91 @@
       <button v-if="!tabData" @click="$router.push('/')" class="back-button">← Back</button>
       <h2>{{ chatTitle }}</h2>
       <div class="header-actions">
-        <button @click="sidebarOpen = !sidebarOpen">{{ sidebarOpen ? '◀' : '▶' }}</button>
         <button v-if="isGroupChat" @click="showGroupManager = !showGroupManager" :class="{ 'active': showGroupManager }">👥 Group</button>
-        <button @click="showDebug = !showDebug" :class="{ 'active': showDebug }">🐛 Debug</button>
       </div>
     </div>
 
     <!-- Chat Sidebar -->
-    <div v-if="sidebarOpen" class="chat-sidebar">
-      <div class="sidebar-header">
-        <h3>Chat Controls</h3>
-        <button @click="sidebarOpen = false" class="close-sidebar">×</button>
-      </div>
+    <div class="chat-sidebar" :class="{ collapsed: !sidebarOpen }">
+      <button @click="sidebarOpen = !sidebarOpen" class="sidebar-toggle" :title="sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'">
+        {{ sidebarOpen ? '◀' : '▶' }}
+      </button>
+
+      <div v-if="sidebarOpen" class="sidebar-content">
+        <div class="sidebar-header">
+          <h3>Chat Controls</h3>
+        </div>
 
       <!-- Model/Preset Info -->
       <div class="sidebar-info">
         <div class="info-row">
           <span class="info-label">Model:</span>
-          <span class="info-value">{{ settings.model || 'Not set' }}</span>
+          <span class="info-value" :title="settings.model">{{ displayModelName }}</span>
         </div>
         <div class="info-row">
           <span class="info-label">Preset:</span>
           <span class="info-value">{{ currentPresetName || 'None' }}</span>
         </div>
+        <div class="context-window">
+          <div class="context-header">
+            <span class="info-label">Context:</span>
+            <span class="context-stats">{{ debugInfo.estimatedTokens.toLocaleString() }} / {{ settings.max_tokens.toLocaleString() }}</span>
+          </div>
+          <div class="context-bar">
+            <div class="context-fill" :style="{ width: contextPercentage + '%' }"></div>
+          </div>
+          <div class="context-percentage">{{ contextPercentage }}%</div>
+        </div>
       </div>
 
-      <!-- Sidebar Actions -->
-      <div class="sidebar-actions">
-        <button @click="newChat" class="sidebar-btn">📝 New Chat</button>
-        <button @click="showChatHistory = !showChatHistory" :class="{ 'active': showChatHistory }" class="sidebar-btn">📜 History</button>
-        <button @click="showPersonas = true" class="sidebar-btn">👤 Persona</button>
-        <button @click="showLorebooks = true" class="sidebar-btn">📚 Lorebook</button>
-        <button @click="showPresets = true" class="sidebar-btn">⚙️ Presets</button>
+        <!-- Sidebar Actions -->
+        <div class="sidebar-actions">
+          <button @click="newChat" class="sidebar-btn">📝 New Chat</button>
+          <button @click="showChatHistory = !showChatHistory" :class="{ 'active': showChatHistory }" class="sidebar-btn">📜 History</button>
+          <button @click="showPersonas = true" class="sidebar-btn">👤 Persona</button>
+          <button @click="showLorebooks = true" class="sidebar-btn">📚 Lorebook</button>
+          <button @click="showPresets = true" class="sidebar-btn">⚙️ Presets</button>
+          <button @click="showDebug = !showDebug" :class="{ 'active': showDebug }" class="sidebar-btn">🐛 Debug</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Avatar Menu -->
+    <div v-if="avatarMenu.show" class="avatar-menu" :style="{ top: avatarMenu.y + 'px', left: avatarMenu.x + 'px' }" @click.stop>
+      <div class="avatar-menu-header">
+        <strong>{{ avatarMenu.characterName }}</strong>
+      </div>
+      <button @click="viewCharacterCard" class="avatar-menu-btn">📄 View Card</button>
+      <button v-if="isGroupChat" @click="setNextSpeaker" class="avatar-menu-btn">🎤 Set as Next Speaker</button>
+      <button @click="closeAvatarMenu" class="avatar-menu-btn cancel">✕ Close</button>
+    </div>
+
+    <!-- Character Card Modal -->
+    <div v-if="showCharacterCard" class="modal-overlay" @click="showCharacterCard = false">
+      <div class="modal-content character-card-modal" @click.stop>
+        <div class="modal-header">
+          <h3>{{ viewingCharacter?.data?.name || 'Character Card' }}</h3>
+          <button @click="showCharacterCard = false" class="close-button">×</button>
+        </div>
+        <div class="character-card-content" v-if="viewingCharacter">
+          <img v-if="viewingCharacter.avatar" :src="viewingCharacter.avatar" :alt="viewingCharacter.data.name" class="card-avatar" />
+          <div class="card-field" v-if="viewingCharacter.data.description">
+            <strong>Description:</strong>
+            <p>{{ viewingCharacter.data.description }}</p>
+          </div>
+          <div class="card-field" v-if="viewingCharacter.data.personality">
+            <strong>Personality:</strong>
+            <p>{{ viewingCharacter.data.personality }}</p>
+          </div>
+          <div class="card-field" v-if="viewingCharacter.data.scenario">
+            <strong>Scenario:</strong>
+            <p>{{ viewingCharacter.data.scenario }}</p>
+          </div>
+          <div class="card-field" v-if="viewingCharacter.data.first_mes">
+            <strong>First Message:</strong>
+            <p>{{ viewingCharacter.data.first_mes }}</p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -367,15 +420,19 @@
             v-if="message.role === 'assistant'"
             :src="getMessageAvatar(message)"
             :alt="getMessageCharacterName(message)"
-            class="message-avatar"
+            class="message-avatar clickable"
+            @click="showAvatarMenu($event, message, index)"
+            :title="'Click for options'"
           />
           <img
             v-else-if="persona.avatar"
             :src="persona.avatar"
             :alt="persona.name"
-            class="message-avatar"
+            class="message-avatar clickable"
+            @click="showAvatarMenu($event, message, index)"
+            :title="'Click for options'"
           />
-          <div v-else class="message-avatar user-avatar">
+          <div v-else class="message-avatar user-avatar clickable" @click="showAvatarMenu($event, message, index)" :title="'Click for options'">
             {{ persona.name[0] }}
           </div>
           <div class="message-bubble">
@@ -397,7 +454,7 @@
                 <button @click="cancelEdit" class="edit-cancel" title="Cancel">✕</button>
               </div>
             </div>
-            <div v-else class="message-content" v-html="sanitizeHtml(isGeneratingSwipe && generatingSwipeIndex === index ? streamingContent : getCurrentContent(message), message)"></div>
+            <div v-else class="message-content" v-html="sanitizeHtml(isGeneratingSwipe && generatingSwipeIndex === index ? streamingContent : getCurrentContent(message), message)" :title="`~${estimateTokens(getCurrentContent(message))} tokens`"></div>
 
             <!-- Swipe navigation for assistant messages -->
             <div v-if="message.role === 'assistant' && getTotalSwipes(message) > 0" class="swipe-controls">
@@ -500,6 +557,17 @@ export default {
       showDebug: false,
       showGroupManager: false,
       currentPresetName: null,
+      avatarMenu: {
+        show: false,
+        x: 0,
+        y: 0,
+        message: null,
+        messageIndex: null,
+        characterName: '',
+        characterFilename: ''
+      },
+      showCharacterCard: false,
+      viewingCharacter: null,
       chatHistory: [],
       lorebooks: [],
       selectedLorebookFilenames: [],
@@ -548,6 +616,16 @@ export default {
         return `Group: ${names}`;
       }
       return this.characterName;
+    },
+    displayModelName() {
+      if (!this.settings.model) return 'Not set';
+      const parts = this.settings.model.split('/');
+      return parts.length > 1 ? parts[parts.length - 1] : this.settings.model;
+    },
+    contextPercentage() {
+      if (!this.settings.max_tokens || this.settings.max_tokens === 0) return 0;
+      const percentage = (this.debugInfo.estimatedTokens / this.settings.max_tokens) * 100;
+      return Math.min(100, Math.round(percentage));
     }
   },
   watch: {
@@ -682,6 +760,7 @@ export default {
           systemPrompts: preset.prompts || [],
           prompt_processing: preset.prompt_processing || 'merge_system'
         };
+        this.currentPresetName = preset.name;
       } catch (error) {
         console.error('Failed to load active preset:', error);
         // Continue with default settings if preset fails to load
@@ -1088,6 +1167,13 @@ export default {
         }
       }
     },
+    estimateTokens(text) {
+      if (!text) return 0;
+      // Rough estimate: ~4 characters per token
+      // Strip HTML tags for more accurate count
+      const stripped = text.replace(/<[^>]*>/g, '');
+      return Math.ceil(stripped.length / 4);
+    },
     sanitizeHtml(html, message = null) {
       // Process macros first - use the specific character for group chats
       let charName = this.character?.data?.name || 'Character';
@@ -1303,6 +1389,60 @@ export default {
       // TODO: Implement branching system
       this.$root.$notify('Branching system coming soon!', 'info');
     },
+    showAvatarMenu(event, message, index) {
+      const rect = event.target.getBoundingClientRect();
+      this.avatarMenu.x = rect.right + 10;
+      this.avatarMenu.y = rect.top;
+      this.avatarMenu.message = message;
+      this.avatarMenu.messageIndex = index;
+
+      if (message.role === 'assistant') {
+        this.avatarMenu.characterName = this.getMessageCharacterName(message);
+        this.avatarMenu.characterFilename = message.characterFilename || this.characterFilename;
+      } else {
+        this.avatarMenu.characterName = this.persona.name;
+        this.avatarMenu.characterFilename = null;
+      }
+
+      this.avatarMenu.show = true;
+
+      // Close menu when clicking outside
+      setTimeout(() => {
+        document.addEventListener('click', this.closeAvatarMenu, { once: true });
+      }, 0);
+    },
+    closeAvatarMenu() {
+      this.avatarMenu.show = false;
+    },
+    async viewCharacterCard() {
+      if (this.avatarMenu.message?.role === 'assistant' && this.avatarMenu.characterFilename) {
+        try {
+          // Load character data
+          const response = await fetch(`/api/characters/${this.avatarMenu.characterFilename}`);
+          if (response.ok) {
+            this.viewingCharacter = await response.json();
+            this.showCharacterCard = true;
+          } else {
+            this.$root.$notify('Failed to load character card', 'error');
+          }
+        } catch (error) {
+          console.error('Error loading character card:', error);
+          this.$root.$notify('Error loading character card', 'error');
+        }
+      } else if (this.character) {
+        // Viewing current character
+        this.viewingCharacter = this.character;
+        this.showCharacterCard = true;
+      }
+      this.closeAvatarMenu();
+    },
+    setNextSpeaker() {
+      if (this.isGroupChat && this.avatarMenu.characterFilename) {
+        this.nextSpeaker = this.avatarMenu.characterFilename;
+        this.$root.$notify(`Next speaker: ${this.avatarMenu.characterName}`, 'success');
+      }
+      this.closeAvatarMenu();
+    },
     applyPreset(preset) {
       // Apply preset settings to current chat
       this.settings = {
@@ -1317,8 +1457,27 @@ export default {
       this.$root.$notify(`Applied preset: ${preset.name}`, 'success');
     },
     onPersonaSaved(persona) {
-      this.persona = persona;
+      console.log('ChatView: Switching persona to:', persona);
+      console.log('ChatView: Persona avatar:', persona.avatar);
+
+      // Force Vue reactivity by creating a completely new object
+      this.persona = {
+        name: persona.name || 'User',
+        avatar: persona.avatar || null,
+        description: persona.description || '',
+        tagBindings: persona.tagBindings || [],
+        characterBindings: persona.characterBindings || []
+      };
+
+      console.log('ChatView: Updated this.persona to:', this.persona);
+
       this.$root.$notify(`Now using persona: ${persona.name}`, 'success');
+
+      // Save to localStorage as default persona
+      localStorage.setItem('default-persona', JSON.stringify(persona));
+
+      // Force re-render by triggering a key update
+      this.$forceUpdate();
     },
     async newChat() {
       this.messages = [];
@@ -1915,6 +2074,8 @@ button.active {
   -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border-bottom: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
+  position: relative;
+  z-index: 100;
 }
 
 .back-button {
@@ -1944,9 +2105,52 @@ button.active {
   -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border-right: 1px solid var(--border-color);
   box-shadow: var(--shadow-md);
-  z-index: 100;
+  z-index: 50;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.chat-sidebar.collapsed {
+  width: 40px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-right: none;
+  box-shadow: none;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  right: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s;
+}
+
+.collapsed .sidebar-toggle {
+  right: 8px;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
+}
+
+.sidebar-toggle:hover {
+  background: var(--hover-color);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.sidebar-content {
   display: flex;
   flex-direction: column;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -1954,7 +2158,8 @@ button.active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
+  padding: 24px 16px 16px 16px;
+  padding-right: 40px;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -1964,18 +2169,8 @@ button.active {
   font-weight: 600;
 }
 
-.close-sidebar {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .sidebar-info {
-  padding: 16px;
+  padding: 12px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
 }
@@ -2005,6 +2200,46 @@ button.active {
   white-space: nowrap;
 }
 
+.context-window {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.context-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.context-stats {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.context-bar {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.context-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-color) 0%, #22c55e 50%, #eab308 75%, #ef4444 100%);
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.context-percentage {
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
 .sidebar-actions {
   flex: 1;
   padding: 12px;
@@ -2031,13 +2266,58 @@ button.active {
   color: white;
 }
 
+/* Avatar Menu */
+.avatar-menu {
+  position: fixed;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  z-index: 1000;
+  min-width: 200px;
+}
+
+.avatar-menu-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.avatar-menu-btn {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.avatar-menu-btn:hover {
+  background: var(--hover-color);
+}
+
+.avatar-menu-btn.cancel {
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+  padding-top: 10px;
+}
+
 .chat-container {
-  margin-left: 0;
+  margin-left: 280px;
   transition: margin-left 0.3s ease;
 }
 
-.chat-view:has(.chat-sidebar) .chat-container {
-  margin-left: 280px;
+.chat-view:has(.chat-sidebar.collapsed) .chat-container {
+  margin-left: 40px;
 }
 
 .chat-container {
@@ -2086,6 +2366,16 @@ button.active {
   object-fit: cover;
   flex-shrink: 0;
   background: var(--bg-tertiary);
+  transition: all 0.2s;
+}
+
+.message-avatar.clickable {
+  cursor: pointer;
+}
+
+.message-avatar.clickable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 3px var(--accent-color);
 }
 
 .user-avatar {
@@ -3035,6 +3325,59 @@ button.active {
   30% {
     opacity: 1;
   }
+}
+
+/* Character Card Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.character-card-modal {
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+.character-card-content {
+  padding: 20px;
+}
+
+.card-avatar {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin: 0 auto 20px;
+  display: block;
+}
+
+.card-field {
+  margin-bottom: 20px;
+}
+
+.card-field strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.card-field p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 @media (max-width: 768px) {

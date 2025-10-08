@@ -79,6 +79,8 @@
   ],
   "strategy": "swap",
   "explicitMode": false,
+  "name": "Cool chat",
+  "tags": [],
   "messages": [
     {
       "role": "assistant",
@@ -124,9 +126,13 @@
       ]
     },
     {
+      "role": "user",
+      "content": "Ok..."
+    },
+    {
       "role": "assistant",
       "swipes": [
-        "Melina’s brow furrowed slightly as she completed the eye-tracking test. \"Good, good... pupillary response is normal. The motor reflexes seem intact.\" She straightened up, crossing her arms under her chest, her large, fluffy tail giving a single, contemplative swish behind her. \"The real question is your memory. Do you know who you are? What's the last thing you remember before... well, before the long sleep?\"\n\nShe gestured around the room, a sleek, sterile chamber with soft, glowing panels set into the walls. It was a far cry from any hospital you might recall. \"Don't be alarmed by your surroundings. Medicine has advanced a little since your time.\" A slight, almost imperceptible smirk touched her lips. \"Though I suppose *everything* has.\""
+        "You track her finger as best you can, though your eyes feel sluggish, like they're moving through molasses. Everything seems slightly out of focus, edges bleeding into one another.\n\nMelina nodded approvingly, her tail swishing behind her in a slow, measured arc. \"Good, good. Pupillary response is adequate. Tracking is a bit slow, but that should improve over the next few hours.\" She withdrew her hand and made a note on a tablet that materialized from somewhere within her lab coat.\n\nShe sat down on the edge of your bed, the mattress dipping slightly under her weight. This close, you could see the individual strands of white fur on her muzzle, the way her ears kept swiveling, constantly alert to sounds you couldn't even register yet.\n\n\"Now, I need to ask you some questions. Standard cognitive assessment. Do you remember your name?\" Her tone was clinical, but there was an undercurrent of genuine curiosity, almost excitement. Like a scientist observing a successful experiment for the first time.\n\nThe medical bay around you was stark white, with soft, recessed lighting that didn't hurt your sensitive eyes. Various pieces of equipment hummed quietly in the background, their purposes completely alien to you. Through a small window, you could see... nothing. Just blackness. Either it was night, or you were somewhere very, very far from the surface.\n\n<div style=\"background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 25px; border-radius: 15px; border: 2px solid #0f3460; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin: 20px 0;\">\n<div style=\"color: #e94560; font-size: 0.9em; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px;\">⚕️ Medical Status</div>\n<div style=\"color: #f1f1f1; line-height: 1.8;\">\n<strong style=\"color: #00d4ff;\">Cognitive Function:</strong> Recovering<br>\n<strong style=\"color: #00d4ff;\">Physical Status:</strong> Stable<br>\n<strong style=\"color: #00d4ff;\">Time Unconscious:</strong> Unknown Duration<br>\n<strong style=\"color: #00d4ff;\">Current Location:</strong> Medical Bay - Unknown Facility\n</div>\n</div>"
       ],
       "swipeIndex": 0,
       "characterFilename": "Lemniscate station alpha.png",
@@ -135,7 +141,5 @@
       ]
     }
   ],
-  "timestamp": 1759604793438,
-  "name": "Cool chat",
-  "tags": []
+  "timestamp": 1759879693590
 }

@@ -147,7 +147,7 @@ const editedCard = ref({
   }
 })
 
-const isEditMode = computed(() => !!props.character)
+const isEditMode = computed(() => !!(props.character || props.tabData?.character))
 
 const isValid = computed(() => {
   return editedCard.value.data.name.trim() !== '' &&
@@ -207,6 +207,52 @@ watch(() => props.isOpen, (isOpen) => {
     resetForm()
   }
 })
+
+// Watch for tabData.character changes (when opening in edit mode via tab)
+watch(() => props.tabData?.character, (newChar) => {
+  if (newChar) {
+    // Use the character's data card structure
+    if (newChar.data) {
+      editedCard.value = {
+        spec: newChar.spec || 'chara_card_v3',
+        spec_version: newChar.spec_version || '3.0',
+        data: {
+          name: newChar.data.name || '',
+          nickname: newChar.data.nickname || '',
+          description: newChar.data.description || '',
+          personality: newChar.data.personality || '',
+          scenario: newChar.data.scenario || '',
+          first_mes: newChar.data.first_mes || '',
+          mes_example: newChar.data.mes_example || '',
+          system_prompt: newChar.data.system_prompt || '',
+          post_history_instructions: newChar.data.post_history_instructions || '',
+          alternate_greetings: newChar.data.alternate_greetings || [],
+          tags: newChar.data.tags || [],
+          creator: newChar.data.creator || '',
+          character_version: newChar.data.character_version || '',
+          extensions: newChar.data.extensions || {}
+        }
+      }
+    } else {
+      editedCard.value = JSON.parse(JSON.stringify(newChar))
+    }
+
+    // Set image preview from character
+    if (newChar.image) {
+      imagePreview.value = newChar.image
+    }
+
+    // Set tags string
+    if (editedCard.value.data.tags && editedCard.value.data.tags.length > 0) {
+      tagsString.value = editedCard.value.data.tags.join(', ')
+    } else {
+      tagsString.value = ''
+    }
+  } else {
+    // Reset for create mode
+    resetForm()
+  }
+}, { immediate: true })
 
 function resetForm() {
   editedCard.value = {
@@ -275,15 +321,71 @@ async function save() {
   const characterData = {
     card: editedCard.value,
     imageFile: imageFile.value,
-    originalFilename: props.character?.filename || props.tabData?.characterId
+    originalFilename: props.character?.filename || props.tabData?.character?.filename
   }
 
-  // In tab mode, update tab label when name changes
+  // In tab mode, save directly to API
   if (props.tabData) {
-    emit('update-tab', { label: editedCard.value.data.name })
-  }
+    try {
+      const formData = new FormData()
 
-  emit('save', characterData)
+      if (imageFile.value) {
+        formData.append('file', imageFile.value)
+      }
+      formData.append('card', JSON.stringify(editedCard.value))
+
+      let response
+      if (characterData.originalFilename) {
+        // Update existing character
+        response = await fetch(`/api/characters/${characterData.originalFilename}`, {
+          method: 'PUT',
+          body: formData
+        })
+      } else {
+        // Create new character
+        response = await fetch('/api/characters', {
+          method: 'POST',
+          body: formData
+        })
+      }
+
+      if (response.ok) {
+        const result = await response.json()
+
+        // Update tab label
+        emit('update-tab', { label: editedCard.value.data.name })
+
+        // Show success notification
+        if (window.$root?.$notify) {
+          window.$root.$notify(
+            characterData.originalFilename ? 'Character updated successfully' : 'Character created successfully',
+            'success'
+          )
+        }
+
+        // If it was a new character, update the tabData to have the filename
+        if (!characterData.originalFilename && result.filename) {
+          emit('update-tab', {
+            label: editedCard.value.data.name,
+            data: { character: { ...editedCard.value, filename: result.filename } }
+          })
+        }
+      } else {
+        const error = await response.json()
+        if (window.$root?.$notify) {
+          window.$root.$notify(`Failed to save character: ${error.error}`, 'error')
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save character:', error)
+      if (window.$root?.$notify) {
+        window.$root.$notify('Failed to save character', 'error')
+      }
+    }
+  } else {
+    // In modal mode, emit to parent
+    emit('save', characterData)
+  }
 }
 
 // Watch for character name changes in tab mode

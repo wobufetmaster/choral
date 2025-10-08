@@ -2,6 +2,6 @@
   "port": 3000,
   "dataDir": "./data",
   "openRouterApiKey": "",
-  "activePreset": "spaghetti2.json",
+  "activePreset": "spaghetti2_claude.json",
   "bookkeepingModel": "openai/gpt-4o-mini"
 }

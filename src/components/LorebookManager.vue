@@ -3,10 +3,20 @@
     <div class="lorebook-header">
       <button @click="$router.push('/')" class="back-button">← Back</button>
       <h2>Lorebook Manager</h2>
-      <button @click="createNewLorebook" class="btn-primary">New Lorebook</button>
+      <div class="header-actions">
+        <button @click="triggerImport" class="btn-secondary">Import Lorebook</button>
+        <button @click="createNewLorebook" class="btn-primary">New Lorebook</button>
+      </div>
+      <input
+        ref="fileInput"
+        type="file"
+        accept=".json"
+        @change="handleFileImport"
+        style="display: none"
+      />
     </div>
 
-    <div class="lorebook-list">
+    <div class="lorebook-list" :class="{ expanded: !selectedLorebook }">
       <div
         v-for="lorebook in lorebooks"
         :key="lorebook.filename"
@@ -118,7 +128,7 @@
             <textarea
               v-model="entry.content"
               placeholder="Information to inject when matched..."
-              rows="4"
+              rows="3"
               class="content-textarea"
             ></textarea>
           </div>
@@ -249,6 +259,40 @@ export default {
         .split(',')
         .map(k => k.trim())
         .filter(k => k.length > 0);
+    },
+    triggerImport() {
+      this.$refs.fileInput.click();
+    },
+    async handleFileImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const lorebookData = JSON.parse(text);
+
+        // Send to import endpoint
+        const response = await fetch('/api/lorebooks/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(lorebookData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          await this.loadLorebooks();
+          alert(`Imported "${result.lorebook.name}" with ${result.lorebook.entries.length} entries`);
+        } else {
+          alert('Import failed: ' + (result.error || 'Unknown error'));
+        }
+      } catch (error) {
+        alert('Failed to import lorebook: ' + error.message);
+        console.error('Import error:', error);
+      } finally {
+        // Reset file input
+        event.target.value = '';
+      }
     }
   }
 };
@@ -278,6 +322,11 @@ export default {
   flex: 1;
 }
 
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .back-button {
   padding: 0.5rem 1rem;
   background-color: var(--bg-secondary);
@@ -296,6 +345,12 @@ export default {
   overflow-y: auto;
   border: 1px solid var(--border-color);
   border-radius: 4px;
+  transition: max-height 0.3s ease;
+}
+
+.lorebook-list.expanded {
+  flex: 1;
+  max-height: none;
 }
 
 .lorebook-item {
@@ -415,8 +470,8 @@ export default {
 .entry-item {
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  padding: 1rem;
-  margin-bottom: 1rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
   background-color: var(--bg-secondary);
 }
 
@@ -424,7 +479,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
   gap: 1rem;
 }
 
@@ -454,14 +509,14 @@ export default {
 .entry-matching {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .match-section label {
   display: block;
-  margin-bottom: 0.25rem;
-  font-size: 0.875rem;
+  margin-bottom: 0.125rem;
+  font-size: 0.8rem;
   font-weight: 500;
 }
 
@@ -477,8 +532,8 @@ export default {
 
 .entry-content label {
   display: block;
-  margin-bottom: 0.25rem;
-  font-size: 0.875rem;
+  margin-bottom: 0.125rem;
+  font-size: 0.8rem;
   font-weight: 500;
 }
 
@@ -494,7 +549,11 @@ export default {
 }
 
 .entry-settings {
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.entry-settings label {
+  font-size: 0.8rem;
 }
 
 .priority-input {

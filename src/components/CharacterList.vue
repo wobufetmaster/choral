@@ -445,18 +445,18 @@ export default {
       }, character.name);
     },
     createNewCharacter() {
-      this.characterBeingEdited = null;
-      this.isEditorOpen = true;
+      // Open character editor in a new tab for creating a new character
+      this.$emit('open-tab', 'character-editor', {}, 'New Character', false);
     },
     editCharacter(character) {
-      // Prepare character data with image URL
-      // character.data is the full card object from the API
-      this.characterBeingEdited = {
-        ...character.data, // Spread the card data (spec, spec_version, data)
-        filename: character.filename,
-        image: `/api/characters/${character.filename}/image`
-      };
-      this.isEditorOpen = true;
+      // Open character editor in a new tab
+      this.$emit('open-tab', 'character-editor', {
+        character: {
+          ...character.data,
+          filename: character.filename,
+          image: `/api/characters/${character.filename}/image`
+        }
+      }, `Edit: ${character.data.data.name}`, false);
     },
     closeEditor() {
       this.isEditorOpen = false;
