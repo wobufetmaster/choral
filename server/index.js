@@ -909,6 +909,45 @@ app.delete('/api/personas/:filename', async (req, res) => {
 
 // ===== Lorebook Routes =====
 
+// Helper function to convert SillyTavern lorebook format to Choral format
+function convertSillyTavernLorebook(lorebook) {
+  // If entries is already an array, it's in Choral format
+  if (Array.isArray(lorebook.entries)) {
+    return lorebook;
+  }
+
+  // Convert SillyTavern format (entries as object) to Choral format (entries as array)
+  const entries = [];
+  if (lorebook.entries && typeof lorebook.entries === 'object') {
+    for (const key in lorebook.entries) {
+      const entry = lorebook.entries[key];
+      const choralEntry = {
+        name: entry.comment || entry.key?.[0] || 'Entry',
+        enabled: !entry.disable,
+        constant: entry.constant || false,
+        keys: Array.isArray(entry.key) ? entry.key : [],
+        keysInput: Array.isArray(entry.key) ? entry.key.join(', ') : '',
+        regex: entry.regex || '',
+        content: entry.content || '',
+        priority: entry.order || entry.priority || 0
+      };
+      entries.push(choralEntry);
+    }
+  }
+
+  // Extract name and scan depth from various locations
+  const name = lorebook.originalData?.name || lorebook.name || 'Unnamed Lorebook';
+  const scanDepth = lorebook.originalData?.scan_depth || lorebook.scanDepth || lorebook.scan_depth || 0;
+
+  return {
+    name: name,
+    autoSelect: lorebook.autoSelect || false,
+    matchTags: lorebook.matchTags || '',
+    scanDepth: scanDepth,
+    entries: entries
+  };
+}
+
 // Get all lorebooks
 app.get('/api/lorebooks', async (req, res) => {
   try {
@@ -920,12 +959,17 @@ app.get('/api/lorebooks', async (req, res) => {
         try {
           const filePath = path.join(LOREBOOKS_DIR, file);
           const content = await fs.readFile(filePath, 'utf-8');
-          const lorebook = JSON.parse(content);
+          let lorebook = JSON.parse(content);
+
+          // Auto-convert SillyTavern format to Choral format
+          lorebook = convertSillyTavernLorebook(lorebook);
+
           return {
             filename: file,
             ...lorebook
           };
         } catch (err) {
+          console.error(`Error loading lorebook ${file}:`, err);
           return null;
         }
       })
@@ -942,7 +986,11 @@ app.get('/api/lorebooks/:filename', async (req, res) => {
   try {
     const filePath = path.join(LOREBOOKS_DIR, req.params.filename);
     const content = await fs.readFile(filePath, 'utf-8');
-    const lorebook = JSON.parse(content);
+    let lorebook = JSON.parse(content);
+
+    // Auto-convert SillyTavern format to Choral format
+    lorebook = convertSillyTavernLorebook(lorebook);
+
     res.json(lorebook);
   } catch (error) {
     res.status(404).json({ error: 'Lorebook not found' });
@@ -1261,7 +1309,10 @@ app.post('/api/chat/stream', async (req, res) => {
         try {
           const lorebookPath = path.join(LOREBOOKS_DIR, lorebookFilename);
           const lorebookContent = await fs.readFile(lorebookPath, 'utf-8');
-          const lorebook = JSON.parse(lorebookContent);
+          let lorebook = JSON.parse(lorebookContent);
+
+          // Auto-convert SillyTavern format to Choral format
+          lorebook = convertSillyTavernLorebook(lorebook);
 
           const matchedEntries = processLorebook(lorebook, processedMessages);
 
@@ -1358,7 +1409,10 @@ app.post('/api/chat', async (req, res) => {
           try {
             const lorebookPath = path.join(LOREBOOKS_DIR, lorebookFilename);
             const lorebookContent = await fs.readFile(lorebookPath, 'utf-8');
-            const lorebook = JSON.parse(lorebookContent);
+            let lorebook = JSON.parse(lorebookContent);
+
+            // Auto-convert SillyTavern format to Choral format
+            lorebook = convertSillyTavernLorebook(lorebook);
 
             const matchedEntries = processLorebook(lorebook, processedMessages);
             allMatchedEntries = allMatchedEntries.concat(matchedEntries);

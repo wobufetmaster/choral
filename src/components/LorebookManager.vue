@@ -4,6 +4,7 @@
       <button @click="$router.push('/')" class="back-button">← Back</button>
       <h2>Lorebook Manager</h2>
       <div class="header-actions">
+        <button @click="refreshLorebooks" class="btn-secondary">🔄 Refresh</button>
         <button @click="triggerImport" class="btn-secondary">Import Lorebook</button>
         <button @click="createNewLorebook" class="btn-primary">New Lorebook</button>
       </div>
@@ -188,17 +189,63 @@ export default {
       // Deep clone to avoid mutations
       this.selectedLorebook = JSON.parse(JSON.stringify(lorebook));
 
-      // Initialize keysInput for display
-      if (this.selectedLorebook.entries) {
-        this.selectedLorebook.entries.forEach(entry => {
-          if (!entry.keysInput && entry.keys) {
-            entry.keysInput = entry.keys.join(', ');
-          }
-          if (entry.enabled === undefined) {
-            entry.enabled = true;
-          }
-        });
+      // Initialize missing required fields
+      if (!this.selectedLorebook.name) {
+        this.selectedLorebook.name = 'Unnamed Lorebook';
       }
+      if (this.selectedLorebook.autoSelect === undefined) {
+        this.selectedLorebook.autoSelect = false;
+      }
+      if (!this.selectedLorebook.matchTags) {
+        this.selectedLorebook.matchTags = '';
+      }
+      if (this.selectedLorebook.scanDepth === undefined) {
+        this.selectedLorebook.scanDepth = 0;
+      }
+      if (!this.selectedLorebook.entries) {
+        this.selectedLorebook.entries = [];
+      }
+
+      // Initialize entries (ensure entries is an array)
+      if (Array.isArray(this.selectedLorebook.entries)) {
+        this.selectedLorebook.entries.forEach(entry => {
+        // Initialize missing entry fields
+        if (entry.enabled === undefined) {
+          entry.enabled = true;
+        }
+        if (entry.constant === undefined) {
+          entry.constant = false;
+        }
+        if (!entry.name) {
+          entry.name = 'Unnamed Entry';
+        }
+        if (!entry.keys) {
+          entry.keys = [];
+        }
+        if (!entry.content) {
+          entry.content = '';
+        }
+        if (entry.priority === undefined) {
+          entry.priority = 0;
+        }
+        if (!entry.regex) {
+          entry.regex = '';
+        }
+
+        // Initialize keysInput for display
+        if (!entry.keysInput && entry.keys) {
+          entry.keysInput = entry.keys.join(', ');
+        }
+        if (!entry.keysInput) {
+          entry.keysInput = '';
+        }
+      });
+      }
+    },
+    async refreshLorebooks() {
+      this.selectedLorebook = null; // Close any open editor
+      await this.loadLorebooks();
+      this.$root.$notify?.('Lorebooks refreshed', 'success');
     },
     async saveLorebook() {
       try {
