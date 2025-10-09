@@ -199,8 +199,43 @@ function validateCharacterCard(cardData) {
   return true;
 }
 
+/**
+ * Converts a Character Card V2 to V3 format
+ * @param {Object} v2Card - V2 card data
+ * @returns {Object} - V3 card data
+ */
+function convertV2ToV3(v2Card) {
+  // If it's already V3, return as-is
+  if (v2Card.spec === 'chara_card_v3') {
+    return v2Card;
+  }
+
+  // Convert V2 to V3 format
+  return {
+    spec: 'chara_card_v3',
+    spec_version: '3.0',
+    data: {
+      name: v2Card.name || v2Card.data?.name || 'Unknown',
+      description: v2Card.description || v2Card.data?.description || '',
+      personality: v2Card.personality || v2Card.data?.personality || '',
+      scenario: v2Card.scenario || v2Card.data?.scenario || '',
+      first_mes: v2Card.first_mes || v2Card.data?.first_mes || '',
+      mes_example: v2Card.mes_example || v2Card.data?.mes_example || '',
+      creator_notes: v2Card.creator_notes || v2Card.data?.creator_notes || '',
+      system_prompt: v2Card.system_prompt || v2Card.data?.system_prompt || '',
+      post_history_instructions: v2Card.post_history_instructions || v2Card.data?.post_history_instructions || '',
+      tags: v2Card.tags || v2Card.data?.tags || [],
+      creator: v2Card.creator || v2Card.data?.creator || '',
+      character_version: v2Card.character_version || v2Card.data?.character_version || '1.0',
+      alternate_greetings: v2Card.alternate_greetings || v2Card.data?.alternate_greetings || [],
+      extensions: v2Card.extensions || v2Card.data?.extensions || {}
+    }
+  };
+}
+
 module.exports = {
   readCharacterCard,
   writeCharacterCard,
-  validateCharacterCard
+  validateCharacterCard,
+  convertV2ToV3
 };

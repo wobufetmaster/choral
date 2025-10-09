@@ -17,6 +17,7 @@
           {{ isAutoTaggingAll ? 'Auto-tagging...' : '✨ Auto-tag All' }}
         </button>
         <button @click="$emit('open-tab', 'lorebooks', {}, 'Lorebooks', false)">Lorebooks</button>
+        <button @click="$emit('open-tab', 'bookkeeping-settings', {}, 'Bookkeeping', false)">🏷️ Tags</button>
         <button @click="$emit('open-tab', 'settings', {}, 'Settings', false)">⚙️ Settings</button>
       </div>
     </div>
@@ -41,6 +42,7 @@
 
         <div v-if="allTags.length > 0" class="tag-filter">
           <span class="filter-label">Filter by tag:</span>
+          <button v-if="selectedTags.length > 0" @click="clearAllTags" class="clear-tags-btn">Clear All</button>
           <div class="filter-tags">
             <button
               v-for="tag in allTags"
@@ -437,6 +439,9 @@ export default {
       } else {
         this.selectedTags.push(tag);
       }
+    },
+    clearAllTags() {
+      this.selectedTags = [];
     },
     startChat(character) {
       this.$emit('open-tab', 'chat', {
@@ -1160,10 +1165,30 @@ export default {
   font-weight: 500;
 }
 
+.clear-tags-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-primary);
+}
+
+.clear-tags-btn:hover {
+  background: var(--hover-color);
+  border-color: var(--accent-color);
+}
+
 .filter-tags {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  max-height: 120px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px;
 }
 
 .filter-tag {

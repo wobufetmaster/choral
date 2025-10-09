@@ -31,6 +31,7 @@ import GroupChatManager from './GroupChatManager.vue';
 import PresetSelector from './PresetSelector.vue';
 import Settings from './Settings.vue';
 import LorebookManager from './LorebookManager.vue';
+import BookkeepingSettings from './BookkeepingSettings.vue';
 
 export default {
   name: 'TabManager',
@@ -43,6 +44,7 @@ export default {
     PresetSelector,
     Settings,
     LorebookManager,
+    BookkeepingSettings,
   },
   setup() {
     const tabs = ref([]);
@@ -57,6 +59,7 @@ export default {
       'presets': PresetSelector,
       'settings': Settings,
       'lorebooks': LorebookManager,
+      'bookkeeping-settings': BookkeepingSettings,
     };
 
     const activeTab = computed(() => {
@@ -112,6 +115,7 @@ export default {
         'group-chat': 'Group Chat',
         'presets': 'Presets',
         'settings': 'Settings',
+        'bookkeeping-settings': 'Bookkeeping',
       };
 
       const tab = {

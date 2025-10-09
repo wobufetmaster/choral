@@ -3,7 +3,7 @@ const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
 const multer = require('multer');
-const { readCharacterCard, writeCharacterCard, validateCharacterCard } = require('./characterCard');
+const { readCharacterCard, writeCharacterCard, validateCharacterCard, convertV2ToV3 } = require('./characterCard');
 const { streamChatCompletion, chatCompletion } = require('./openrouter');
 const { processMacros, processMessagesWithMacros } = require('./macros');
 const { DEFAULT_PRESET, convertPixiJBToPreset, validatePreset } = require('./presets');
@@ -65,6 +65,8 @@ const PERSONAS_DIR = path.join(DATA_DIR, 'personas');
 const PRESETS_DIR = path.join(DATA_DIR, 'presets');
 const GROUP_CHATS_DIR = path.join(DATA_DIR, 'group_chats');
 const TAGS_FILE = path.join(DATA_DIR, 'tags.json');
+const CORE_TAGS_FILE = path.join(DATA_DIR, 'core-tags.json');
+const BOOKKEEPING_SETTINGS_FILE = path.join(DATA_DIR, 'bookkeeping-settings.json');
 
 // Tag management helpers
 async function loadTags() {
@@ -78,6 +80,38 @@ async function loadTags() {
 
 async function saveTags(tags) {
   await fs.writeFile(TAGS_FILE, JSON.stringify(tags, null, 2));
+}
+
+// Core tags management (global tags that can't be removed from characters)
+async function loadCoreTags() {
+  try {
+    const data = await fs.readFile(CORE_TAGS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    return [];
+  }
+}
+
+async function saveCoreTags(coreTags) {
+  await fs.writeFile(CORE_TAGS_FILE, JSON.stringify(coreTags, null, 2));
+}
+
+// Bookkeeping settings management
+async function loadBookkeepingSettings() {
+  try {
+    const data = await fs.readFile(BOOKKEEPING_SETTINGS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    // Return default settings
+    return {
+      model: config.bookkeepingModel || 'openai/gpt-4o-mini',
+      strictMode: false
+    };
+  }
+}
+
+async function saveBookkeepingSettings(settings) {
+  await fs.writeFile(BOOKKEEPING_SETTINGS_FILE, JSON.stringify(settings, null, 2));
 }
 
 function normalizeTag(tag) {
@@ -386,9 +420,17 @@ app.post('/api/characters/:filename/auto-tag', async (req, res) => {
       return res.status(400).json({ error: 'Character has no description to analyze' });
     }
 
-    // Load existing tag colors
+    // Load bookkeeping settings
+    const bookkeepingSettings = await loadBookkeepingSettings();
+    const strictMode = bookkeepingSettings.strictMode || false;
+    const model = bookkeepingSettings.model || 'openai/gpt-4o-mini';
+
+    // Load existing tag colors and core tags
     const existingTags = await loadTags();
-    const existingTagNames = Object.keys(existingTags);
+    const coreTags = await loadCoreTags();
+
+    // In strict mode, only use core tags. Otherwise, use all existing tags.
+    const availableTags = strictMode ? coreTags : Object.keys(existingTags);
 
     // Build prompt for the bookkeeping model
     const characterInfo = [
@@ -397,11 +439,30 @@ app.post('/api/characters/:filename/auto-tag', async (req, res) => {
       scenario && `Scenario: ${scenario}`
     ].filter(Boolean).join('\n\n');
 
-    const existingTagsSection = existingTagNames.length > 0
-      ? `\n\nExisting tags in the system (PREFER REUSING THESE when appropriate):\n${existingTagNames.join(', ')}`
-      : '';
+    let prompt;
+    if (strictMode && availableTags.length > 0) {
+      // Strict mode: only select from predefined tags
+      prompt = `Analyze this character and select the most relevant tags from the provided list. You MUST ONLY use tags from this list, do not create new tags.
 
-    const prompt = `Analyze this character and generate relevant tags with appropriate colors. Tags should be concise, descriptive keywords (e.g., genre, setting, personality traits, themes).
+Available tags:
+${availableTags.join(', ')}
+
+Character Information:
+${characterInfo}
+
+Select 5-10 relevant tags from the list above. For each tag, provide the tag name and assign a meaningful CSS color (hex code) that relates to the tag's meaning. Examples:
+- sci-fi: #4a9eff (blue)
+- fantasy: #22c55e (green)
+- romance: #ec4899 (pink)
+- horror: #dc2626 (red)
+- comedy: #f59e0b (orange)`;
+    } else {
+      // Normal mode: prefer existing tags but can create new ones
+      const existingTagsSection = availableTags.length > 0
+        ? `\n\nExisting tags in the system (PREFER REUSING THESE when appropriate):\n${availableTags.join(', ')}`
+        : '';
+
+      prompt = `Analyze this character and generate relevant tags with appropriate colors. Tags should be concise, descriptive keywords (e.g., genre, setting, personality traits, themes).
 
 IMPORTANT: If any existing tags are relevant, YOU MUST reuse them exactly as shown. Only create new tags if none of the existing tags fit. Avoid creating similar variations (e.g., don't create "science fiction" if "sci-fi" exists, or "alien encounter" if "alien" exists).${existingTagsSection}
 
@@ -414,6 +475,52 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
 - romance: #ec4899 (pink)
 - horror: #dc2626 (red)
 - comedy: #f59e0b (orange)`;
+    }
+
+    // Build request body
+    const requestBody = {
+      model: model,
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'character_tags',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              tags: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string', description: 'Tag name' },
+                    color: { type: 'string', description: 'CSS color (hex code or named color)' }
+                  },
+                  required: ['name', 'color'],
+                  additionalProperties: false
+                },
+                description: 'Array of tags with colors'
+              }
+            },
+            required: ['tags'],
+            additionalProperties: false
+          }
+        }
+      }
+    };
+
+    console.log('\n========== AUTO-TAGGER REQUEST ==========');
+    console.log('Model:', model);
+    console.log('Strict mode:', strictMode);
+    console.log('Available tags count:', availableTags.length);
+    console.log('Prompt:', prompt.substring(0, 500) + '...');
+    console.log('=========================================\n');
 
     // Call OpenRouter with structured output
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -424,42 +531,7 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
         'HTTP-Referer': 'http://localhost:3000',
         'X-Title': 'Choral'
       },
-      body: JSON.stringify({
-        model: config.bookkeepingModel || 'openai/gpt-4o-mini',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'character_tags',
-            strict: true,
-            schema: {
-              type: 'object',
-              properties: {
-                tags: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      name: { type: 'string', description: 'Tag name' },
-                      color: { type: 'string', description: 'CSS color (hex code or named color)' }
-                    },
-                    required: ['name', 'color'],
-                    additionalProperties: false
-                  },
-                  description: 'Array of tags with colors'
-                }
-              },
-              required: ['tags'],
-              additionalProperties: false
-            }
-          }
-        }
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -470,37 +542,135 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
     const data = await response.json();
     const generatedTagsWithColors = JSON.parse(data.choices[0].message.content).tags;
 
-    // Process tags: use existing colors if tag already exists (case-insensitive), otherwise save new color
+    console.log('\n========== AUTO-TAGGER RESPONSE ==========');
+    console.log('Raw AI response:', data.choices[0].message.content);
+    console.log('Generated tags:', JSON.stringify(generatedTagsWithColors, null, 2));
+    console.log('==========================================\n');
+
+    // Process tags: validate against core tags in strict mode, use/save colors appropriately
     const processedTags = [];
     let tagsUpdated = false;
+
+    // Normalize core tags for comparison
+    const normalizedCoreTags = strictMode
+      ? new Set(coreTags.map(t => normalizeTag(t)))
+      : null;
 
     for (const tagObj of generatedTagsWithColors) {
       const normalizedTag = normalizeTag(tagObj.name);
 
-      if (existingTags[normalizedTag]) {
-        // Tag exists, use existing color
-        processedTags.push({
-          name: tagObj.name,
-          color: existingTags[normalizedTag]
-        });
-      } else {
-        // New tag, save the color
+      // In strict mode, only accept tags from the core tags list
+      if (strictMode) {
+        if (!normalizedCoreTags.has(normalizedTag)) {
+          console.log(`Skipping tag "${tagObj.name}" - not in core tags list (strict mode)`);
+          console.log(`Core tags:`, Array.from(normalizedCoreTags));
+          continue;
+        }
+      }
+
+      // Use existing color if available, otherwise use generated color
+      const finalColor = existingTags[normalizedTag] || tagObj.color;
+
+      processedTags.push({
+        name: tagObj.name,
+        color: finalColor
+      });
+
+      // Save new color to tags file if it didn't exist before (and not in strict mode, or if in strict mode and it's a core tag)
+      if (!existingTags[normalizedTag]) {
         existingTags[normalizedTag] = tagObj.color;
-        processedTags.push(tagObj);
         tagsUpdated = true;
       }
     }
 
-    // Save updated tags if there were new ones
+    // Save updated tags if there were new colors added
     if (tagsUpdated) {
       await saveTags(existingTags);
     }
 
     console.log('Generated tags:', processedTags);
+    console.log('Strict mode:', strictMode);
+    console.log('Core tags count:', coreTags.length);
 
     res.json({ success: true, tags: processedTags });
   } catch (error) {
     console.error('Failed to auto-generate tags:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk remove tags from all characters
+app.post('/api/characters/bulk-remove-tags', async (req, res) => {
+  try {
+    const files = await fs.readdir(CHARACTERS_DIR);
+    const pngFiles = files.filter(f => f.endsWith('.png'));
+    let updatedCount = 0;
+    let skippedCount = 0;
+    const errors = [];
+
+    console.log(`Processing ${pngFiles.length} character files...`);
+
+    for (const file of pngFiles) {
+      try {
+        const filePath = path.join(CHARACTERS_DIR, file);
+        console.log(`Reading ${file}...`);
+        let card = await readCharacterCard(filePath);
+
+        console.log(`${file} - Spec:`, card.spec);
+        console.log(`${file} - Has data:`, !!card.data);
+        console.log(`${file} - Tags:`, card.data?.tags);
+
+        // Convert V2 to V3 if needed
+        if (card.spec !== 'chara_card_v3') {
+          console.log(`Converting ${file} from V2 to V3...`);
+          card = convertV2ToV3(card);
+        }
+
+        // Check if character has tags (including empty arrays)
+        if (card.data && Array.isArray(card.data.tags)) {
+          const hadTags = card.data.tags.length > 0;
+          const tagCount = card.data.tags.length;
+
+          // Clear tags
+          card.data.tags = [];
+
+          // Read PNG buffer and write back
+          console.log(`Writing ${file}...`);
+          const pngBuffer = await fs.readFile(filePath);
+          await writeCharacterCard(filePath, card, pngBuffer);
+
+          // Verify the write
+          const verifyCard = await readCharacterCard(filePath);
+          console.log(`${file} - Verified tags after write:`, verifyCard.data?.tags);
+
+          if (hadTags) {
+            updatedCount++;
+            console.log(`✓ Updated ${file} (removed ${tagCount} tags)`);
+          } else {
+            skippedCount++;
+            console.log(`○ Skipped ${file} (no tags to remove)`);
+          }
+        } else {
+          skippedCount++;
+          console.log(`○ Skipped ${file} (no tags array)`);
+        }
+      } catch (err) {
+        console.error(`✗ Error processing ${file}:`, err.message);
+        errors.push({ file, error: err.message });
+      }
+    }
+
+    console.log(`Bulk tag removal complete: ${updatedCount} updated, ${skippedCount} skipped, ${errors.length} errors`);
+
+    res.json({
+      success: true,
+      updatedCount,
+      skippedCount,
+      totalFiles: pngFiles.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('Bulk tag removal error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -985,6 +1155,52 @@ app.post('/api/tags', async (req, res) => {
   try {
     const tags = req.body;
     await saveTags(tags);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ===== Core Tags Routes =====
+
+// Get core tags
+app.get('/api/core-tags', async (req, res) => {
+  try {
+    const coreTags = await loadCoreTags();
+    res.json(coreTags);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Save core tags
+app.post('/api/core-tags', async (req, res) => {
+  try {
+    const coreTags = req.body;
+    await saveCoreTags(coreTags);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ===== Bookkeeping Settings Routes =====
+
+// Get bookkeeping settings
+app.get('/api/bookkeeping-settings', async (req, res) => {
+  try {
+    const settings = await loadBookkeepingSettings();
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Save bookkeeping settings
+app.post('/api/bookkeeping-settings', async (req, res) => {
+  try {
+    const settings = req.body;
+    await saveBookkeepingSettings(settings);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
