@@ -1094,19 +1094,82 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .character-list {
+    height: 100vh;
+    overflow: hidden;
+  }
+
   .header {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
+    gap: 8px;
+    padding: 12px;
+    flex-shrink: 0;
+  }
+
+  .header h1 {
+    font-size: 20px;
   }
 
   .actions {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
     width: 100%;
   }
 
   .actions button {
     width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .search-bar {
+    padding: 12px;
+    flex-shrink: 0;
+  }
+
+  .search-bar input {
+    margin-bottom: 8px;
+    padding: 8px;
+  }
+
+  .filters-row {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .sort-section {
+    width: 100%;
+  }
+
+  .sort-select {
+    flex: 1;
+  }
+
+  .tag-filter {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .filter-tags {
+    max-height: 80px;
+    overflow-y: auto;
+  }
+
+  .characters-grid {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .character-card {
+    padding: 12px;
   }
 }
 
