@@ -182,12 +182,27 @@ export default {
       saveTabs();
     };
 
-    // Update tab (e.g., change label)
+    // Update tab (e.g., change label, chatId)
     const updateTab = (updates) => {
-      if (!activeTab.value) return;
-      const index = tabs.value.findIndex(tab => tab.id === activeTabId.value);
+      // If updates include an id, update that specific tab
+      const tabId = updates.id || activeTabId.value;
+      if (!tabId) return;
+
+      const index = tabs.value.findIndex(tab => tab.id === tabId);
       if (index !== -1) {
-        tabs.value[index] = { ...tabs.value[index], ...updates };
+        // Remove the id from updates to avoid overwriting the tab's id
+        const { id, ...rest } = updates;
+
+        // Update tab data (e.g., label, data.chatFilename)
+        if (rest.chatId) {
+          tabs.value[index].data = { ...tabs.value[index].data, chatFilename: rest.chatId };
+        }
+        if (rest.title) {
+          tabs.value[index].label = rest.title;
+        }
+
+        // Merge any other updates
+        tabs.value[index] = { ...tabs.value[index], ...rest };
         saveTabs();
       }
     };

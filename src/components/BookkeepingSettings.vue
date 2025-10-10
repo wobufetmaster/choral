@@ -6,13 +6,51 @@
     </div>
 
     <div class="settings-content">
-      <!-- Auto-tagger Settings Section -->
+      <!-- Enable Bookkeeping Section -->
       <section class="settings-section">
-        <h3>Auto-Tagger Configuration</h3>
+        <h3>Enable Bookkeeping Features</h3>
+        <p class="section-description">
+          Bookkeeping features use AI to automatically tag characters and rename chats.
+          <strong>These features make API calls and will cost money.</strong> Enable them only after reviewing the settings below.
+        </p>
 
         <div class="setting-group">
-          <label for="model-select">Model:</label>
-          <select id="model-select" v-model="settings.model" class="model-select">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="settings.enableBookkeeping" />
+            <span>Enable Bookkeeping Features</span>
+          </label>
+          <p class="setting-description">
+            When enabled, allows auto-tagging and auto-renaming features to run. Must be enabled for bookkeeping to work.
+          </p>
+        </div>
+
+        <div class="setting-group">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="settings.autoRenameChats" :disabled="!settings.enableBookkeeping" />
+            <span>Auto-Rename Chats</span>
+          </label>
+          <p class="setting-description">
+            <strong>⚠️ Runs automatically:</strong> When enabled, new chats and chats loaded from history will be automatically renamed using the bookkeeping model.
+            This happens in the background every time you start or load a chat. Manual renames are preserved.
+          </p>
+        </div>
+
+        <div class="action-buttons">
+          <button @click="saveSettings" class="btn-primary">Save Settings</button>
+        </div>
+      </section>
+
+      <!-- Bookkeeping Model Section -->
+      <section class="settings-section">
+        <h3>Bookkeeping Model</h3>
+        <p class="section-description">
+          This model is used for all bookkeeping tasks: auto-tagging and auto-naming chats.
+          Choose a cheap, fast model for best results.
+        </p>
+
+        <div class="setting-group">
+          <label for="bookkeeping-model-select">Bookkeeping Model:</label>
+          <select id="bookkeeping-model-select" v-model="settings.model" class="model-select">
             <option value="deepseek/deepseek-chat-v3.1">DeepSeek Chat v3.1 (very cheap)</option>
             <option value="openai/gpt-4o-mini">GPT-4o Mini (fast, cheap)</option>
             <option value="google/gemini-2.0-flash-exp">Gemini 2.0 Flash (fast, cheap)</option>
@@ -22,6 +60,45 @@
             <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
           </select>
         </div>
+
+        <div class="action-buttons">
+          <button @click="saveSettings" class="btn-primary">Save Model</button>
+        </div>
+      </section>
+
+      <!-- Auto-naming Configuration -->
+      <section class="settings-section">
+        <h3>Auto-Naming Configuration</h3>
+        <p class="section-description">
+          Customize the prompt used to generate chat titles. The prompt will receive conversation text and should generate a 3-6 word title.
+        </p>
+
+        <div class="setting-group">
+          <label for="auto-naming-prompt">Auto-Naming Prompt:</label>
+          <textarea
+            id="auto-naming-prompt"
+            v-model="settings.autoNamingPrompt"
+            class="prompt-textarea"
+            rows="10"
+            placeholder="Enter the prompt for auto-naming chats..."
+          ></textarea>
+          <p class="setting-description" v-pre>
+            Use <code>{{conversationText}}</code> as a placeholder for the actual conversation content.
+          </p>
+        </div>
+
+        <div class="action-buttons">
+          <button @click="resetAutoNamingPrompt" class="btn-secondary">Reset to Default</button>
+          <button @click="saveSettings" class="btn-primary">Save Prompt</button>
+        </div>
+      </section>
+
+      <!-- Auto-tagger Configuration -->
+      <section class="settings-section">
+        <h3>Auto-Tagger Configuration</h3>
+        <p class="section-description">
+          Customize the prompt used to generate character tags and configure strict mode.
+        </p>
 
         <div class="setting-group">
           <label class="checkbox-label">
@@ -34,8 +111,37 @@
           </p>
         </div>
 
+        <div class="setting-group">
+          <label for="auto-tagging-prompt-strict">Auto-Tagging Prompt (Strict Mode):</label>
+          <textarea
+            id="auto-tagging-prompt-strict"
+            v-model="settings.autoTaggingPromptStrict"
+            class="prompt-textarea"
+            rows="12"
+            placeholder="Enter the prompt for auto-tagging in strict mode..."
+          ></textarea>
+          <p class="setting-description" v-pre>
+            Use <code>{{availableTags}}</code> for the tag list and <code>{{characterInfo}}</code> for character details.
+          </p>
+        </div>
+
+        <div class="setting-group">
+          <label for="auto-tagging-prompt-normal">Auto-Tagging Prompt (Normal Mode):</label>
+          <textarea
+            id="auto-tagging-prompt-normal"
+            v-model="settings.autoTaggingPromptNormal"
+            class="prompt-textarea"
+            rows="12"
+            placeholder="Enter the prompt for auto-tagging in normal mode..."
+          ></textarea>
+          <p class="setting-description" v-pre>
+            Use <code>{{existingTagsSection}}</code> for existing tags and <code>{{characterInfo}}</code> for character details.
+          </p>
+        </div>
+
         <div class="action-buttons">
-          <button @click="saveSettings" class="btn-primary">Save Settings</button>
+          <button @click="resetAutoTaggingPrompts" class="btn-secondary">Reset to Defaults</button>
+          <button @click="saveSettings" class="btn-primary">Save Prompts</button>
         </div>
       </section>
 
@@ -116,8 +222,13 @@ export default {
   data() {
     return {
       settings: {
+        enableBookkeeping: false,
+        autoRenameChats: false,
         model: 'openai/gpt-4o-mini',
-        strictMode: false
+        strictMode: false,
+        autoNamingPrompt: this.getDefaultAutoNamingPrompt(),
+        autoTaggingPromptStrict: this.getDefaultAutoTaggingPromptStrict(),
+        autoTaggingPromptNormal: this.getDefaultAutoTaggingPromptNormal()
       },
       coreTags: [],
       allTags: {} // Map of existing tags for import
@@ -129,11 +240,78 @@ export default {
     await this.loadAllTags();
   },
   methods: {
+    getDefaultAutoNamingPrompt() {
+      return `Analyze this conversation and generate a short, descriptive title (3-6 words).
+The title should capture the main topic, theme, or scenario of the conversation.
+Be concise and descriptive. Use title case.
+
+Examples of good titles:
+- "Robot Girlfriend Paradox"
+- "Coffee Shop Philosophy"
+- "Dragon Heist Planning"
+- "Late Night Confession"
+- "Time Travel Paradox"
+
+Conversation:
+{{conversationText}}
+
+Generate a short title (3-6 words) that captures the essence of this conversation.`;
+    },
+    getDefaultAutoTaggingPromptStrict() {
+      return `Analyze this character and select the most relevant tags from the provided list. You MUST ONLY use tags from this list, do not create new tags.
+
+Available tags:
+{{availableTags}}
+
+Character Information:
+{{characterInfo}}
+
+Select 5-10 relevant tags from the list above. For each tag, provide the tag name and assign a meaningful CSS color (hex code) that relates to the tag's meaning. Examples:
+- sci-fi: #4a9eff (blue)
+- fantasy: #22c55e (green)
+- romance: #ec4899 (pink)
+- horror: #dc2626 (red)
+- comedy: #f59e0b (orange)`;
+    },
+    getDefaultAutoTaggingPromptNormal() {
+      return `Analyze this character and generate relevant tags with appropriate colors. Tags should be concise, descriptive keywords (e.g., genre, setting, personality traits, themes).
+
+IMPORTANT: If any existing tags are relevant, YOU MUST reuse them exactly as shown. Only create new tags if none of the existing tags fit. Avoid creating similar variations (e.g., don't create "science fiction" if "sci-fi" exists, or "alien encounter" if "alien" exists).{{existingTagsSection}}
+
+Character Information:
+{{characterInfo}}
+
+Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS colors (hex codes) that relate to the tag's meaning. Examples:
+- sci-fi: #4a9eff (blue)
+- fantasy: #22c55e (green)
+- romance: #ec4899 (pink)
+- horror: #dc2626 (red)
+- comedy: #f59e0b (orange)`;
+    },
+    resetAutoNamingPrompt() {
+      this.settings.autoNamingPrompt = this.getDefaultAutoNamingPrompt();
+      this.$root.$notify('Auto-naming prompt reset to default', 'info');
+    },
+    resetAutoTaggingPrompts() {
+      this.settings.autoTaggingPromptStrict = this.getDefaultAutoTaggingPromptStrict();
+      this.settings.autoTaggingPromptNormal = this.getDefaultAutoTaggingPromptNormal();
+      this.$root.$notify('Auto-tagging prompts reset to defaults', 'info');
+    },
     async loadSettings() {
       try {
         const response = await fetch('/api/bookkeeping-settings');
         if (response.ok) {
-          this.settings = await response.json();
+          const loadedSettings = await response.json();
+          // Merge with defaults to ensure all fields exist
+          this.settings = {
+            enableBookkeeping: loadedSettings.enableBookkeeping || false,
+            autoRenameChats: loadedSettings.autoRenameChats || false,
+            model: loadedSettings.model || 'openai/gpt-4o-mini',
+            strictMode: loadedSettings.strictMode || false,
+            autoNamingPrompt: loadedSettings.autoNamingPrompt || this.getDefaultAutoNamingPrompt(),
+            autoTaggingPromptStrict: loadedSettings.autoTaggingPromptStrict || this.getDefaultAutoTaggingPromptStrict(),
+            autoTaggingPromptNormal: loadedSettings.autoTaggingPromptNormal || this.getDefaultAutoTaggingPromptNormal()
+          };
         }
       } catch (error) {
         console.error('Failed to load bookkeeping settings:', error);
@@ -589,5 +767,33 @@ export default {
   background-color: rgba(251, 191, 36, 0.1);
   border-left: 3px solid #fbbf24;
   border-radius: 4px;
+}
+
+.prompt-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.prompt-textarea:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.setting-description code {
+  background-color: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  color: var(--accent-color);
 }
 </style>

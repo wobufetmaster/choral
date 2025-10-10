@@ -837,8 +837,54 @@ export default {
         const chat = await response.json();
         this.messages = this.normalizeMessages(chat.messages || []);
         this.chatId = chatId;
+
+        // Trigger auto-naming if chat has messages and hasn't been named yet
+        await this.autoNameChat(chatId, chat);
       } catch (error) {
         console.error('Failed to load chat:', error);
+      }
+    },
+    async autoNameChat(chatId, chat) {
+      try {
+        // Only auto-name if:
+        // 1. Chat has messages
+        // 2. Chat hasn't been auto-named before
+        // 3. Title is still the default (character name or filename-based)
+        if (!chat || !chat.messages || chat.messages.length === 0) {
+          return;
+        }
+
+        if (chat.autoNamed) {
+          return; // Already auto-named
+        }
+
+        // Call auto-naming endpoint (runs in background)
+        const endpoint = this.isGroupChat
+          ? `/api/group-chats/${chatId}/auto-name`
+          : `/api/chats/${chatId}/auto-name`;
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (!result.skipped && result.title) {
+            console.log('Auto-named chat:', result.title);
+            // Optionally update tab title if in tab mode
+            if (this.tabData) {
+              this.$emit('update-tab', {
+                id: this.tabData.id,
+                title: result.title
+              });
+            }
+          }
+        }
+      } catch (error) {
+        // Fail silently - auto-naming is not critical
+        console.debug('Auto-naming skipped:', error.message);
       }
     },
     normalizeMessages(messages) {
@@ -870,6 +916,9 @@ export default {
           const chat = await response.json();
           this.messages = this.normalizeMessages(chat.messages || []);
           this.chatId = chat.filename;
+
+          // Trigger auto-naming if needed
+          await this.autoNameChat(chat.filename, chat);
         } else {
           // No existing chat, initialize new one
           this.initializeChat();
@@ -1628,6 +1677,9 @@ export default {
 
       this.showChatHistory = false;
       this.$nextTick(() => this.scrollToBottom());
+
+      // Trigger auto-naming if needed
+      await this.autoNameChat(chat.filename, chat);
     },
     async renameChatFromHistory(chat) {
       const newTitle = prompt('Enter new chat title:', chat.title || 'Untitled Chat');
@@ -1649,6 +1701,15 @@ export default {
           // If this is the current chat, update the chatId (filename may have changed)
           if (chat.filename === this.chatId) {
             this.chatId = result.filename;
+
+            // Update tab data to reflect the new filename and title
+            if (this.tabData) {
+              this.$emit('update-tab', {
+                id: this.tabData.id,
+                chatId: result.filename,
+                title: result.title
+              });
+            }
           }
 
           this.$root.$notify('Chat renamed', 'success');

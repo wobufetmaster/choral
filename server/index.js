@@ -104,6 +104,8 @@ async function loadBookkeepingSettings() {
   } catch (error) {
     // Return default settings
     return {
+      enableBookkeeping: false,
+      autoRenameChats: false,
       model: config.bookkeepingModel || 'openai/gpt-4o-mini',
       strictMode: false
     };
@@ -422,6 +424,12 @@ app.post('/api/characters/:filename/auto-tag', async (req, res) => {
 
     // Load bookkeeping settings
     const bookkeepingSettings = await loadBookkeepingSettings();
+
+    // Check if bookkeeping is enabled
+    if (!bookkeepingSettings.enableBookkeeping) {
+      return res.status(400).json({ error: 'Bookkeeping features are disabled. Enable them in Bookkeeping Settings.' });
+    }
+
     const strictMode = bookkeepingSettings.strictMode || false;
     const model = bookkeepingSettings.model || 'openai/gpt-4o-mini';
 
@@ -439,16 +447,16 @@ app.post('/api/characters/:filename/auto-tag', async (req, res) => {
       scenario && `Scenario: ${scenario}`
     ].filter(Boolean).join('\n\n');
 
-    let prompt;
+    // Get prompt template from settings or use defaults
+    let promptTemplate;
     if (strictMode && availableTags.length > 0) {
-      // Strict mode: only select from predefined tags
-      prompt = `Analyze this character and select the most relevant tags from the provided list. You MUST ONLY use tags from this list, do not create new tags.
+      promptTemplate = bookkeepingSettings.autoTaggingPromptStrict || `Analyze this character and select the most relevant tags from the provided list. You MUST ONLY use tags from this list, do not create new tags.
 
 Available tags:
-${availableTags.join(', ')}
+{{availableTags}}
 
 Character Information:
-${characterInfo}
+{{characterInfo}}
 
 Select 5-10 relevant tags from the list above. For each tag, provide the tag name and assign a meaningful CSS color (hex code) that relates to the tag's meaning. Examples:
 - sci-fi: #4a9eff (blue)
@@ -456,18 +464,23 @@ Select 5-10 relevant tags from the list above. For each tag, provide the tag nam
 - romance: #ec4899 (pink)
 - horror: #dc2626 (red)
 - comedy: #f59e0b (orange)`;
+
+      // Replace placeholders
+      prompt = promptTemplate
+        .replace('{{availableTags}}', availableTags.join(', '))
+        .replace('{{characterInfo}}', characterInfo);
     } else {
       // Normal mode: prefer existing tags but can create new ones
       const existingTagsSection = availableTags.length > 0
         ? `\n\nExisting tags in the system (PREFER REUSING THESE when appropriate):\n${availableTags.join(', ')}`
         : '';
 
-      prompt = `Analyze this character and generate relevant tags with appropriate colors. Tags should be concise, descriptive keywords (e.g., genre, setting, personality traits, themes).
+      promptTemplate = bookkeepingSettings.autoTaggingPromptNormal || `Analyze this character and generate relevant tags with appropriate colors. Tags should be concise, descriptive keywords (e.g., genre, setting, personality traits, themes).
 
-IMPORTANT: If any existing tags are relevant, YOU MUST reuse them exactly as shown. Only create new tags if none of the existing tags fit. Avoid creating similar variations (e.g., don't create "science fiction" if "sci-fi" exists, or "alien encounter" if "alien" exists).${existingTagsSection}
+IMPORTANT: If any existing tags are relevant, YOU MUST reuse them exactly as shown. Only create new tags if none of the existing tags fit. Avoid creating similar variations (e.g., don't create "science fiction" if "sci-fi" exists, or "alien encounter" if "alien" exists).{{existingTagsSection}}
 
 Character Information:
-${characterInfo}
+{{characterInfo}}
 
 Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS colors (hex codes) that relate to the tag's meaning. Examples:
 - sci-fi: #4a9eff (blue)
@@ -475,6 +488,11 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
 - romance: #ec4899 (pink)
 - horror: #dc2626 (red)
 - comedy: #f59e0b (orange)`;
+
+      // Replace placeholders
+      prompt = promptTemplate
+        .replace('{{existingTagsSection}}', existingTagsSection)
+        .replace('{{characterInfo}}', characterInfo);
     }
 
     // Build request body
@@ -793,8 +811,11 @@ app.patch('/api/chats/:filename', async (req, res) => {
     const content = await fs.readFile(oldFilePath, 'utf-8');
     const chat = JSON.parse(content);
 
-    // Update the title
+    // Update the title and mark as manually named
     chat.title = title.trim();
+    chat.manuallyNamed = true;
+    // Remove autoNamed flag if it exists (user is overriding auto-name)
+    delete chat.autoNamed;
 
     // Generate new filename based on title
     const safeTitle = title.trim().replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
@@ -814,6 +835,152 @@ app.patch('/api/chats/:filename', async (req, res) => {
 
     res.json({ success: true, filename: newFilename, title: chat.title });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Auto-generate chat title
+app.post('/api/chats/:filename/auto-name', async (req, res) => {
+  try {
+    const filePath = path.join(CHATS_DIR, req.params.filename);
+    const content = await fs.readFile(filePath, 'utf-8');
+    const chat = JSON.parse(content);
+
+    // Check if chat has messages
+    if (!chat.messages || chat.messages.length === 0) {
+      return res.status(400).json({ error: 'Chat has no messages to analyze' });
+    }
+
+    // Skip if manually named by user (unless force flag is provided)
+    if (chat.manuallyNamed && !req.body.force) {
+      return res.json({ success: true, title: chat.title, skipped: true, reason: 'manually_named' });
+    }
+
+    // Check if already auto-named (unless force flag is provided)
+    if (chat.autoNamed && !req.body.force) {
+      return res.json({ success: true, title: chat.title, skipped: true, reason: 'already_auto_named' });
+    }
+
+    // Skip if chat already has a title (unless force flag is provided)
+    if (chat.title && !req.body.force) {
+      return res.json({ success: true, title: chat.title, skipped: true, reason: 'has_title' });
+    }
+
+    // Load bookkeeping settings
+    const bookkeepingSettings = await loadBookkeepingSettings();
+
+    // Check if bookkeeping and auto-rename are enabled
+    if (!bookkeepingSettings.enableBookkeeping || !bookkeepingSettings.autoRenameChats) {
+      return res.json({ success: true, skipped: true, reason: 'auto_rename_disabled' });
+    }
+
+    const model = bookkeepingSettings.model || 'openai/gpt-4o-mini';
+
+    // Extract messages for context (limit to first 10 messages or 2000 chars)
+    const messagesToAnalyze = chat.messages.slice(0, 10);
+    let conversationText = messagesToAnalyze
+      .map(msg => {
+        const role = msg.role === 'user' ? 'User' : 'Assistant';
+        const content = msg.content || (msg.swipes && msg.swipes[msg.swipeIndex || 0]) || '';
+        return `${role}: ${content}`;
+      })
+      .join('\n\n');
+
+    // Truncate if too long
+    if (conversationText.length > 2000) {
+      conversationText = conversationText.substring(0, 2000) + '...';
+    }
+
+    // Build prompt for title generation from settings or use default
+    const promptTemplate = bookkeepingSettings.autoNamingPrompt || `Analyze this conversation and generate a short, descriptive title (3-6 words).
+The title should capture the main topic, theme, or scenario of the conversation.
+Be concise and descriptive. Use title case.
+
+Examples of good titles:
+- "Robot Girlfriend Paradox"
+- "Coffee Shop Philosophy"
+- "Dragon Heist Planning"
+- "Late Night Confession"
+- "Time Travel Paradox"
+
+Conversation:
+{{conversationText}}
+
+Generate a short title (3-6 words) that captures the essence of this conversation.`;
+
+    // Replace placeholders
+    const prompt = promptTemplate.replace('{{conversationText}}', conversationText);
+
+    // Build request body with structured output
+    const requestBody = {
+      model: model,
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'chat_title',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              title: {
+                type: 'string',
+                description: 'Short descriptive title for the chat (3-6 words)'
+              }
+            },
+            required: ['title'],
+            additionalProperties: false
+          }
+        }
+      }
+    };
+
+    console.log('\n========== AUTO-NAMING REQUEST ==========');
+    console.log('Chat:', req.params.filename);
+    console.log('Model:', model);
+    console.log('Message count:', chat.messages.length);
+    console.log('=========================================\n');
+
+    // Call OpenRouter with structured output
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || config.openRouterApiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'http://localhost:3000',
+        'X-Title': 'Choral'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenRouter API error: ${error}`);
+    }
+
+    const data = await response.json();
+    const result = JSON.parse(data.choices[0].message.content);
+    const generatedTitle = result.title;
+
+    console.log('\n========== AUTO-NAMING RESPONSE ==========');
+    console.log('Generated title:', generatedTitle);
+    console.log('==========================================\n');
+
+    // Update chat with new title and mark as auto-named
+    chat.title = generatedTitle;
+    chat.autoNamed = true;
+
+    // Save updated chat
+    await fs.writeFile(filePath, JSON.stringify(chat, null, 2));
+
+    res.json({ success: true, title: generatedTitle });
+  } catch (error) {
+    console.error('Failed to auto-generate chat title:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -882,6 +1049,153 @@ app.post('/api/group-chats', async (req, res) => {
     await fs.writeFile(filePath, JSON.stringify(groupChat, null, 2));
     res.json({ success: true, filename });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Auto-generate group chat title
+app.post('/api/group-chats/:filename/auto-name', async (req, res) => {
+  try {
+    const filePath = path.join(GROUP_CHATS_DIR, req.params.filename);
+    const content = await fs.readFile(filePath, 'utf-8');
+    const groupChat = JSON.parse(content);
+
+    // Check if chat has messages
+    if (!groupChat.messages || groupChat.messages.length === 0) {
+      return res.status(400).json({ error: 'Group chat has no messages to analyze' });
+    }
+
+    // Skip if manually named by user (unless force flag is provided)
+    if (groupChat.manuallyNamed && !req.body.force) {
+      return res.json({ success: true, title: groupChat.title, skipped: true, reason: 'manually_named' });
+    }
+
+    // Check if already auto-named (unless force flag is provided)
+    if (groupChat.autoNamed && !req.body.force) {
+      return res.json({ success: true, title: groupChat.title, skipped: true, reason: 'already_auto_named' });
+    }
+
+    // Skip if chat already has a title (unless force flag is provided)
+    if (groupChat.title && !req.body.force) {
+      return res.json({ success: true, title: groupChat.title, skipped: true, reason: 'has_title' });
+    }
+
+    // Load bookkeeping settings
+    const bookkeepingSettings = await loadBookkeepingSettings();
+
+    // Check if bookkeeping and auto-rename are enabled
+    if (!bookkeepingSettings.enableBookkeeping || !bookkeepingSettings.autoRenameChats) {
+      return res.json({ success: true, skipped: true, reason: 'auto_rename_disabled' });
+    }
+
+    const model = bookkeepingSettings.model || 'openai/gpt-4o-mini';
+
+    // Extract messages for context (limit to first 10 messages or 2000 chars)
+    const messagesToAnalyze = groupChat.messages.slice(0, 10);
+    let conversationText = messagesToAnalyze
+      .map(msg => {
+        const role = msg.role === 'user' ? 'User' : msg.character || 'Assistant';
+        const content = msg.content || (msg.swipes && msg.swipes[msg.swipeIndex || 0]) || '';
+        return `${role}: ${content}`;
+      })
+      .join('\n\n');
+
+    // Truncate if too long
+    if (conversationText.length > 2000) {
+      conversationText = conversationText.substring(0, 2000) + '...';
+    }
+
+    // Build prompt for title generation from settings or use default
+    // Use the same prompt as regular chats (works for both individual and group chats)
+    const promptTemplate = bookkeepingSettings.autoNamingPrompt || `Analyze this conversation and generate a short, descriptive title (3-6 words).
+The title should capture the main topic, theme, or scenario of the conversation.
+Be concise and descriptive. Use title case.
+
+Examples of good titles:
+- "Robot Girlfriend Paradox"
+- "Coffee Shop Philosophy"
+- "Dragon Heist Planning"
+- "Late Night Confession"
+- "Time Travel Paradox"
+
+Conversation:
+{{conversationText}}
+
+Generate a short title (3-6 words) that captures the essence of this conversation.`;
+
+    // Replace placeholders
+    const prompt = promptTemplate.replace('{{conversationText}}', conversationText);
+
+    // Build request body with structured output
+    const requestBody = {
+      model: model,
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'chat_title',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              title: {
+                type: 'string',
+                description: 'Short descriptive title for the group chat (3-6 words)'
+              }
+            },
+            required: ['title'],
+            additionalProperties: false
+          }
+        }
+      }
+    };
+
+    console.log('\n========== AUTO-NAMING REQUEST (GROUP) ==========');
+    console.log('Group chat:', req.params.filename);
+    console.log('Model:', model);
+    console.log('Message count:', groupChat.messages.length);
+    console.log('=================================================\n');
+
+    // Call OpenRouter with structured output
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || config.openRouterApiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'http://localhost:3000',
+        'X-Title': 'Choral'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenRouter API error: ${error}`);
+    }
+
+    const data = await response.json();
+    const result = JSON.parse(data.choices[0].message.content);
+    const generatedTitle = result.title;
+
+    console.log('\n========== AUTO-NAMING RESPONSE (GROUP) ==========');
+    console.log('Generated title:', generatedTitle);
+    console.log('==================================================\n');
+
+    // Update chat with new title and mark as auto-named
+    groupChat.title = generatedTitle;
+    groupChat.autoNamed = true;
+
+    // Save updated chat
+    await fs.writeFile(filePath, JSON.stringify(groupChat, null, 2));
+
+    res.json({ success: true, title: generatedTitle });
+  } catch (error) {
+    console.error('Failed to auto-generate group chat title:', error);
     res.status(500).json({ error: error.message });
   }
 });

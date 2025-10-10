@@ -17,7 +17,7 @@
           {{ isAutoTaggingAll ? 'Auto-tagging...' : '✨ Auto-tag All' }}
         </button>
         <button @click="$emit('open-tab', 'lorebooks', {}, 'Lorebooks', false)">Lorebooks</button>
-        <button @click="$emit('open-tab', 'bookkeeping-settings', {}, 'Bookkeeping', false)">🏷️ Tags</button>
+        <button @click="$emit('open-tab', 'bookkeeping-settings', {}, 'Bookkeeping', false)">📊 Bookkeeping / Tags</button>
         <button @click="$emit('open-tab', 'settings', {}, 'Settings', false)">⚙️ Settings</button>
       </div>
     </div>
@@ -635,6 +635,11 @@ export default {
         });
 
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          if (response.status === 400 && errorData.error) {
+            // Show specific error message from server (e.g., bookkeeping disabled)
+            throw new Error(errorData.error);
+          }
           throw new Error('Failed to auto-generate tags');
         }
 
@@ -655,7 +660,7 @@ export default {
         this.$root.$notify('Tags generated successfully', 'success');
       } catch (error) {
         console.error('Failed to auto-generate tags:', error);
-        this.$root.$notify('Failed to auto-generate tags', 'error');
+        this.$root.$notify(error.message || 'Failed to auto-generate tags', 'error');
       } finally {
         this.isAutoTagging = false;
       }
@@ -1003,6 +1008,12 @@ export default {
             });
 
             if (!response.ok) {
+              // Check for bookkeeping disabled error
+              const errorData = await response.json().catch(() => ({}));
+              if (response.status === 400 && errorData.error) {
+                // Show the specific error (e.g., bookkeeping disabled) and stop
+                throw new Error(errorData.error);
+              }
               console.error(`Failed to auto-tag ${char.name}`);
               continue;
             }
@@ -1031,6 +1042,10 @@ export default {
             await new Promise(resolve => setTimeout(resolve, 500));
 
           } catch (error) {
+            // Re-throw errors that should stop the process (like bookkeeping disabled)
+            if (error.message && error.message.includes('Bookkeeping features are disabled')) {
+              throw error;
+            }
             console.error(`Error auto-tagging ${char.name}:`, error);
           }
         }
@@ -1048,7 +1063,7 @@ export default {
         this.$root.$notify(`Successfully auto-tagged ${characters.length} character${characters.length === 1 ? '' : 's'}!`, 'success');
       } catch (error) {
         console.error('Error during batch auto-tagging:', error);
-        this.$root.$notify('Auto-tagging completed with some errors', 'error');
+        this.$root.$notify(error.message || 'Auto-tagging completed with some errors', 'error');
       } finally {
         this.isAutoTaggingAll = false;
         this.showAutoTagProgress = false;
