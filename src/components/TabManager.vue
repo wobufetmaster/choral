@@ -7,6 +7,7 @@
       @close-tab="closeTab"
       @new-tab="newTab"
       @reorder-tabs="reorderTabs"
+      @rename-tab="renameTab"
     />
     <div class="tab-content">
       <component
@@ -191,6 +192,38 @@ export default {
       }
     };
 
+    // Rename tab
+    const renameTab = async (tabId, newLabel) => {
+      const tab = tabs.value.find(t => t.id === tabId);
+      if (!tab) return;
+
+      // Update tab label
+      tab.label = newLabel;
+
+      // If it's a chat tab with a chat file, rename the file on server
+      if ((tab.type === 'chat' || tab.type === 'group-chat') && tab.data.chatFilename) {
+        try {
+          const response = await fetch(`/api/chats/${tab.data.chatFilename}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: newLabel }),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            // Update the chat filename in tab data
+            tab.data.chatFilename = result.filename;
+          } else {
+            console.error('Failed to rename chat on server');
+          }
+        } catch (error) {
+          console.error('Error renaming chat:', error);
+        }
+      }
+
+      saveTabs();
+    };
+
     // Reorder tabs
     const reorderTabs = (newOrder) => {
       tabs.value = newOrder;
@@ -216,6 +249,7 @@ export default {
       newTab,
       openTab,
       updateTab,
+      renameTab,
       reorderTabs,
     };
   },

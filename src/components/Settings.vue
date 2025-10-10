@@ -33,6 +33,20 @@
       </div>
 
       <div class="setting-group">
+        <h3>Default Persona</h3>
+        <div class="form-group">
+          <label>Default Persona for New Chats</label>
+          <select v-model="defaultPersona" @change="saveDefaultPersona">
+            <option value="">None (use "User")</option>
+            <option v-for="persona in personas" :key="persona.name" :value="persona.name + '.json'">
+              {{ persona.name }}
+            </option>
+          </select>
+          <small>This persona will be automatically selected when starting new chats</small>
+        </div>
+      </div>
+
+      <div class="setting-group">
         <h3>Appearance</h3>
 
         <div class="form-group">
@@ -118,6 +132,8 @@ export default {
     const apiKey = ref('');
     const activePreset = ref('');
     const presets = ref([]);
+    const defaultPersona = ref('');
+    const personas = ref([]);
     const currentTheme = ref('cozy-dark');
     const backgroundType = ref('pattern');
     const backgroundPattern = ref('noise');
@@ -140,11 +156,12 @@ export default {
       // Load API key from localStorage
       apiKey.value = localStorage.getItem('openrouter-api-key') || '';
 
-      // Load active preset
+      // Load config (active preset and default persona)
       try {
         const configResponse = await fetch('/api/config');
         const config = await configResponse.json();
         activePreset.value = config.activePreset || '';
+        defaultPersona.value = config.defaultPersona || '';
       } catch (error) {
         console.error('Failed to load config:', error);
       }
@@ -155,6 +172,14 @@ export default {
         presets.value = await presetsResponse.json();
       } catch (error) {
         console.error('Failed to load presets:', error);
+      }
+
+      // Load personas list
+      try {
+        const personasResponse = await fetch('/api/personas');
+        personas.value = await personasResponse.json();
+      } catch (error) {
+        console.error('Failed to load personas:', error);
       }
 
       // Load theme
@@ -191,6 +216,18 @@ export default {
         });
       } catch (error) {
         console.error('Failed to save active preset:', error);
+      }
+    };
+
+    const saveDefaultPersona = async () => {
+      try {
+        await fetch('/api/config/default-persona', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona: defaultPersona.value }),
+        });
+      } catch (error) {
+        console.error('Failed to save default persona:', error);
       }
     };
 
@@ -241,6 +278,8 @@ export default {
       apiKey,
       activePreset,
       presets,
+      defaultPersona,
+      personas,
       currentTheme,
       themeOptions,
       backgroundType,
@@ -250,6 +289,7 @@ export default {
       patternOptions,
       saveApiKey,
       saveActivePreset,
+      saveDefaultPersona,
       updateTheme,
       updateBackground,
     };

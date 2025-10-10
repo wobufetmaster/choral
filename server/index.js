@@ -777,6 +777,47 @@ app.post('/api/chats', async (req, res) => {
   }
 });
 
+// Rename chat
+app.patch('/api/chats/:filename', async (req, res) => {
+  try {
+    const oldFilename = req.params.filename;
+    const { title } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    const oldFilePath = path.join(CHATS_DIR, oldFilename);
+
+    // Read the existing chat
+    const content = await fs.readFile(oldFilePath, 'utf-8');
+    const chat = JSON.parse(content);
+
+    // Update the title
+    chat.title = title.trim();
+
+    // Generate new filename based on title
+    const safeTitle = title.trim().replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+    const newFilename = `${safeTitle}_${Date.now()}.json`;
+    const newFilePath = path.join(CHATS_DIR, newFilename);
+
+    // Update the filename in the chat object
+    chat.filename = newFilename;
+
+    // Write to new file
+    await fs.writeFile(newFilePath, JSON.stringify(chat, null, 2));
+
+    // Delete old file (if different)
+    if (oldFilename !== newFilename) {
+      await fs.unlink(oldFilePath);
+    }
+
+    res.json({ success: true, filename: newFilename, title: chat.title });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Delete chat
 app.delete('/api/chats/:filename', async (req, res) => {
   try {
@@ -1261,7 +1302,8 @@ app.get('/api/config', (req, res) => {
   res.json({
     port: config.port || 3000,
     hasApiKey: !!(config.openRouterApiKey || process.env.OPENROUTER_API_KEY),
-    activePreset: config.activePreset || 'default.json'
+    activePreset: config.activePreset || 'default.json',
+    defaultPersona: config.defaultPersona || null
   });
 });
 
@@ -1278,6 +1320,24 @@ app.post('/api/config/active-preset', async (req, res) => {
     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
     res.json({ success: true, activePreset: preset });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Set default persona
+app.post('/api/config/default-persona', async (req, res) => {
+  try {
+    const { persona } = req.body;
+
+    // Update config
+    config.defaultPersona = persona;
+
+    // Save config to disk
+    const configPath = path.join(__dirname, '..', 'config.json');
+    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+
+    res.json({ success: true, defaultPersona: persona });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

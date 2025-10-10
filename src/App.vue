@@ -204,6 +204,14 @@ input, textarea, select {
   transition: all 0.2s ease;
 }
 
+textarea {
+  resize: none;
+}
+
+textarea::-webkit-resizer {
+  display: none;
+}
+
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--accent-color);

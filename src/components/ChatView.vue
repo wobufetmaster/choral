@@ -44,6 +44,7 @@
         <!-- Sidebar Actions -->
         <div class="sidebar-actions">
           <button @click="newChat" class="sidebar-btn">📝 New Chat</button>
+          <button v-if="!isGroupChat && character" @click="convertToGroupChat" class="sidebar-btn">👥 Convert to Group</button>
           <button @click="showChatHistory = !showChatHistory" :class="{ 'active': showChatHistory }" class="sidebar-btn">📜 History</button>
           <button @click="showPersonas = true" class="sidebar-btn">👤 Persona</button>
           <button @click="showLorebooks = true" class="sidebar-btn">📚 Lorebook</button>
@@ -106,7 +107,10 @@
             <span class="history-date">{{ formatDate(chat.timestamp) }}</span>
             <span class="history-preview">{{ getPreview(chat) }}</span>
           </div>
-          <button @click.stop="deleteChat(chat.filename)" class="history-delete">🗑️</button>
+          <div class="history-actions">
+            <button @click.stop="renameChatFromHistory(chat)" class="history-rename" title="Rename chat">✏️</button>
+            <button @click.stop="deleteChat(chat.filename)" class="history-delete" title="Delete chat">🗑️</button>
+          </div>
         </div>
       </div>
       <button @click="showChatHistory = false" class="close-history">Close</button>
@@ -482,7 +486,9 @@
 
       <div class="input-area">
         <textarea
+          ref="messageInput"
           v-model="userInput"
+          @input="autoResizeTextarea"
           @keydown.enter.exact.prevent="sendMessage"
           placeholder="Type your message..."
           :disabled="isStreaming"
@@ -518,6 +524,7 @@
 
 <script>
 import DOMPurify from 'dompurify';
+import MarkdownIt from 'markdown-it';
 import { processMacrosForDisplay } from '../utils/macros';
 import PresetSelector from './PresetSelector.vue';
 import PersonaManager from './PersonaManager.vue';
@@ -539,6 +546,7 @@ export default {
   emits: ['open-tab', 'update-tab'],
   data() {
     return {
+      md: null, // Markdown renderer (initialized in mounted)
       character: null,
       characterName: 'Chat',
       persona: { name: 'User', avatar: null },
@@ -652,6 +660,14 @@ export default {
     }
   },
   async mounted() {
+    // Initialize markdown renderer
+    this.md = new MarkdownIt({
+      html: true, // Allow HTML (DOMPurify sanitizes it afterward)
+      linkify: true, // Auto-convert URLs to links
+      breaks: true, // Convert line breaks to <br>
+      typographer: true, // Enable smart quotes and other typography
+    });
+
     // Support both tab data and route query params (for backward compatibility)
     const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
     const groupChatId = this.tabData?.groupChatId || this.$route?.query?.groupChat;
@@ -742,8 +758,24 @@ export default {
             );
           }
 
-          // Use bound persona if found, otherwise use first persona
-          this.persona = boundPersona || personas[0];
+          // Priority 3: Check for default persona in config
+          let defaultPersona = null;
+          if (!boundPersona) {
+            try {
+              const configResponse = await fetch('/api/config');
+              const config = await configResponse.json();
+              if (config.defaultPersona) {
+                defaultPersona = personas.find(p =>
+                  (p.name + '.json') === config.defaultPersona
+                );
+              }
+            } catch (error) {
+              console.error('Failed to load config for default persona:', error);
+            }
+          }
+
+          // Use bound persona, default persona, or first persona
+          this.persona = boundPersona || defaultPersona || personas[0];
 
           // Ensure persona has all fields
           if (!this.persona.description) this.persona.description = '';
@@ -873,6 +905,16 @@ export default {
         }
       }
     },
+    autoResizeTextarea() {
+      const textarea = this.$refs.messageInput;
+      if (textarea) {
+        // Reset to 'auto' to allow shrinking
+        textarea.style.height = 'auto';
+        // Calculate new height based on content (capped between 60px and 200px)
+        const newHeight = Math.min(Math.max(textarea.scrollHeight, 60), 200);
+        textarea.style.height = newHeight + 'px';
+      }
+    },
     async sendMessage() {
       if (this.isStreaming) return;
 
@@ -917,6 +959,14 @@ export default {
 
       this.messages.push(userMessage);
       this.userInput = '';
+
+      // Reset textarea height
+      this.$nextTick(() => {
+        const textarea = this.$refs.messageInput;
+        if (textarea) {
+          textarea.style.height = '60px';
+        }
+      });
 
       // Reset scroll lock when user sends a message (they want to see it)
       this.userHasScrolledUp = false;
@@ -1221,10 +1271,13 @@ export default {
       };
       const processed = processMacrosForDisplay(html, macroContext);
 
+      // Render markdown (if markdown renderer is initialized)
+      const rendered = this.md ? this.md.render(processed) : processed;
+
       // Then sanitize
-      return DOMPurify.sanitize(processed, {
-        ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'div', 'span', 'img', 'h1', 'h2', 'h3', 'ul', 'ol', 'li'],
-        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style']
+      return DOMPurify.sanitize(rendered, {
+        ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'div', 'span', 'img', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target', 'rel']
       });
     },
     getCurrentContent(message) {
@@ -1572,6 +1625,37 @@ export default {
       this.showChatHistory = false;
       this.$nextTick(() => this.scrollToBottom());
     },
+    async renameChatFromHistory(chat) {
+      const newTitle = prompt('Enter new chat title:', chat.title || 'Untitled Chat');
+      if (!newTitle || newTitle.trim() === '' || newTitle === chat.title) return;
+
+      try {
+        const response = await fetch(`/api/chats/${chat.filename}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: newTitle.trim() }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+
+          // Update chat history to show the new title
+          await this.loadChatHistory();
+
+          // If this is the current chat, update the chatId (filename may have changed)
+          if (chat.filename === this.chatId) {
+            this.chatId = result.filename;
+          }
+
+          this.$root.$notify('Chat renamed', 'success');
+        } else {
+          throw new Error('Failed to rename chat');
+        }
+      } catch (error) {
+        console.error('Failed to rename chat:', error);
+        this.$root.$notify('Failed to rename chat', 'error');
+      }
+    },
     async deleteChat(filename) {
       if (!confirm('Delete this chat?')) return;
 
@@ -1607,12 +1691,19 @@ export default {
       }
     },
     getPreview(chat) {
+      // Priority 1: Show chat title if it exists
+      if (chat.title && chat.title.trim()) {
+        return chat.title;
+      }
+
+      // Priority 2: For group chats, show character names
       if (chat.isGroupChat) {
         const names = chat.characters?.map(c => c.name).join(', ') || 'Group';
         const messageCount = chat.messages?.length || 0;
         return `${names} (${messageCount} messages)`;
       }
 
+      // Priority 3: Show preview of last message
       const lastMessage = chat.messages?.[chat.messages.length - 1];
       if (!lastMessage) return 'Empty chat';
 
@@ -1626,8 +1717,10 @@ export default {
         content = lastMessage.swipes?.[swipeIndex] || lastMessage.content || '';
       }
 
-      const preview = content.substring(0, 50);
-      return preview + (content.length > 50 ? '...' : '');
+      // Strip HTML tags for cleaner preview
+      const strippedContent = content.replace(/<[^>]*>/g, '').trim();
+      const preview = strippedContent.substring(0, 50);
+      return preview + (strippedContent.length > 50 ? '...' : '');
     },
     scrollToBottom(force = false) {
       const container = this.$refs.messagesContainer;
@@ -2510,9 +2603,19 @@ button.active {
 
 .input-area textarea {
   flex: 1;
+  height: 60px;
   min-height: 60px;
   max-height: 200px;
-  resize: vertical;
+  resize: none !important;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  line-height: 1.5;
+}
+
+/* Force hide resize handle on all browsers */
+.input-area textarea::-webkit-resizer {
+  display: none;
 }
 
 .input-area button {
@@ -2635,16 +2738,27 @@ button.active {
   text-overflow: ellipsis;
 }
 
+.history-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.history-rename,
 .history-delete {
   padding: 4px 8px;
   background: transparent;
   border: none;
   cursor: pointer;
   opacity: 0.6;
+  font-size: 14px;
+  transition: all 0.2s;
 }
 
+.history-rename:hover,
 .history-delete:hover {
   opacity: 1;
+  transform: scale(1.1);
 }
 
 .close-history {

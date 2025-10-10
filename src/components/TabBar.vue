@@ -5,10 +5,22 @@
         v-for="tab in tabs"
         :key="tab.id"
         class="tab"
-        :class="{ active: tab.id === activeTabId }"
+        :class="{ active: tab.id === activeTabId, editing: editingTabId === tab.id }"
         :title="tab.label"
+        @click="editingTabId === tab.id ? null : $emit('switch-tab', tab.id)"
+        @dblclick="startEditing(tab.id, tab.label)"
       >
-        <span class="tab-label" @click="$emit('switch-tab', tab.id)">{{ tab.label }}</span>
+        <input
+          v-if="editingTabId === tab.id"
+          ref="editInput"
+          v-model="editingLabel"
+          class="tab-edit-input"
+          @blur="saveEdit"
+          @keydown.enter="saveEdit"
+          @keydown.esc="cancelEdit"
+          @click.stop
+        />
+        <span v-else class="tab-label">{{ tab.label }}</span>
         <span
           class="tab-close"
           @click.stop="$emit('close-tab', tab.id)"
@@ -37,7 +49,41 @@ export default {
       default: null,
     },
   },
-  emits: ['switch-tab', 'close-tab', 'new-tab', 'reorder-tabs'],
+  emits: ['switch-tab', 'close-tab', 'new-tab', 'reorder-tabs', 'rename-tab'],
+  data() {
+    return {
+      editingTabId: null,
+      editingLabel: '',
+      originalLabel: '',
+    };
+  },
+  methods: {
+    startEditing(tabId, label) {
+      this.editingTabId = tabId;
+      this.editingLabel = label;
+      this.originalLabel = label;
+      this.$nextTick(() => {
+        const input = this.$refs.editInput?.[0];
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      });
+    },
+    saveEdit() {
+      if (this.editingTabId && this.editingLabel.trim()) {
+        if (this.editingLabel !== this.originalLabel) {
+          this.$emit('rename-tab', this.editingTabId, this.editingLabel.trim());
+        }
+      }
+      this.cancelEdit();
+    },
+    cancelEdit() {
+      this.editingTabId = null;
+      this.editingLabel = '';
+      this.originalLabel = '';
+    },
+  },
 };
 </script>
 
@@ -175,5 +221,21 @@ export default {
 
 .tabs-container:has(.tab:nth-child(20)) .tab {
   min-width: 60px;
+}
+
+.tab-edit-input {
+  flex: 1;
+  background: var(--bg-primary, rgba(13, 13, 13, 0.8));
+  border: 1px solid var(--accent-color, #4a9eff);
+  border-radius: 3px;
+  padding: 2px 6px;
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.tab.editing {
+  cursor: default;
 }
 </style>
