@@ -1117,41 +1117,43 @@ export default {
   .header {
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
-    padding: 12px;
+    gap: 6px;
+    padding: 8px;
     flex-shrink: 0;
   }
 
   .header h1 {
-    font-size: 20px;
+    font-size: 18px;
+    margin: 0;
   }
 
   .actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: 4px;
     width: 100%;
   }
 
   .actions button {
     width: 100%;
-    padding: 8px 12px;
-    font-size: 13px;
+    padding: 6px 10px;
+    font-size: 12px;
   }
 
   .search-bar {
-    padding: 12px;
+    padding: 8px;
     flex-shrink: 0;
   }
 
   .search-bar input {
-    margin-bottom: 8px;
-    padding: 8px;
+    margin-bottom: 6px;
+    padding: 6px 8px;
+    font-size: 14px;
   }
 
   .filters-row {
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     align-items: stretch;
   }
 
@@ -1161,16 +1163,22 @@ export default {
 
   .sort-select {
     flex: 1;
+    padding: 6px 8px;
+    font-size: 13px;
   }
 
   .tag-filter {
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
+    gap: 6px;
+  }
+
+  .filter-label {
+    font-size: 13px;
   }
 
   .filter-tags {
-    max-height: 80px;
+    max-height: 60px;
     overflow-y: auto;
   }
 
@@ -1178,13 +1186,39 @@ export default {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 12px;
+    overflow-x: hidden;
+    padding: 8px;
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 10px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .character-card {
-    padding: 12px;
+    padding: 10px;
+  }
+
+  .character-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .character-info h3 {
+    font-size: 15px;
+  }
+
+  /* Make action buttons always visible on mobile for easier access */
+  .character-actions {
+    opacity: 1;
+  }
+
+  /* Adjust modal for mobile */
+  .modal-content {
+    max-height: 90vh;
+    width: 95%;
+  }
+
+  .character-selector-list {
+    max-height: 300px;
   }
 }
 
