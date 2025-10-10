@@ -5,10 +5,21 @@
         v-for="tab in tabs"
         :key="tab.id"
         class="tab"
-        :class="{ active: tab.id === activeTabId, editing: editingTabId === tab.id }"
+        :class="{
+          active: tab.id === activeTabId,
+          editing: editingTabId === tab.id,
+          'drag-over': dragOverTabId === tab.id
+        }"
+        :draggable="editingTabId !== tab.id"
         :title="tab.label"
         @click="editingTabId === tab.id ? null : $emit('switch-tab', tab.id)"
         @dblclick="startEditing(tab.id, tab.label)"
+        @dragstart="handleDragStart($event, tab.id)"
+        @dragend="handleDragEnd"
+        @dragover="handleDragOver"
+        @dragenter="handleDragEnter($event, tab.id)"
+        @dragleave="handleDragLeave($event, tab.id)"
+        @drop="handleDrop($event, tab.id)"
       >
         <input
           v-if="editingTabId === tab.id"
@@ -55,6 +66,8 @@ export default {
       editingTabId: null,
       editingLabel: '',
       originalLabel: '',
+      draggedTabId: null,
+      dragOverTabId: null,
     };
   },
   methods: {
@@ -82,6 +95,61 @@ export default {
       this.editingTabId = null;
       this.editingLabel = '';
       this.originalLabel = '';
+    },
+    handleDragStart(event, tabId) {
+      this.draggedTabId = tabId;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', tabId);
+      // Add a small delay to allow the drag image to be created
+      setTimeout(() => {
+        event.target.classList.add('dragging');
+      }, 0);
+    },
+    handleDragEnd(event) {
+      event.target.classList.remove('dragging');
+      this.draggedTabId = null;
+      this.dragOverTabId = null;
+    },
+    handleDragOver(event) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+    },
+    handleDragEnter(event, tabId) {
+      if (this.draggedTabId && this.draggedTabId !== tabId) {
+        this.dragOverTabId = tabId;
+      }
+    },
+    handleDragLeave(event, tabId) {
+      if (this.dragOverTabId === tabId) {
+        this.dragOverTabId = null;
+      }
+    },
+    handleDrop(event, targetTabId) {
+      event.preventDefault();
+
+      if (!this.draggedTabId || this.draggedTabId === targetTabId) {
+        this.dragOverTabId = null;
+        return;
+      }
+
+      // Find indices
+      const draggedIndex = this.tabs.findIndex(tab => tab.id === this.draggedTabId);
+      const targetIndex = this.tabs.findIndex(tab => tab.id === targetTabId);
+
+      if (draggedIndex === -1 || targetIndex === -1) {
+        this.dragOverTabId = null;
+        return;
+      }
+
+      // Create new array with reordered tabs
+      const newTabs = [...this.tabs];
+      const [draggedTab] = newTabs.splice(draggedIndex, 1);
+      newTabs.splice(targetIndex, 0, draggedTab);
+
+      // Emit reorder event
+      this.$emit('reorder-tabs', newTabs);
+
+      this.dragOverTabId = null;
     },
   },
 };
@@ -237,5 +305,23 @@ export default {
 
 .tab.editing {
   cursor: default;
+}
+
+/* Drag and drop styles */
+.tab[draggable="true"] {
+  cursor: grab;
+}
+
+.tab[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.tab.dragging {
+  opacity: 0.4;
+}
+
+.tab.drag-over {
+  border-left: 3px solid var(--accent-color, #4a9eff);
+  padding-left: 9px; /* Compensate for border */
 }
 </style>

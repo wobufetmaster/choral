@@ -11,9 +11,9 @@
 ### 🟡 Medium Complexity
 - [x] **Set default persona** - Add config option + settings UI ✅
 - [x] **Markdown rendering** - Integrate markdown-it for message display ✅
+- [x] **Tabs should be draggable** - Implement drag-and-drop tab reordering ✅
 - [ ] **Tag searching in character pickers** - Add tag filtering to group chat creation screen (300+ cards need filtering!)
 - [ ] **Auto-name chats with bookkeeping model** - Generate chat title from first message/response
-- [ ] **Tabs should be draggable** - Implement drag-and-drop tab reordering
 
 ### 🔴 Complex Features
 - [ ] **Regex replacement system** - Post-process AI responses with regex find/replace
@@ -32,6 +32,7 @@
 - [x] **Convert to Group button** - Restored in chat sidebar
 - [x] **Default persona** - Set in Settings, auto-applies to new chats
 - [x] **Markdown rendering** - Full markdown support in messages (bold, italic, code blocks, lists, tables, etc.)
+- [x] **Tab dragging** - Drag-and-drop tab reordering with visual feedback
 
 ## ✅ Already Working (Not in original list)
 - **PWA Support** - Manifest and service worker functional, works well on Termux (service worker disabled during dev to prevent cache conflicts, re-enable in production)
