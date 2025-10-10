@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Persona Management - Choral Documentation</title>
+  <link rel="stylesheet" href="css/choral-docs.css">
+</head>
+<body>
+  <div class="docs-container">
+    <nav class="docs-sidebar">
+      <div class="docs-logo">
+        <h1>Choral</h1>
+        <p>Documentation</p>
+      </div>
+      <ul class="docs-nav">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="characters.html">Creating Characters</a></li>
+        <li><a href="macros.html">Macros Reference</a></li>
+        <li><a href="lorebooks.html">Using Lorebooks</a></li>
+        <li><a href="group-chats.html">Group Chats</a></li>
+        <li><a href="personas.html" class="active">Personas</a></li>
+        <li><a href="bookkeeping.html">Bookkeeping</a></li>
+        <li><a href="advanced.html">Advanced Features</a></li>
+      </ul>
+    </nav>
+
+    <main class="docs-main">
+      <h1>Persona Management</h1>
+      <p class="text-secondary">Create and manage user personas to represent yourself in conversations</p>
+
+      <h2>What are Personas?</h2>
+      <p>
+        Personas represent <strong>you</strong> in conversations with AI characters. They control how characters
+        refer to you and what they know about you. Think of personas as different versions of yourself for
+        different roleplay scenarios or character types.
+      </p>
+
+      <div class="callout info">
+        <div class="callout-title">The {{user}} Macro</div>
+        <p>
+          Whenever a character's card uses the <code>{{user}}</code> macro, it gets replaced with your
+          active persona's name. Your persona's description is also included in the conversation context,
+          so characters know who they're talking to.
+        </p>
+      </div>
+
+      <h3>Why Use Multiple Personas?</h3>
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">Different Settings</div>
+          <p class="text-secondary">
+            Use a fantasy persona for medieval characters, a sci-fi persona for space adventures,
+            and a modern persona for contemporary scenarios.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Different Roles</div>
+          <p class="text-secondary">
+            Play as a detective in mystery stories, a merchant in fantasy markets, or a starship
+            captain in space operas - each with their own background and personality.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Character-Specific</div>
+          <p class="text-secondary">
+            Have specific personas for specific characters. Perhaps you're a student when talking
+            to a teacher character, but a warrior when talking to combat-oriented characters.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Privacy & Organization</div>
+          <p class="text-secondary">
+            Keep your real name private by using character names, or organize personas by story
+            arcs and campaigns for easier management.
+          </p>
+        </div>
+      </div>
+
+      <h2>Creating Your First Persona</h2>
+      <p>
+        Let's create a simple persona to get started:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Creating a Basic Persona</div>
+        <ol>
+          <li>Click the <strong>Persona Manager</strong> button in the chat interface</li>
+          <li>Click <strong>"+ New Persona"</strong></li>
+          <li>Fill in the basic information:
+            <ul>
+              <li><strong>Persona Name:</strong> The name characters will use (e.g., "Alex", "Traveler")</li>
+              <li><strong>Description:</strong> A brief description of yourself (optional but recommended)</li>
+            </ul>
+          </li>
+          <li>Click <strong>"Save Persona"</strong></li>
+          <li>Click <strong>"Use This Persona"</strong> to activate it</li>
+        </ol>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">Default Persona</div>
+        <p>
+          If you don't create any personas, Choral uses "User" as the default name. Create at least
+          one persona and set it as default to personalize your experience.
+        </p>
+      </div>
+
+      <h2>Persona Fields Explained</h2>
+
+      <h3>Display Name (Nickname)</h3>
+      <p>
+        The display name is <strong>only for your organization</strong> - it's never sent to the AI.
+        Use it to help yourself remember which persona is which, especially when managing many personas.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Display Name Examples</div>
+        <pre><code>Persona Name: Forrest
+Display Name: Forrest - Fantasy Ranger
+(Shows "Forrest - Fantasy Ranger" in UI, AI sees only "Forrest")
+
+Persona Name: Alex Chen
+Display Name: Alex - Cyberpunk Detective
+(Shows "Alex - Cyberpunk Detective" in UI, AI sees only "Alex Chen")
+
+Persona Name: User
+Display Name: Main Persona (Default)
+(Shows "Main Persona (Default)" in UI, AI sees only "User")</code></pre>
+      </div>
+
+      <h3>Persona Name</h3>
+      <p>
+        This is the <strong>actual name</strong> sent to the AI. It replaces every instance of <code>{{user}}</code>
+        in character cards, system prompts, and conversations.
+      </p>
+
+      <div class="callout warning">
+        <div class="callout-title">Name Consistency</div>
+        <p>
+          If you change a persona's name after starting chats, those existing chats will still use
+          the old name. Create a new persona instead if you want a different name for new conversations.
+        </p>
+      </div>
+
+      <h3>Description</h3>
+      <p>
+        The description is sent to the AI as context about who you are. Use it to tell characters about
+        your appearance, personality, background, skills, or anything else they should know.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Example Persona Descriptions</div>
+        <pre><code><strong>Fantasy Ranger Persona:</strong>
+A skilled ranger from the northern forests, experienced in tracking and survival.
+Wears practical leather armor and carries a well-worn longbow. Quiet and observant,
+preferring the company of animals to people. Has a deep respect for nature and a
+strong moral code.
+
+<strong>Cyberpunk Detective Persona:</strong>
+A freelance detective in Neo-Tokyo, 2089. Former corporate security turned
+independent investigator. Augmented with neural interfaces and ocular implants.
+Cynical but determined, with a soft spot for the downtrodden. Drinks too much
+synthetic coffee and trusts AIs more than people.
+
+<strong>Greek Scholar Persona:</strong>
+A young scholar from Athens, dedicated to philosophy and the pursuit of wisdom.
+Often found in the agora debating with citizens or studying scrolls in the library.
+Respectful of the gods but questions traditional beliefs. Eager to learn from
+those wiser and more experienced.</code></pre>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">How Much Detail?</div>
+        <p>
+          Keep descriptions concise (2-4 sentences) for most cases. Longer descriptions use more tokens
+          and can slow down responses. Add more detail only when it significantly enhances the roleplay.
+        </p>
+      </div>
+
+      <h3>Avatar</h3>
+      <p>
+        Upload an image to represent your persona visually. Avatars are <strong>only for your reference</strong>
+        in the UI - they're not sent to the AI (unless you're using a vision-capable model).
+      </p>
+
+      <div class="example">
+        <div class="example-title">Adding an Avatar</div>
+        <ol>
+          <li>Click <strong>"Upload Avatar"</strong> in the persona editor</li>
+          <li>Select an image file (PNG, JPG, GIF, etc.)</li>
+          <li>The image is embedded as base64 and saved with your persona</li>
+          <li>Click <strong>"Remove Avatar"</strong> to delete it</li>
+        </ol>
+      </div>
+
+      <h2>Automatic Persona Selection</h2>
+      <p>
+        One of the most powerful features of personas is <strong>automatic selection</strong>. Instead of
+        manually switching personas, you can configure them to activate automatically based on which character
+        you're chatting with.
+      </p>
+
+      <h3>Character Bindings</h3>
+      <p>
+        Character bindings link a persona to specific characters. When you open a chat with that character,
+        the bound persona is automatically selected.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Setting Up Character Bindings</div>
+        <ol>
+          <li>Open the <strong>Persona Manager</strong></li>
+          <li>Select the persona you want to bind</li>
+          <li>Scroll to the <strong>"Character Bindings"</strong> section</li>
+          <li>Click on character portraits to toggle bindings (✓ means bound)</li>
+          <li>Save the persona</li>
+        </ol>
+      </div>
+
+      <div class="grid grid-2 mt-3">
+        <div class="card">
+          <div class="card-title">Example: Greek Scholar Persona</div>
+          <p class="text-secondary">
+            Bind to: Athena, Hermes, Apollo<br>
+            When you chat with any Greek mythology character, you're automatically a Greek scholar
+            seeking wisdom from the gods.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Example: Student Persona</div>
+          <p class="text-secondary">
+            Bind to: Teacher characters, Professor characters<br>
+            Automatically become a student when chatting with educational characters.
+          </p>
+        </div>
+      </div>
+
+      <h3>Tag Bindings</h3>
+      <p>
+        Tag bindings are more flexible than character bindings. They automatically select a persona for
+        any character that has specific tags.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Setting Up Tag Bindings</div>
+        <ol>
+          <li>Open the <strong>Persona Manager</strong></li>
+          <li>Select the persona you want to bind</li>
+          <li>Scroll to the <strong>"Tag Bindings"</strong> section</li>
+          <li>Type a tag name in the input field (autocomplete will suggest existing tags)</li>
+          <li>Press <strong>Enter</strong> to add the tag</li>
+          <li>Remove tags by clicking the <strong>×</strong> button</li>
+          <li>Save the persona</li>
+        </ol>
+      </div>
+
+      <div class="grid grid-2 mt-3">
+        <div class="card">
+          <div class="card-title">Example: Fantasy Persona</div>
+          <p><strong>Tag Bindings:</strong> fantasy, medieval, magic, d&d</p>
+          <p class="text-secondary">
+            Automatically used for any character tagged with fantasy-related tags, no matter who they are.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Example: Sci-Fi Persona</div>
+          <p><strong>Tag Bindings:</strong> sci-fi, space, cyberpunk, futuristic</p>
+          <p class="text-secondary">
+            Automatically used for science fiction characters across all settings and time periods.
+          </p>
+        </div>
+      </div>
+
+      <h3>Binding Priority</h3>
+      <p>
+        When multiple personas could apply to a character, Choral uses this priority order:
+      </p>
+
+      <ol>
+        <li><strong>Character Bindings</strong> (highest priority) - Specific character overrides everything</li>
+        <li><strong>Tag Bindings</strong> - Tags are checked if no character binding exists</li>
+        <li><strong>Default Persona</strong> - Used if no bindings match</li>
+      </ol>
+
+      <div class="callout info">
+        <div class="callout-title">Multiple Tag Matches</div>
+        <p>
+          If a character has tags that match multiple personas (e.g., both "fantasy" and "romance"),
+          Choral selects the first matching persona found. Use character bindings for precise control.
+        </p>
+      </div>
+
+      <h2>Example Persona Library</h2>
+      <p>
+        Here's a complete persona library setup for various roleplay scenarios:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Complete Persona Set</div>
+        <pre><code><strong>1. Default Persona (Set as Default)</strong>
+Name: Alex
+Description: A friendly, curious person with an open mind and sense of humor.
+Tag Bindings: (none)
+Character Bindings: (none)
+Purpose: Fallback for any character without specific bindings
+
+<strong>2. Fantasy Adventurer</strong>
+Name: Rowan Blackwood
+Display Name: Rowan - Fantasy Adventurer
+Description: An experienced adventurer from the kingdom of Valoria. Skilled
+with sword and magic. Brave but cautious, with scars from past battles.
+Tag Bindings: fantasy, medieval, d&d, magic
+Character Bindings: (any specific fantasy characters)
+
+<strong>3. Cyberpunk Netrunner</strong>
+Name: Byte
+Display Name: Byte - Cyberpunk Hacker
+Description: A netrunner in Neo-Tokyo, 2089. Expert hacker with illegal neural
+mods. Lives in the shadows, trading information for credits. Sarcastic and
+paranoid but loyal to friends.
+Tag Bindings: cyberpunk, sci-fi, hacker, dystopian
+Character Bindings: (cyberpunk-specific characters)
+
+<strong>4. Greek Scholar</strong>
+Name: Diokles
+Display Name: Diokles - Ancient Scholar
+Description: A young Athenian scholar, 400 BCE. Student of philosophy and
+rhetoric. Respectful but curious, always eager to learn from the wise.
+Tag Bindings: greek mythology, ancient greece, historical
+Character Bindings: Athena, Apollo, Socrates
+
+<strong>5. Space Explorer</strong>
+Name: Captain Rivera
+Display Name: Rivera - Starship Captain
+Description: Captain of the exploration vessel Odyssey. Former military officer
+turned deep space explorer. Diplomatic but firm, with a talent for first contact
+situations.
+Tag Bindings: space, alien, starship, exploration
+Character Bindings: (alien characters, space-themed characters)
+
+<strong>6. Modern Professional</strong>
+Name: Jordan Taylor
+Display Name: Jordan - Modern Setting
+Description: A software engineer in their late 20s. Works remotely, enjoys
+coffee and video games. Introverted but friendly once comfortable.
+Tag Bindings: modern, contemporary, realistic, slice of life
+Character Bindings: (modern/realistic characters)</code></pre>
+      </div>
+
+      <h2>Managing Personas</h2>
+
+      <h3>Switching Personas Mid-Chat</h3>
+      <p>
+        You can manually switch personas at any time during a conversation:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Manual Persona Switch</div>
+        <ol>
+          <li>Open the <strong>Persona Manager</strong> during a chat</li>
+          <li>Select the persona you want to use</li>
+          <li>Click <strong>"Use This Persona"</strong></li>
+          <li>The change takes effect immediately for new messages</li>
+        </ol>
+      </div>
+
+      <div class="callout warning">
+        <div class="callout-title">Mid-Chat Switching</div>
+        <p>
+          When you switch personas mid-conversation, previous messages still reference the old persona's
+          name. The AI will see the inconsistency, so it's best to switch personas only at the start of
+          new chats.
+        </p>
+      </div>
+
+      <h3>Setting a Default Persona</h3>
+      <p>
+        The default persona is used when no tag or character bindings match. Set your most general persona
+        as the default:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Setting Default Persona</div>
+        <ol>
+          <li>Open the <strong>Persona Manager</strong></li>
+          <li>Select the persona you want as default</li>
+          <li>Click <strong>"Set as Default"</strong></li>
+          <li>The button will show <strong>"✓ Default"</strong> when active</li>
+        </ol>
+      </div>
+
+      <h3>Deleting Personas</h3>
+      <p>
+        You can delete any persona except the last one (you must always have at least one persona):
+      </p>
+
+      <div class="example">
+        <div class="example-title">Deleting a Persona</div>
+        <ol>
+          <li>Select the persona you want to delete</li>
+          <li>Click the <strong>"Delete"</strong> button</li>
+          <li>Confirm the deletion</li>
+        </ol>
+      </div>
+
+      <div class="callout warning">
+        <div class="callout-title">Deletion is Permanent</div>
+        <p>
+          Deleting a persona is permanent and cannot be undone. Any chats that were using that persona
+          will continue to work, but the persona information will no longer be available for new chats.
+        </p>
+      </div>
+
+      <h2>Advanced Persona Strategies</h2>
+
+      <h3>Consistent Character Development</h3>
+      <p>
+        Use personas to maintain character development across multiple chats:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Story Arc Personas</div>
+        <pre><code><strong>Campaign Progression:</strong>
+
+1. "Rowan - Level 1 Adventurer"
+   Description: A novice adventurer, fresh from the village...
+
+2. "Rowan - Level 10 Hero"
+   Description: An experienced hero with notable achievements...
+
+3. "Rowan - Level 20 Legend"
+   Description: A legendary warrior known across the realm...
+
+Switch personas as your character progresses through the story!</code></pre>
+      </div>
+
+      <h3>Relationship-Based Personas</h3>
+      <p>
+        Create personas that reflect different relationships with the same character:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Relationship Variants</div>
+        <pre><code><strong>For character "Athena":</strong>
+
+Persona 1: "Diokles - Student"
+Character Binding: Athena
+Description: A student seeking wisdom from the goddess...
+
+Persona 2: "Ares - Rival God"
+Character Binding: Athena
+Description: The god of war, often at odds with Athena's strategies...
+
+Persona 3: "Perseus - Champion"
+Character Binding: Athena
+Description: A mortal hero blessed by Athena...</code></pre>
+      </div>
+
+      <h3>Privacy-Focused Personas</h3>
+      <p>
+        Use fictional names and minimal personal details to maintain privacy:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Privacy Persona</div>
+        <pre><code>Name: Traveler
+Description: A wanderer passing through, with stories to share
+            and questions to ask.
+
+(No personal details, no real name, maximum privacy)</code></pre>
+      </div>
+
+      <h2>Personas with Macros</h2>
+      <p>
+        The <code>{{user}}</code> macro is automatically replaced with your persona name throughout
+        character cards:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Macro Replacement Examples</div>
+        <pre><code><strong>Character card text:</strong>
+"Welcome, {{user}}. *Athena regards you with piercing gray eyes*"
+
+<strong>With persona "Diokles":</strong>
+"Welcome, Diokles. *Athena regards you with piercing gray eyes*"
+
+<strong>With persona "Alex":</strong>
+"Welcome, Alex. *Athena regards you with piercing gray eyes*"</code></pre>
+      </div>
+
+      <p>
+        Characters can also reference your persona's description in their responses, allowing for
+        contextual interactions based on who you're playing as.
+      </p>
+
+      <h2>API Endpoints</h2>
+      <p>
+        For developers integrating with Choral's persona system:
+      </p>
+
+      <table class="api-table">
+        <thead>
+          <tr>
+            <th>Endpoint</th>
+            <th>Method</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>/api/personas</code></td>
+            <td>GET</td>
+            <td>List all personas</td>
+          </tr>
+          <tr>
+            <td><code>/api/personas</code></td>
+            <td>POST</td>
+            <td>Create or update a persona</td>
+          </tr>
+          <tr>
+            <td><code>/api/personas/:filename</code></td>
+            <td>DELETE</td>
+            <td>Delete a specific persona</td>
+          </tr>
+          <tr>
+            <td><code>/api/config/default-persona</code></td>
+            <td>POST</td>
+            <td>Set the default persona</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Best Practices</h2>
+
+      <h3>Organization Tips</h3>
+      <ul>
+        <li>Use descriptive display names to quickly identify personas</li>
+        <li>Create a general "Default" persona for untagged or new characters</li>
+        <li>Group personas by setting (fantasy, sci-fi, modern, etc.) using display names</li>
+        <li>Use tag bindings for broad categories, character bindings for specific cases</li>
+      </ul>
+
+      <h3>Description Writing</h3>
+      <ul>
+        <li>Keep descriptions between 2-4 sentences for optimal token usage</li>
+        <li>Focus on facts the character should know (appearance, role, background)</li>
+        <li>Avoid meta-commentary or instructions (save that for system prompts)</li>
+        <li>Use present tense and active voice</li>
+      </ul>
+
+      <h3>Binding Strategy</h3>
+      <ul>
+        <li>Start with tag bindings for broad categories (fantasy, sci-fi, etc.)</li>
+        <li>Add character bindings for specific characters that need unique personas</li>
+        <li>Test bindings by opening chats and checking which persona is selected</li>
+        <li>Adjust tag bindings if you find personas activating unexpectedly</li>
+      </ul>
+
+      <h2>Troubleshooting</h2>
+
+      <h3>Wrong persona is being selected</h3>
+      <ul>
+        <li>Check character bindings first (they override tag bindings)</li>
+        <li>Review tag bindings for overlapping tags</li>
+        <li>Verify the character's tags to see which might be triggering selection</li>
+        <li>Use character bindings for precise control over automatic selection</li>
+      </ul>
+
+      <h3>Persona changes aren't showing in chat</h3>
+      <ul>
+        <li>Make sure you saved the persona after making changes</li>
+        <li>Try clicking "Use This Persona" to manually activate it</li>
+        <li>Refresh the page and reopen the chat</li>
+        <li>Check browser console (F12) for error messages</li>
+      </ul>
+
+      <h3>Avatar isn't displaying</h3>
+      <ul>
+        <li>Ensure the image file size is reasonable (under 2MB recommended)</li>
+        <li>Try a different image format (PNG or JPG work best)</li>
+        <li>Clear browser cache and refresh</li>
+      </ul>
+
+      <h2>Next Steps</h2>
+      <ul>
+        <li><a href="characters.html">Learn how to create characters that use the {{user}} macro</a></li>
+        <li><a href="macros.html">Master all macro types for dynamic content</a></li>
+        <li><a href="group-chats.html">Use personas in group chats with multiple characters</a></li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

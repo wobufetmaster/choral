@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced Features - Choral Documentation</title>
+  <link rel="stylesheet" href="css/choral-docs.css">
+</head>
+<body>
+  <div class="docs-container">
+    <nav class="docs-sidebar">
+      <div class="docs-logo">
+        <h1>Choral</h1>
+        <p>Documentation</p>
+      </div>
+      <ul class="docs-nav">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="characters.html">Creating Characters</a></li>
+        <li><a href="macros.html">Macros Reference</a></li>
+        <li><a href="lorebooks.html">Using Lorebooks</a></li>
+        <li><a href="group-chats.html">Group Chats</a></li>
+        <li><a href="personas.html">Personas</a></li>
+        <li><a href="bookkeeping.html">Bookkeeping</a></li>
+        <li><a href="advanced.html" class="active">Advanced Features</a></li>
+      </ul>
+    </nav>
+
+    <main class="docs-main">
+      <h1>Advanced Features</h1>
+      <p class="text-secondary">Technical documentation, API endpoints, and advanced configuration</p>
+
+      <div class="callout warning mt-4">
+        <div class="callout-title">Advanced Users Only</div>
+        <p>
+          This section covers technical details for developers and power users. Most users won't need this information
+          for normal operation.
+        </p>
+      </div>
+
+      <h2>API Endpoints</h2>
+      <p>Choral exposes a REST API for programmatic access. All endpoints return JSON.</p>
+
+      <h3>Characters</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Endpoint</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/characters</code></td>
+            <td>List all characters</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/characters/:filename</code></td>
+            <td>Get specific character</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/characters/:filename/image</code></td>
+            <td>Get character image</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/characters</code></td>
+            <td>Upload/create character (multipart or JSON)</td>
+          </tr>
+          <tr>
+            <td>PUT</td>
+            <td><code>/api/characters/:filename</code></td>
+            <td>Update existing character</td>
+          </tr>
+          <tr>
+            <td>PUT</td>
+            <td><code>/api/characters/:filename/tags</code></td>
+            <td>Update character tags</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/characters/:filename/auto-tag</code></td>
+            <td>Auto-generate tags using AI</td>
+          </tr>
+          <tr>
+            <td>DELETE</td>
+            <td><code>/api/characters/:filename</code></td>
+            <td>Delete character</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Chats</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Endpoint</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/chats</code></td>
+            <td>List all chats</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/chats/:filename</code></td>
+            <td>Get specific chat</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/chats</code></td>
+            <td>Save chat</td>
+          </tr>
+          <tr>
+            <td>DELETE</td>
+            <td><code>/api/chats/:filename</code></td>
+            <td>Delete chat</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Group Chats</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Endpoint</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/group-chats</code></td>
+            <td>List all group chats</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/group-chats/:filename</code></td>
+            <td>Get specific group chat</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/group-chats</code></td>
+            <td>Save/create group chat</td>
+          </tr>
+          <tr>
+            <td>DELETE</td>
+            <td><code>/api/group-chats/:filename</code></td>
+            <td>Delete group chat</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Presets</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Endpoint</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/presets</code></td>
+            <td>List all presets</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/presets/:filename</code></td>
+            <td>Get specific preset</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/presets</code></td>
+            <td>Save/create preset</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/presets/import/pixijb</code></td>
+            <td>Import PixiJB config</td>
+          </tr>
+          <tr>
+            <td>DELETE</td>
+            <td><code>/api/presets/:filename</code></td>
+            <td>Delete preset</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Lorebooks</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Endpoint</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/lorebooks</code></td>
+            <td>List all lorebooks</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/lorebooks/:filename</code></td>
+            <td>Get specific lorebook</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/lorebooks</code></td>
+            <td>Save lorebook</td>
+          </tr>
+          <tr>
+            <td>DELETE</td>
+            <td><code>/api/lorebooks/:filename</code></td>
+            <td>Delete lorebook</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Chat Completion</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Endpoint</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/chat/stream</code></td>
+            <td>Streaming chat (SSE)</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/chat</code></td>
+            <td>Non-streaming chat</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Configuration & Tags</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Endpoint</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/config</code></td>
+            <td>Get config (sanitized)</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/config/active-preset</code></td>
+            <td>Set active preset</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/tags</code></td>
+            <td>Get all tag colors</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/tags</code></td>
+            <td>Update tag colors</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/api/personas</code></td>
+            <td>List all personas</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/api/personas</code></td>
+            <td>Save persona</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Prompt Processing Modes</h2>
+      <p>Choral offers six prompt processing modes to ensure API compatibility:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Mode</th>
+            <th>Behavior</th>
+            <th>Best For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>merge_system</code></td>
+            <td>All system messages merged into one (default)</td>
+            <td>Most models</td>
+          </tr>
+          <tr>
+            <td><code>semi_strict</code></td>
+            <td>One system message, then alternating user/assistant</td>
+            <td>Claude models</td>
+          </tr>
+          <tr>
+            <td><code>strict</code></td>
+            <td>User first, strict alternation, no system messages</td>
+            <td>Strict APIs</td>
+          </tr>
+          <tr>
+            <td><code>single_user</code></td>
+            <td>Everything in one giant user message</td>
+            <td>Simple models</td>
+          </tr>
+          <tr>
+            <td><code>anthropic_prefill</code></td>
+            <td>Semi-strict with assistant prefill support</td>
+            <td>Claude with prefill</td>
+          </tr>
+          <tr>
+            <td><code>none</code></td>
+            <td>No processing, messages sent as-is</td>
+            <td>Testing/debugging</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="example">
+        <div class="example-title">Setting Processing Mode</div>
+        <p class="example-description">
+          In your preset, set the <code>promptProcessing</code> field:
+        </p>
+        <pre><code>{
+  "model": "anthropic/claude-3.5-sonnet",
+  "promptProcessing": "semi_strict",
+  ...
+}</code></pre>
+      </div>
+
+      <h2>Debug Logging</h2>
+      <p>All LLM requests are logged to <code>logs/api-requests.log</code> in JSON format:</p>
+
+      <pre><code>{
+  "timestamp": "2025-10-10T15:23:06.789Z",
+  "request": {
+    "model": "anthropic/claude-3.5-sonnet",
+    "messages": [...],
+    "options": {...},
+    "context": {...},
+    "processingMode": "semi_strict"
+  },
+  "response": {
+    "timestamp": "2025-10-10T15:23:08.123Z",
+    "contentLength": 1234,
+    "content": "..."
+  }
+}</code></pre>
+
+      <div class="callout tip">
+        <div class="callout-title">VSCode Tip</div>
+        <p>
+          The JSON format is collapsible in VSCode, making it easy to browse through logs and find specific requests.
+        </p>
+      </div>
+
+      <h2>File Storage</h2>
+      <p>All data is stored in the <code>data/</code> directory:</p>
+
+      <pre><code>data/
+├── characters/       # PNG character cards
+├── chats/            # Chat history JSON files
+├── lorebooks/        # Lorebook JSON files
+├── personas/         # Persona JSON files
+└── presets/          # Preset JSON files</code></pre>
+
+      <h2>Environment Variables</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Variable</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>OPENROUTER_API_KEY</code></td>
+            <td>OpenRouter API key (overrides config.json)</td>
+          </tr>
+          <tr>
+            <td><code>PORT</code></td>
+            <td>Server port (overrides config.json)</td>
+          </tr>
+          <tr>
+            <td><code>NODE_ENV</code></td>
+            <td>Environment (development/production)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Macro Processing</h2>
+      <p>Macros are processed in two stages:</p>
+      <ol>
+        <li><strong>Server-side</strong> (before sending to AI):
+          <ul>
+            <li>Hidden comments (<code>{{//}}</code>) are removed</li>
+            <li>Visible comments (<code>{{comment:}}</code>) are preserved</li>
+            <li><code>{{hidden_key:}}</code> triggers lorebook but is removed from text</li>
+          </ul>
+        </li>
+        <li><strong>Client-side</strong> (before displaying):
+          <ul>
+            <li>Visible comments are shown</li>
+            <li>All substitutions are rendered</li>
+          </ul>
+        </li>
+      </ol>
+
+      <div class="callout info">
+        <div class="callout-title">Implementation Details</div>
+        <p>
+          Macro processing is implemented in <code>server/macros.js</code> (server-side) and
+          <code>src/utils/macros.js</code> (client-side).
+        </p>
+      </div>
+
+      <h2>Character Card V3 Spec</h2>
+      <p>Choral implements the full Character Card V3 specification:</p>
+
+      <pre><code>{
+  "spec": "chara_card_v3",
+  "spec_version": "3.0",
+  "data": {
+    "name": "Character Name",
+    "description": "Physical description",
+    "personality": "Personality traits",
+    "scenario": "Current situation",
+    "first_mes": "Greeting message",
+    "mes_example": "Example dialogue",
+    "creator_notes": "Notes about the character",
+    "system_prompt": "Custom system instructions",
+    "post_history_instructions": "Instructions after chat history",
+    "tags": ["tag1", "tag2"],
+    "creator": "Creator name",
+    "character_version": "1.0",
+    "alternate_greetings": [],
+    "extensions": {}
+  }
+}</code></pre>
+
+      <div class="callout warning">
+        <div class="callout-title">V2 Compatibility</div>
+        <p>
+          Choral can read V2 cards (chara chunk) and will automatically convert them to V3 format internally.
+          However, saving will always use the V3 format (ccv3 chunk).
+        </p>
+      </div>
+
+      <h2>Custom Themes</h2>
+      <p>
+        Choral's themes are defined in <code>src/utils/themes.js</code>. You can add custom themes by editing this file.
+        Each theme defines CSS variables and optional background patterns.
+      </p>
+
+      <h2>Building for Production</h2>
+      <pre><code># Build the frontend
+npm run build
+
+# Run production server
+npm run server</code></pre>
+
+      <p>The production build:</p>
+      <ul>
+        <li>Minifies JavaScript and CSS</li>
+        <li>Optimizes assets</li>
+        <li>Serves from <code>dist/</code> directory</li>
+        <li>Includes source maps for debugging</li>
+      </ul>
+
+      <h2>Troubleshooting</h2>
+
+      <h3>CORS Errors</h3>
+      <p>
+        If running frontend and backend separately, ensure Vite's proxy is configured in <code>vite.config.js</code>.
+      </p>
+
+      <h3>Port Conflicts</h3>
+      <p>
+        Change the port in <code>config.json</code> or set the <code>PORT</code> environment variable.
+      </p>
+
+      <h3>Character Cards Not Loading</h3>
+      <p>
+        Ensure PNG files have valid tEXt chunks with either "ccv3" or "chara" keywords. Use the character
+        editor to view card data and verify structure.
+      </p>
+
+      <h3>API Rate Limits</h3>
+      <p>
+        OpenRouter enforces rate limits. If you hit them, responses will fail. Check your OpenRouter dashboard
+        for current usage and limits.
+      </p>
+
+      <h2>Security Considerations</h2>
+
+      <div class="callout warning">
+        <div class="callout-title">Production Deployment</div>
+        <ul>
+          <li>Never expose your OpenRouter API key in client-side code</li>
+          <li>Run behind a reverse proxy (nginx, Caddy) for HTTPS</li>
+          <li>Implement authentication if exposing to the internet</li>
+          <li>Regularly backup your <code>data/</code> directory</li>
+          <li>Monitor <code>logs/</code> for suspicious activity</li>
+        </ul>
+      </div>
+
+      <h2>Performance Tips</h2>
+      <ul>
+        <li><strong>Enable streaming</strong> for better perceived performance</li>
+        <li><strong>Reduce max_tokens</strong> if responses are too long</li>
+        <li><strong>Use faster models</strong> (Haiku, GPT-3.5) for quick interactions</li>
+        <li><strong>Minimize lorebook entries</strong> to reduce token usage</li>
+        <li><strong>Clear old chats</strong> to keep the database lean</li>
+      </ul>
+
+      <h2>Contributing</h2>
+      <p>
+        Choral is open source! If you'd like to contribute, check the GitHub repository for issues,
+        feature requests, and contribution guidelines.
+      </p>
+
+      <div class="callout info">
+        <div class="callout-title">Need More Help?</div>
+        <p>
+          For questions not covered in this documentation, check the project README or open an issue on GitHub.
+        </p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Macros Reference - Choral Documentation</title>
+  <link rel="stylesheet" href="css/choral-docs.css">
+</head>
+<body>
+  <div class="docs-container">
+    <nav class="docs-sidebar">
+      <div class="docs-logo">
+        <h1>Choral</h1>
+        <p>Documentation</p>
+      </div>
+      <ul class="docs-nav">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="characters.html">Creating Characters</a></li>
+        <li><a href="macros.html" class="active">Macros Reference</a></li>
+        <li><a href="lorebooks.html">Using Lorebooks</a></li>
+        <li><a href="group-chats.html">Group Chats</a></li>
+        <li><a href="personas.html">Personas</a></li>
+        <li><a href="bookkeeping.html">Bookkeeping</a></li>
+        <li><a href="advanced.html">Advanced Features</a></li>
+      </ul>
+    </nav>
+
+    <main class="docs-main">
+      <h1>Macros Reference</h1>
+      <p class="text-secondary">Dynamic content generation using curly braced syntax</p>
+
+      <div class="callout info mt-4">
+        <div class="callout-title">What are Macros?</div>
+        <p>
+          Macros are special placeholders enclosed in <code>{{double curly braces}}</code> that get replaced with
+          dynamic content. They make your characters more varied, responsive, and interactive.
+        </p>
+      </div>
+
+      <h2>Basic Substitution Macros</h2>
+
+      <h3><code>{{char}}</code> - Character Name</h3>
+      <p>Replaced with the character's name (or nickname if set in persona settings).</p>
+      <div class="example">
+        <div class="example-title">Example from Athena</div>
+        <pre><code>*{{char}} regards you with piercing gray eyes*</code></pre>
+        <div class="example-description">Becomes: "*Athena regards you with piercing gray eyes*"</div>
+      </div>
+
+      <h3><code>{{user}}</code> - User Name</h3>
+      <p>Replaced with the user's name (from persona settings, defaults to "User").</p>
+      <div class="example">
+        <div class="example-title">Example Usage</div>
+        <pre><code>Welcome, {{user}}. What brings you to my temple today?</code></pre>
+        <div class="example-description">If your persona is named "Alex", becomes: "Welcome, Alex. What brings you to my temple today?"</div>
+      </div>
+
+      <h2>Random Selection Macros</h2>
+
+      <h3><code>{{random:option1,option2,option3}}</code> - Random Choice</h3>
+      <p>Randomly selects one option from the comma-separated list. Useful for varied responses.</p>
+      <div class="example">
+        <div class="example-title">Example from Hermes</div>
+        <pre><code>I can have it delivered {{random:in the blink of an eye,faster than thought itself,before you finish speaking}}.</code></pre>
+        <div class="example-description">
+          Each time this is processed, a different phrase is randomly selected, making responses feel fresh and unpredictable.
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">When to use {{random:}}</div>
+        <p>
+          Use <code>{{random:}}</code> for variety in greetings, reactions, and flavor text. It's perfect for characters like
+          Hermes who are unpredictable and spontaneous.
+        </p>
+      </div>
+
+      <h3><code>{{pick:option1,option2,option3}}</code> - Consistent Random</h3>
+      <p>Like <code>{{random:}}</code>, but the choice is cached and remains consistent within the same session.</p>
+      <div class="example">
+        <div class="example-title">Example from Athena</div>
+        <pre><code>{{pick:Strategy defeats strength,The clever general wins without fighting,Victory belongs to those who plan}}.</code></pre>
+        <div class="example-description">
+          The first time this is used in a conversation, it picks one option. Subsequent uses in the same chat will return
+          the same choice, maintaining consistency.
+        </div>
+      </div>
+
+      <div class="callout warning">
+        <div class="callout-title">{{random:}} vs {{pick:}}</div>
+        <p>
+          <strong>{{random:}}</strong> - Changes every time it's used<br>
+          <strong>{{pick:}}</strong> - Consistent within a session<br><br>
+          Use <code>{{pick:}}</code> when you want variety between conversations but consistency within one conversation.
+        </p>
+      </div>
+
+      <h2>Dice Roll Macros</h2>
+
+      <h3><code>{{roll:N}}</code> or <code>{{roll:dN}}</code> - Random Number</h3>
+      <p>Generates a random number. <code>{{roll:20}}</code> generates 1-20, <code>{{roll:d20}}</code> is equivalent.</p>
+      <div class="example">
+        <div class="example-title">Example from Artemis</div>
+        <pre><code>Take only what you need, waste nothing, and {{roll:d20}} creatures you disturb today will remember.</code></pre>
+        <div class="example-description">
+          Might become: "...and 17 creatures you disturb today will remember." Great for adding unpredictability and
+          game-like elements.
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">Creative Uses for {{roll:}}</div>
+        <ul>
+          <li>Generating random quantities or numbers in dialogue</li>
+          <li>Simulating dice rolls for RPG-style characters</li>
+          <li>Adding numerical variety to descriptions</li>
+        </ul>
+      </div>
+
+      <h2>Text Manipulation Macros</h2>
+
+      <h3><code>{{reverse:text}}</code> - Reverse Text</h3>
+      <p>Reverses the text. Can be used for mysterious messages or hidden meanings.</p>
+      <div class="example">
+        <div class="example-title">Example from Dionysus</div>
+        <pre><code>{{reverse:ecnad dna gnis}}</code></pre>
+        <div class="example-description">Becomes: "sing and dance" - a playful way to hide messages</div>
+      </div>
+
+      <h2>Comment Macros</h2>
+
+      <h3><code>{{// comment text}}</code> - Hidden Comment</h3>
+      <p>Removed entirely from the output. Useful for notes to yourself or the AI that shouldn't appear.</p>
+      <div class="example">
+        <div class="example-title">Example Usage</div>
+        <pre><code>*She smiles warmly* {{// Use friendly tone here}} Welcome to my temple.</code></pre>
+        <div class="example-description">Output: "*She smiles warmly* Welcome to my temple."</div>
+      </div>
+
+      <h3><code>{{comment:visible text}}</code> - Visible Comment</h3>
+      <p>Displayed in the UI but removed when sent to the AI. Good for OOC notes.</p>
+      <div class="example">
+        <div class="example-title">Example from Dionysus</div>
+        <pre><code>*He offers you a golden goblet* {{comment:Dionysus always offers wine to visitors}}</code></pre>
+        <div class="example-description">
+          You'll see the comment in the chat, reminding you of character behavior, but the AI doesn't receive it.
+        </div>
+      </div>
+
+      <h2>Lorebook Integration</h2>
+
+      <h3><code>{{hidden_key:keyword1,keyword2}}</code> - Hidden Lorebook Trigger</h3>
+      <p>Acts as a hidden keyword for lorebook scanning without appearing in the text.</p>
+      <div class="example">
+        <div class="example-title">Example from Artemis</div>
+        <pre><code>You tread in my domain, mortal. {{hidden_key:wilderness,nature,forest,hunt}}</code></pre>
+        <div class="example-description">
+          This triggers lorebook entries about wilderness, nature, forests, and hunting without cluttering the visible message.
+          The keywords are invisible to both the user and the AI, but lorebook scanning still picks them up.
+        </div>
+      </div>
+
+      <div class="callout info">
+        <div class="callout-title">Why use hidden_key?</div>
+        <p>
+          Hidden keys let you precisely control when lorebook entries are injected without awkwardly forcing keywords
+          into dialogue. They're especially useful for setting-specific information that should appear at certain moments.
+        </p>
+      </div>
+
+      <h2>Practical Example: Creating Dynamic Responses</h2>
+      <div class="example">
+        <div class="example-title">Hermes - Master of Macros</div>
+        <p class="example-description">
+          Here's how Hermes uses multiple macros to create varied, unpredictable responses:
+        </p>
+        <pre><code>&lt;START&gt;
+{{user}}: Can you deliver a message for me?
+{{char}}: *{{char}} perks up* A message? Now you're speaking my language!
+*He produces a golden stylus from thin air* For the right price, I can have
+it delivered {{random:in the blink of an eye,faster than thought itself,before you finish speaking}}.
+
+{{comment:Hermes loves making deals}}
+
+It'll cost you {{roll:d100}} gold coins - unless you'd prefer a
+{{pick:riddle,favor,race,challenge}} instead? What say you?</code></pre>
+        <div class="example-description">
+          This creates a dynamic response that:
+          <ul>
+            <li>Uses character and user names naturally</li>
+            <li>Randomly selects delivery speed description</li>
+            <li>Generates a random price each time</li>
+            <li>Consistently offers the same type of alternative within a session</li>
+            <li>Includes an OOC note visible only to the user</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>Best Practices</h2>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">Do's ✓</div>
+          <ul>
+            <li>Use <code>{{random:}}</code> for varied flavor text</li>
+            <li>Use <code>{{pick:}}</code> for character traits that should be consistent</li>
+            <li>Use <code>{{hidden_key:}}</code> to trigger lorebook entries</li>
+            <li>Use <code>{{comment:}}</code> for reminders about character behavior</li>
+            <li>Keep options in lists reasonably similar in length</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Don'ts ✗</div>
+          <ul>
+            <li>Don't overuse macros - keep responses natural</li>
+            <li>Don't put commas inside options (they're delimiters)</li>
+            <li>Don't use <code>{{random:}}</code> for important character traits</li>
+            <li>Don't nest macros (e.g., <code>{{random:{{pick:A,B}},C}}</code>)</li>
+            <li>Don't rely on macros to fix poor character design</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>Processing Order</h2>
+      <p>
+        Macros are processed twice:
+      </p>
+      <ol>
+        <li><strong>Server-side</strong>: Before sending to the AI. Hidden comments are removed, visible comments are preserved.</li>
+        <li><strong>Client-side</strong>: Before displaying in the UI. Visible comments are shown, hidden elements removed.</li>
+      </ol>
+
+      <div class="callout warning">
+        <div class="callout-title">Case Sensitivity</div>
+        <p>
+          Macro names are case-insensitive. <code>{{CHAR}}</code>, <code>{{Char}}</code>, and <code>{{char}}</code>
+          all work the same way.
+        </p>
+      </div>
+
+      <h2>Next Steps</h2>
+      <p>
+        Now that you understand macros, learn how to use them with <a href="lorebooks.html">Lorebooks</a> for advanced
+        world-building, or check out <a href="characters.html">Creating Characters</a> to see macros in action.
+      </p>
+    </main>
+  </div>
+</body>
+</html>

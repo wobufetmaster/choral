@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Using Lorebooks - Choral Documentation</title>
+  <link rel="stylesheet" href="css/choral-docs.css">
+</head>
+<body>
+  <div class="docs-container">
+    <nav class="docs-sidebar">
+      <div class="docs-logo">
+        <h1>Choral</h1>
+        <p>Documentation</p>
+      </div>
+      <ul class="docs-nav">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="characters.html">Creating Characters</a></li>
+        <li><a href="macros.html">Macros Reference</a></li>
+        <li><a href="lorebooks.html" class="active">Using Lorebooks</a></li>
+        <li><a href="group-chats.html">Group Chats</a></li>
+        <li><a href="personas.html">Personas</a></li>
+        <li><a href="bookkeeping.html">Bookkeeping</a></li>
+        <li><a href="advanced.html">Advanced Features</a></li>
+      </ul>
+    </nav>
+
+    <main class="docs-main">
+      <h1>Using Lorebooks</h1>
+      <p class="text-secondary">Context-aware world-building and dynamic information injection</p>
+
+      <div class="callout info mt-4">
+        <div class="callout-title">What is a Lorebook?</div>
+        <p>
+          A lorebook is a collection of entries that contain world-building information, character backgrounds,
+          locations, items, or any other context you want to inject into conversations. Entries are automatically
+          added to the AI's context when specific keywords or patterns are detected.
+        </p>
+      </div>
+
+      <h2>Why Use Lorebooks?</h2>
+      <p>Lorebooks solve several problems:</p>
+      <ul>
+        <li><strong>Consistent world-building:</strong> Ensure locations, NPCs, and lore remain consistent across conversations</li>
+        <li><strong>Dynamic context:</strong> Only inject relevant information when needed, saving tokens</li>
+        <li><strong>Separation of concerns:</strong> Keep character cards focused on personality, world details in lorebooks</li>
+        <li><strong>Reusability:</strong> Share lorebooks across multiple characters in the same setting</li>
+      </ul>
+
+      <h2>Creating a Lorebook</h2>
+      <p>Click <strong>Lorebooks</strong> from the home screen, then <strong>Create New Lorebook</strong>.</p>
+
+      <h3>Lorebook Structure</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>name</code></td>
+            <td>Lorebook identifier</td>
+          </tr>
+          <tr>
+            <td><code>description</code></td>
+            <td>What this lorebook covers</td>
+          </tr>
+          <tr>
+            <td><code>entries</code></td>
+            <td>Array of lorebook entries</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Lorebook Entries</h2>
+      <p>Each entry has several important fields:</p>
+
+      <h3>Entry Fields</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Purpose</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>keys</code></td>
+            <td>Keywords that trigger this entry</td>
+            <td>["Mount Olympus", "temple", "divine hall"]</td>
+          </tr>
+          <tr>
+            <td><code>content</code></td>
+            <td>The information to inject</td>
+            <td>Description of Mount Olympus</td>
+          </tr>
+          <tr>
+            <td><code>enabled</code></td>
+            <td>Whether this entry is active</td>
+            <td>true/false</td>
+          </tr>
+          <tr>
+            <td><code>priority</code></td>
+            <td>Injection order (higher = earlier)</td>
+            <td>100</td>
+          </tr>
+          <tr>
+            <td><code>position</code></td>
+            <td>Where to inject (before_char, after_char)</td>
+            <td>"before_char"</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Example: Greek Mythology Lorebook</h2>
+      <div class="example">
+        <div class="example-title">Mount Olympus Entry</div>
+        <p class="example-description">
+          This entry triggers when Mount Olympus is mentioned:
+        </p>
+        <pre><code><strong>Keys:</strong> ["Mount Olympus", "Olympus", "divine realm", "hall of the gods"]
+<strong>Content:</strong>
+Mount Olympus is the legendary home of the Greek gods, a massive mountain
+that pierces the clouds. Its peak is home to magnificent marble halls where
+the gods hold council. The air shimmers with divine power, and mortal visitors
+find time flows strangely here. Golden light illuminates everything, and the
+sound of distant music fills the air.
+
+<strong>Priority:</strong> 100
+<strong>Position:</strong> before_char
+<strong>Enabled:</strong> true</code></pre>
+      </div>
+
+      <h3>Using with {{hidden_key:}}</h3>
+      <p>Remember Artemis's first message? It used <code>{{hidden_key:}}</code>:</p>
+      <pre><code>You tread in my domain, mortal. {{hidden_key:wilderness,nature,forest,hunt}}</code></pre>
+
+      <p>This triggers lorebook entries with keys like "wilderness", "nature", "forest", or "hunt":</p>
+      <div class="example">
+        <div class="example-title">Artemis's Forest Entry</div>
+        <pre><code><strong>Keys:</strong> ["wilderness", "forest", "hunt", "nature"]
+<strong>Content:</strong>
+You are in Artemis's sacred forest, an ancient woodland where mortal hunters
+are forbidden. The trees here are older than civilization, and strange creatures
+move through the shadows. Artemis protects this place fiercely - those who harm
+the forest or its creatures face her wrath. Silver moonlight filters through the
+canopy even during the day.
+
+<strong>Priority:</strong> 90
+<strong>Position:</strong> before_char
+<strong>Enabled:</strong> true</code></pre>
+      </div>
+
+      <h2>Advanced Features</h2>
+
+      <h3>Regular Expressions</h3>
+      <p>You can use regex patterns for more flexible matching:</p>
+      <pre><code><strong>Keys:</strong> ["/\\bwine\\b/i", "/\\bfestival\\b/i", "/\\bcelebrat(e|ion)\\b/i"]</code></pre>
+      <p>This matches "wine", "festival", "celebrate", "celebration", etc.</p>
+
+      <h3>Priority and Positioning</h3>
+      <p>Control the order and location of injected entries:</p>
+      <ul>
+        <li><strong>High Priority (100-200):</strong> Essential world info, goes first</li>
+        <li><strong>Medium Priority (50-99):</strong> Location and NPC details</li>
+        <li><strong>Low Priority (0-49):</strong> Minor flavor text and details</li>
+      </ul>
+
+      <p><strong>Positions:</strong></p>
+      <ul>
+        <li><code>before_char</code> - Before character description</li>
+        <li><code>after_char</code> - After character description</li>
+      </ul>
+
+      <h3>Scan Depth</h3>
+      <p>
+        Lorebooks scan the most recent N messages for keywords. Set this in lorebook settings:
+      </p>
+      <ul>
+        <li><strong>1-3:</strong> Only recent context (fast, low token usage)</li>
+        <li><strong>5-10:</strong> Medium context window (balanced)</li>
+        <li><strong>20+:</strong> Long-term memory (expensive but comprehensive)</li>
+      </ul>
+
+      <h2>Practical Examples</h2>
+
+      <h3>Example 1: NPCs</h3>
+      <div class="example">
+        <div class="example-title">Recurring Character</div>
+        <pre><code><strong>Keys:</strong> ["Chiron", "centaur teacher"]
+<strong>Content:</strong>
+Chiron is a wise centaur who trains heroes. Unlike other centaurs, he is
+civilized and kind. He appears as an old centaur with a gray beard, carrying
+scrolls and teaching materials. He knows all the gods personally and often
+gives cryptic advice to mortals.
+
+<strong>Priority:</strong> 75
+<strong>Position:</strong> after_char</code></pre>
+      </div>
+
+      <h3>Example 2: Locations</h3>
+      <div class="example">
+        <div class="example-title">The Underworld</div>
+        <pre><code><strong>Keys:</strong> ["underworld", "Hades", "realm of the dead"]
+<strong>Content:</strong>
+The Underworld is the realm of the dead, ruled by Hades. It's a vast,
+shadowy kingdom beneath the earth. The River Styx flows around its borders,
+and souls of the dead wander eternally unless granted special dispensation.
+The air is cold and smells of earth and old stone. Three-headed Cerberus
+guards the entrance.
+
+<strong>Priority:</strong> 95
+<strong>Position:</strong> before_char</code></pre>
+      </div>
+
+      <h3>Example 3: Items and Objects</h3>
+      <div class="example">
+        <div class="example-title">Athena's Aegis</div>
+        <pre><code><strong>Keys:</strong> ["aegis", "shield of Athena"]
+<strong>Content:</strong>
+The Aegis is Athena's legendary shield, bearing the head of Medusa.
+It strikes fear into enemies and can turn the tide of any battle.
+The shield is made of polished bronze that never tarnishes, and
+the Medusa head's eyes seem to follow movement.
+
+<strong>Priority:</strong> 60
+<strong>Position:</strong> after_char</code></pre>
+      </div>
+
+      <h2>Organizing Your Lorebook</h2>
+
+      <h3>By Category</h3>
+      <p>Create separate lorebooks for:</p>
+      <ul>
+        <li><strong>Locations:</strong> Cities, buildings, natural features</li>
+        <li><strong>NPCs:</strong> Recurring characters and supporting cast</li>
+        <li><strong>History:</strong> Past events and lore</li>
+        <li><strong>Items:</strong> Important objects and artifacts</li>
+        <li><strong>Rules:</strong> Magic systems, social customs, laws</li>
+      </ul>
+
+      <h3>By Scope</h3>
+      <p>Or organize by how widely they're used:</p>
+      <ul>
+        <li><strong>Global:</strong> Applies to all characters in a setting</li>
+        <li><strong>Regional:</strong> Specific to certain locations or storylines</li>
+        <li><strong>Character-Specific:</strong> Tied to one character's personal history</li>
+      </ul>
+
+      <h2>Best Practices</h2>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">Do's ✓</div>
+          <ul>
+            <li>Keep entries focused and concise (2-4 sentences)</li>
+            <li>Use clear, specific keywords</li>
+            <li>Set priorities thoughtfully</li>
+            <li>Test entries in actual conversations</li>
+            <li>Use {{hidden_key:}} in characters to trigger entries</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Don'ts ✗</div>
+          <ul>
+            <li>Don't write novel-length entries</li>
+            <li>Don't use overly common keywords (like "the", "and")</li>
+            <li>Don't create entries for info already in character cards</li>
+            <li>Don't forget to test keyword matching</li>
+            <li>Don't use too many entries (diminishing returns)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>Token Management</h2>
+      <p>Lorebook entries consume tokens. Be strategic:</p>
+      <ul>
+        <li><strong>Enable selectively:</strong> Disable entries not needed for current storyline</li>
+        <li><strong>Use scan depth wisely:</strong> Lower scan depth = fewer tokens</li>
+        <li><strong>Write concisely:</strong> Every word counts</li>
+        <li><strong>Leverage hidden_key:</strong> Control exactly when entries trigger</li>
+      </ul>
+
+      <div class="callout warning">
+        <div class="callout-title">Token Budget</div>
+        <p>
+          If you have 10 lorebook entries that are 50 words each, and all trigger at once, that's 500 words
+          of context before your conversation even starts. Be judicious!
+        </p>
+      </div>
+
+      <h2>Troubleshooting</h2>
+
+      <h3>Entry Not Triggering</h3>
+      <ul>
+        <li>Check that the entry is enabled</li>
+        <li>Verify keywords match exactly (check for typos)</li>
+        <li>Ensure scan depth reaches the message with the keyword</li>
+        <li>Use {{hidden_key:}} if relying on implicit mentions</li>
+      </ul>
+
+      <h3>Too Many Entries Triggering</h3>
+      <ul>
+        <li>Make keywords more specific</li>
+        <li>Reduce scan depth</li>
+        <li>Disable less important entries</li>
+        <li>Combine related entries to reduce duplication</li>
+      </ul>
+
+      <h3>Conflicting Information</h3>
+      <ul>
+        <li>Check for duplicate entries with different content</li>
+        <li>Use priorities to ensure correct entry takes precedence</li>
+        <li>Review all entries for consistency</li>
+      </ul>
+
+      <h2>SillyTavern Format</h2>
+      <p>
+        Choral supports SillyTavern lorebook format. If you import a SillyTavern lorebook, Choral will
+        automatically convert it to the standard format.
+      </p>
+
+      <div class="callout info">
+        <div class="callout-title">Import/Export</div>
+        <p>
+          Lorebooks can be exported as JSON files and shared with others. Click the export button in the
+          lorebook editor to save your work.
+        </p>
+      </div>
+
+      <h2>Next Steps</h2>
+      <p>
+        Try creating a small lorebook for the Greek mythology characters! Add entries for Mount Olympus,
+        the Underworld, and famous items like Zeus's lightning bolt. Then see how conversations change
+        when these locations are mentioned.
+      </p>
+    </main>
+  </div>
+</body>
+</html>

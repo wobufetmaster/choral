@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Choral Documentation</title>
+  <link rel="stylesheet" href="css/choral-docs.css">
+</head>
+<body>
+  <div class="docs-container">
+    <nav class="docs-sidebar">
+      <div class="docs-logo">
+        <h1>Choral</h1>
+        <p>Documentation</p>
+      </div>
+      <ul class="docs-nav">
+        <li><a href="index.html" class="active">Home</a></li>
+        <li><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="characters.html">Creating Characters</a></li>
+        <li><a href="macros.html">Macros Reference</a></li>
+        <li><a href="lorebooks.html">Using Lorebooks</a></li>
+        <li><a href="group-chats.html">Group Chats</a></li>
+        <li><a href="personas.html">Personas</a></li>
+        <li><a href="bookkeeping.html">Bookkeeping</a></li>
+        <li><a href="advanced.html">Advanced Features</a></li>
+      </ul>
+    </nav>
+
+    <main class="docs-main">
+      <h1>Welcome to Choral</h1>
+      <p class="text-secondary">A lightweight, drop-in replacement for SillyTavern built with Vue 3 + Vite</p>
+
+      <div class="callout tip mt-4">
+        <div class="callout-title">New to Choral?</div>
+        <p>Start with our <a href="getting-started.html">Getting Started Guide</a> to learn the basics and import your first character.</p>
+      </div>
+
+      <h2>What is Choral?</h2>
+      <p>
+        Choral is a modern, lightweight chat interface for roleplaying with AI characters. It provides a clean,
+        focused experience for character-based conversations with support for advanced features like lorebooks,
+        macros, and group chats.
+      </p>
+
+      <div class="screenshot">
+        <img src="images/character-list.png" alt="Choral interface showing Greek mythology characters">
+        <p class="screenshot-caption">Clean, organized interface with powerful search and filtering</p>
+      </div>
+
+      <h2>Key Features</h2>
+      <div class="grid grid-3">
+        <div class="card">
+          <div class="card-title">Character Cards</div>
+          <p>Full Character Card V3 support with PNG import/export. Compatible with SillyTavern character cards.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Powerful Macros</div>
+          <p>Dynamic content with <code>{{char}}</code>, <code>{{user}}</code>, <code>{{random:}}</code>, <code>{{pick:}}</code>, and more.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Lorebooks</div>
+          <p>Context-aware world-building with automatic entry injection based on keywords and patterns.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Group Chats</div>
+          <p>Multi-character conversations with flexible response strategies and character selection.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Streaming Responses</div>
+          <p>Real-time token-by-token streaming via OpenRouter API for responsive interactions.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Preset System</div>
+          <p>Flexible prompt templates with multiple processing modes for API compatibility.</p>
+        </div>
+      </div>
+
+      <h2>Example: Meet the Greek Gods</h2>
+      <p>
+        Throughout this documentation, we'll use characters from Greek mythology to demonstrate Choral's features.
+        These examples show real-world usage patterns and help you understand how to create engaging characters.
+      </p>
+
+      <div class="grid grid-2 mt-3">
+        <div class="card">
+          <div class="card-title">Athena - Goddess of Wisdom</div>
+          <p class="text-secondary">
+            A strategic and wise character that demonstrates how to create thoughtful, authoritative personalities.
+            Perfect for showing off intelligent dialogue patterns.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Hermes - The Messenger</div>
+          <p class="text-secondary">
+            Quick-witted and playful, Hermes shows how to use <code>{{random:}}</code> and <code>{{pick:}}</code>
+            macros to create unpredictable, dynamic responses.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Artemis - Goddess of the Hunt</div>
+          <p class="text-secondary">
+            An independent, fierce character that demonstrates lorebook integration with <code>{{hidden_key:}}</code>
+            macros and environmental triggers.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Dionysus - God of Celebration</div>
+          <p class="text-secondary">
+            Theatrical and charismatic, Dionysus showcases advanced macro usage including <code>{{reverse:}}</code>
+            and <code>{{comment:}}</code> for creative effects.
+          </p>
+        </div>
+      </div>
+
+      <h2>Quick Start</h2>
+      <div class="example">
+        <div class="example-title">Getting started with Choral in 3 steps:</div>
+        <ol>
+          <li><strong>Import a character</strong> - Drag and drop a PNG character card or create a new one</li>
+          <li><strong>Configure your preset</strong> - Set up your preferred AI model and system prompts</li>
+          <li><strong>Start chatting</strong> - Click on a character to begin your conversation</li>
+        </ol>
+      </div>
+
+      <h2>Documentation Sections</h2>
+      <ul>
+        <li><a href="getting-started.html"><strong>Getting Started</strong></a> - Installation, configuration, and your first chat</li>
+        <li><a href="characters.html"><strong>Creating Characters</strong></a> - Character card structure, personality design, and examples</li>
+        <li><a href="macros.html"><strong>Macros Reference</strong></a> - Complete guide to Choral's macro system</li>
+        <li><a href="lorebooks.html"><strong>Using Lorebooks</strong></a> - World-building with context-aware entries</li>
+        <li><a href="group-chats.html"><strong>Group Chats</strong></a> - Multi-character conversations and strategies</li>
+        <li><a href="personas.html"><strong>Personas</strong></a> - Create and manage user personas for different characters</li>
+        <li><a href="bookkeeping.html"><strong>Bookkeeping</strong></a> - Automated tagging and chat organization with AI</li>
+        <li><a href="advanced.html"><strong>Advanced Features</strong></a> - API endpoints, prompt processing, and technical details</li>
+      </ul>
+
+      <div class="callout info mt-4">
+        <div class="callout-title">Need Help?</div>
+        <p>
+          If you encounter any issues or have questions, check the <a href="advanced.html">Advanced Features</a>
+          section for troubleshooting tips and API documentation.
+        </p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

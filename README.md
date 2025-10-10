@@ -2,6 +2,8 @@
 
 A lightweight, drop-in replacement for SillyTavern. Choral is a Vue 3 + Express application for chatting with AI characters using Character Card V3 format.
 
+📖 **[Full Documentation](docs/index.html)** - Complete guides, tutorials, and API reference
+
 ## Features
 
 ### ✅ Implemented

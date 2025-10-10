@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bookkeeping Settings - Choral Documentation</title>
+  <link rel="stylesheet" href="css/choral-docs.css">
+</head>
+<body>
+  <div class="docs-container">
+    <nav class="docs-sidebar">
+      <div class="docs-logo">
+        <h1>Choral</h1>
+        <p>Documentation</p>
+      </div>
+      <ul class="docs-nav">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="characters.html">Creating Characters</a></li>
+        <li><a href="macros.html">Macros Reference</a></li>
+        <li><a href="lorebooks.html">Using Lorebooks</a></li>
+        <li><a href="group-chats.html">Group Chats</a></li>
+        <li><a href="bookkeeping.html" class="active">Bookkeeping</a></li>
+        <li><a href="advanced.html">Advanced Features</a></li>
+      </ul>
+    </nav>
+
+    <main class="docs-main">
+      <h1>Bookkeeping Settings</h1>
+      <p class="text-secondary">Automate character tagging and chat organization with AI-powered bookkeeping</p>
+
+      <div class="callout warning mt-4">
+        <div class="callout-title">⚠️ Cost Warning</div>
+        <p>
+          Bookkeeping features use AI models to automatically tag characters and rename chats.
+          <strong>These features make API calls and will cost money.</strong> Review all settings
+          carefully before enabling.
+        </p>
+      </div>
+
+      <h2>What is Bookkeeping?</h2>
+      <p>
+        Bookkeeping features help you automatically organize your character library and chat history
+        using AI. Instead of manually tagging characters or naming chats, Choral can analyze them
+        and generate appropriate metadata automatically.
+      </p>
+
+      <h3>Key Features</h3>
+      <ul>
+        <li><strong>Auto-Tagging:</strong> Automatically generate descriptive tags for characters based on their personality, setting, and traits</li>
+        <li><strong>Auto-Naming:</strong> Generate short, descriptive titles for chats based on conversation content</li>
+        <li><strong>Core Tags System:</strong> Maintain a consistent tag vocabulary across your library</li>
+        <li><strong>Strict Mode:</strong> Limit auto-tagging to only use predefined core tags</li>
+      </ul>
+
+      <h2>Enabling Bookkeeping</h2>
+      <p>
+        Bookkeeping features are disabled by default to prevent unexpected API costs. To enable them:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Enabling Bookkeeping</div>
+        <ol>
+          <li>Open the <strong>Bookkeeping Settings</strong> tab in Choral</li>
+          <li>Check the <strong>"Enable Bookkeeping Features"</strong> checkbox</li>
+          <li>Configure your preferred bookkeeping model (see below)</li>
+          <li>Optionally enable <strong>"Auto-Rename Chats"</strong> for automatic chat titling</li>
+          <li>Click <strong>"Save Settings"</strong></li>
+        </ol>
+      </div>
+
+      <div class="callout info">
+        <div class="callout-title">Master Toggle</div>
+        <p>
+          The "Enable Bookkeeping Features" checkbox is a master toggle. All bookkeeping features
+          (auto-tagging and auto-renaming) will only work when this is enabled.
+        </p>
+      </div>
+
+      <h2>Choosing a Bookkeeping Model</h2>
+      <p>
+        Bookkeeping tasks use a separate AI model from your chat conversations. This allows you to
+        use a cheaper, faster model for organizational tasks while using more powerful models for
+        actual conversations.
+      </p>
+
+      <h3>Recommended Models</h3>
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">DeepSeek Chat v3.1 (Default)</div>
+          <p><strong>Best for:</strong> Budget-conscious users</p>
+          <p class="text-secondary">
+            Extremely cheap and fast. Good quality for tagging and naming tasks. Recommended for
+            most users.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">GPT-4o Mini</div>
+          <p><strong>Best for:</strong> Balanced performance</p>
+          <p class="text-secondary">
+            Fast, cheap, and reliable. Excellent for bookkeeping tasks with consistent quality.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Gemini 2.0 Flash</div>
+          <p><strong>Best for:</strong> Speed</p>
+          <p class="text-secondary">
+            Very fast and cheap. Good quality for organizational tasks.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Claude 3.5 Sonnet</div>
+          <p><strong>Best for:</strong> Maximum quality</p>
+          <p class="text-secondary">
+            Highest quality but more expensive. Use only if you need the best possible tagging
+            and naming results.
+          </p>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">Pro Tip: Start Cheap</div>
+        <p>
+          Start with DeepSeek or GPT-4o Mini. These models are sufficient for most bookkeeping tasks
+          and will save you significant money over time.
+        </p>
+      </div>
+
+      <h2>Auto-Tagging Characters</h2>
+      <p>
+        Auto-tagging analyzes character cards and generates relevant tags automatically. This saves
+        time and helps maintain consistent organization across your character library.
+      </p>
+
+      <h3>How Auto-Tagging Works</h3>
+      <ol>
+        <li>Right-click on a character card in the character list</li>
+        <li>Select <strong>"Auto-tag Character"</strong> from the context menu</li>
+        <li>Choral sends the character's name, description, personality, and scenario to the AI</li>
+        <li>The AI generates 5-10 relevant tags with appropriate colors</li>
+        <li>Tags are automatically added to the character card</li>
+      </ol>
+
+      <div class="example">
+        <div class="example-title">Example: Auto-Tagging Athena</div>
+        <pre><code>Character: Athena
+Description: Goddess of wisdom, strategic warfare, and crafts...
+Personality: Wise, strategic, philosophical, patient...
+
+Generated Tags:
+• Greek Mythology (green)
+• Goddess (gold)
+• Wisdom (blue)
+• Philosophy (purple)
+• Strategy (red)
+• Fantasy (emerald)
+• Historical (brown)</code></pre>
+      </div>
+
+      <h3>Normal vs Strict Mode</h3>
+      <p>
+        Auto-tagging can operate in two modes:
+      </p>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">Normal Mode (Default)</div>
+          <ul>
+            <li>AI can create new tags as needed</li>
+            <li>Encouraged to reuse existing tags when relevant</li>
+            <li>More flexible for diverse character libraries</li>
+            <li>May create similar tags (e.g., "sci-fi" and "science fiction")</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Strict Mode</div>
+          <ul>
+            <li>AI can <strong>only</strong> use tags from the Core Tags list</li>
+            <li>Prevents tag proliferation</li>
+            <li>Maintains consistent vocabulary</li>
+            <li>Requires setting up Core Tags first</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">When to Use Strict Mode</div>
+        <p>
+          Enable Strict Mode if you have a large character library and want to prevent duplicate or
+          similar tags. First, build a comprehensive Core Tags list with all the tags you want to use,
+          then enable Strict Mode to enforce it.
+        </p>
+      </div>
+
+      <h2>Auto-Naming Chats</h2>
+      <p>
+        Auto-naming generates short, descriptive titles for your chats based on the conversation content.
+        This makes it easier to find specific conversations in your chat history.
+      </p>
+
+      <div class="callout warning">
+        <div class="callout-title">Automatic Execution</div>
+        <p>
+          When <strong>"Auto-Rename Chats"</strong> is enabled, chat naming happens automatically:
+        </p>
+        <ul>
+          <li>Every time you start a new chat</li>
+          <li>Every time you load a chat from history</li>
+          <li>Runs in the background without user interaction</li>
+        </ul>
+        <p>
+          This will make API calls and cost money automatically. Disable if you prefer manual naming.
+        </p>
+      </div>
+
+      <h3>How Auto-Naming Works</h3>
+      <ol>
+        <li>When a chat is loaded or created, Choral checks if it needs a title</li>
+        <li>The conversation text is sent to the bookkeeping model</li>
+        <li>The AI generates a short title (3-6 words) that captures the essence of the conversation</li>
+        <li>The chat is automatically renamed with the generated title</li>
+      </ol>
+
+      <div class="example">
+        <div class="example-title">Example Auto-Generated Titles</div>
+        <pre><code>Conversation with Athena about work advice:
+→ "Career Strategy and Wisdom"
+
+Conversation with Hermes about pranks:
+→ "Mischievous Messenger Pranks"
+
+Conversation with Artemis about hunting:
+→ "Forest Hunt and Wildlife"
+
+Conversation with Dionysus about a party:
+→ "Grand Celebration Planning"</code></pre>
+      </div>
+
+      <h3>Manual Renames</h3>
+      <p>
+        If you manually rename a chat, that name will be preserved even if auto-naming is enabled.
+        Choral tracks which chats have been manually renamed and won't override your custom titles.
+      </p>
+
+      <h2>Core Tags System</h2>
+      <p>
+        Core Tags are a global list of predefined tags that help maintain consistency across your
+        character library. They serve two purposes:
+      </p>
+
+      <ul>
+        <li><strong>Normal Mode:</strong> Suggests tags for the AI to reuse (but it can create new ones)</li>
+        <li><strong>Strict Mode:</strong> Enforces that the AI can <strong>only</strong> use these tags</li>
+      </ul>
+
+      <h3>Managing Core Tags</h3>
+      <p>
+        The Core Tags editor lets you create, edit, and organize your tag vocabulary:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Building a Core Tags List</div>
+        <ol>
+          <li>Navigate to <strong>Bookkeeping Settings</strong></li>
+          <li>Scroll to the <strong>"Core Tags"</strong> section</li>
+          <li>Click <strong>"+ Add Core Tag"</strong> to create new tags</li>
+          <li>Enter tag names and choose colors for each tag</li>
+          <li>Click <strong>"Save Core Tags"</strong></li>
+        </ol>
+      </div>
+
+      <h3>Importing Existing Tags</h3>
+      <p>
+        If you already have characters with tags, you can import them into your Core Tags list:
+      </p>
+
+      <div class="example">
+        <div class="example-title">Import From Existing</div>
+        <ol>
+          <li>Click <strong>"Import All Existing Tags"</strong></li>
+          <li>Choral scans all your characters and finds unique tags</li>
+          <li>All unique tags are added to the Core Tags list</li>
+          <li>Colors are preserved from existing tags</li>
+          <li>Review and edit as needed, then save</li>
+        </ol>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">Recommended Workflow</div>
+        <p>
+          If you have existing characters:
+        </p>
+        <ol>
+          <li>Use <strong>"Import All Existing Tags"</strong> to build your initial Core Tags list</li>
+          <li>Review and clean up duplicates or similar tags</li>
+          <li>Add any missing tags you want available</li>
+          <li>Enable <strong>Strict Mode</strong> to enforce this vocabulary going forward</li>
+        </ol>
+      </div>
+
+      <h3>Tag Colors</h3>
+      <p>
+        Each core tag can have a custom color. Colors are used when displaying tags on character cards,
+        making it easier to visually identify character types at a glance.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Example Color Scheme</div>
+        <pre><code>Genre Tags:
+• sci-fi: #4a9eff (blue)
+• fantasy: #22c55e (green)
+• horror: #dc2626 (red)
+• romance: #ec4899 (pink)
+• comedy: #f59e0b (orange)
+
+Setting Tags:
+• medieval: #92400e (brown)
+• cyberpunk: #6366f1 (indigo)
+• post-apocalyptic: #78716c (gray)
+• space: #1e3a8a (dark blue)
+
+Trait Tags:
+• dominant: #7c2d12 (dark red)
+• submissive: #ddd6fe (lavender)
+• tsundere: #f472b6 (light pink)</code></pre>
+      </div>
+
+      <h2>Customizing Prompts</h2>
+      <p>
+        Both auto-tagging and auto-naming use customizable prompts. This allows you to adjust how
+        the AI generates tags and titles to match your preferences.
+      </p>
+
+      <h3>Auto-Naming Prompt</h3>
+      <p>
+        The auto-naming prompt controls how chat titles are generated. The default prompt asks for
+        3-6 word titles in title case that capture the main topic or theme.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Default Auto-Naming Prompt</div>
+        <pre><code>Analyze this conversation and generate a short, descriptive title (3-6 words).
+The title should capture the main topic, theme, or scenario of the conversation.
+Be concise and descriptive. Use title case.
+
+Examples of good titles:
+- "Robot Girlfriend Paradox"
+- "Coffee Shop Philosophy"
+- "Dragon Heist Planning"
+- "Late Night Confession"
+- "Time Travel Paradox"
+
+Conversation:
+{{conversationText}}
+
+Generate a short title (3-6 words) that captures the essence of this conversation.</code></pre>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">Customization Ideas</div>
+        <ul>
+          <li>Change title length (e.g., 2-4 words for shorter titles)</li>
+          <li>Request different case styles (lowercase, uppercase, sentence case)</li>
+          <li>Add specific formatting rules (e.g., "use emojis" or "no punctuation")</li>
+          <li>Change tone (e.g., "humorous titles" or "formal descriptions")</li>
+        </ul>
+      </div>
+
+      <h3>Auto-Tagging Prompts</h3>
+      <p>
+        Auto-tagging has two separate prompts: one for Normal Mode and one for Strict Mode.
+      </p>
+
+      <h4>Strict Mode Prompt</h4>
+      <p>
+        Used when Strict Mode is enabled. Instructs the AI to only select tags from the Core Tags list.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Default Strict Mode Prompt</div>
+        <pre><code>Analyze this character and select the most relevant tags from the provided list.
+You MUST ONLY use tags from this list, do not create new tags.
+
+Available tags:
+{{availableTags}}
+
+Character Information:
+{{characterInfo}}
+
+Select 5-10 relevant tags from the list above. For each tag, provide the tag name
+and assign a meaningful CSS color (hex code) that relates to the tag's meaning.</code></pre>
+      </div>
+
+      <h4>Normal Mode Prompt</h4>
+      <p>
+        Used when Strict Mode is disabled. Encourages reusing existing tags but allows creating new ones.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Default Normal Mode Prompt</div>
+        <pre><code>Analyze this character and generate relevant tags with appropriate colors.
+Tags should be concise, descriptive keywords (e.g., genre, setting, personality traits, themes).
+
+IMPORTANT: If any existing tags are relevant, YOU MUST reuse them exactly as shown.
+Only create new tags if none of the existing tags fit.{{existingTagsSection}}
+
+Character Information:
+{{characterInfo}}
+
+Generate 5-10 relevant tags with colors.</code></pre>
+      </div>
+
+      <h3>Resetting Prompts</h3>
+      <p>
+        If you customize the prompts and want to return to the defaults, use the <strong>"Reset to Default(s)"</strong>
+        buttons in each section.
+      </p>
+
+      <h2>Bulk Operations</h2>
+      <p>
+        Bookkeeping settings include powerful bulk operations for managing your entire character library.
+      </p>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Destructive Operations</div>
+        <p>
+          Bulk operations modify many characters at once and <strong>cannot be undone</strong>.
+          Always back up your <code>data/characters/</code> directory before using these features.
+        </p>
+      </div>
+
+      <h3>Remove Tags from All Characters</h3>
+      <p>
+        This operation removes all tags from every character card in your library. Useful if you want
+        to start fresh with a new tagging system.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Use Case: Fresh Start</div>
+        <ol>
+          <li>You've been manually tagging characters inconsistently</li>
+          <li>You want to switch to auto-tagging with Strict Mode</li>
+          <li>Use <strong>"Remove Tags from All Characters"</strong> to clear existing tags</li>
+          <li>Set up your Core Tags list</li>
+          <li>Enable Strict Mode</li>
+          <li>Auto-tag all characters to apply the new consistent system</li>
+        </ol>
+      </div>
+
+      <h2>Best Practices</h2>
+
+      <h3>Cost Management</h3>
+      <ul>
+        <li>Use the cheapest model that provides acceptable quality (DeepSeek or GPT-4o Mini)</li>
+        <li>Disable <strong>"Auto-Rename Chats"</strong> if you don't need automatic chat titles</li>
+        <li>Consider manually tagging characters instead of using auto-tag for small libraries</li>
+        <li>Monitor your OpenRouter usage to track costs</li>
+      </ul>
+
+      <h3>Tag Organization</h3>
+      <ul>
+        <li>Build a comprehensive Core Tags list before enabling Strict Mode</li>
+        <li>Use consistent naming (lowercase, singular form recommended)</li>
+        <li>Group related tags with similar colors (e.g., all genre tags in similar hues)</li>
+        <li>Periodically review and consolidate similar tags</li>
+      </ul>
+
+      <h3>Workflow Recommendations</h3>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">For New Users</div>
+          <ol>
+            <li>Start with Normal Mode and auto-tagging disabled</li>
+            <li>Manually tag a few characters to build initial tags</li>
+            <li>Import existing tags to Core Tags</li>
+            <li>Enable auto-tagging with Normal Mode</li>
+            <li>Switch to Strict Mode once tag list is comprehensive</li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <div class="card-title">For Existing Libraries</div>
+          <ol>
+            <li>Import all existing tags to Core Tags</li>
+            <li>Review and clean up duplicates</li>
+            <li>Enable Strict Mode immediately</li>
+            <li>Use auto-tagging for new characters only</li>
+            <li>Optionally enable auto-rename for chats</li>
+          </ol>
+        </div>
+      </div>
+
+      <h2>API Endpoints</h2>
+      <p>
+        For developers integrating with Choral's bookkeeping system:
+      </p>
+
+      <table class="api-table">
+        <thead>
+          <tr>
+            <th>Endpoint</th>
+            <th>Method</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>/api/bookkeeping-settings</code></td>
+            <td>GET</td>
+            <td>Retrieve current bookkeeping settings</td>
+          </tr>
+          <tr>
+            <td><code>/api/bookkeeping-settings</code></td>
+            <td>POST</td>
+            <td>Save bookkeeping settings</td>
+          </tr>
+          <tr>
+            <td><code>/api/core-tags</code></td>
+            <td>GET</td>
+            <td>Retrieve core tags list</td>
+          </tr>
+          <tr>
+            <td><code>/api/core-tags</code></td>
+            <td>POST</td>
+            <td>Save core tags list</td>
+          </tr>
+          <tr>
+            <td><code>/api/characters/bulk-remove-tags</code></td>
+            <td>POST</td>
+            <td>Remove tags from all characters</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Troubleshooting</h2>
+
+      <h3>Auto-tagging isn't working</h3>
+      <ul>
+        <li>Verify <strong>"Enable Bookkeeping Features"</strong> is checked</li>
+        <li>Check your OpenRouter API key is valid and has credits</li>
+        <li>Try a different bookkeeping model</li>
+        <li>Check browser console (F12) for error messages</li>
+      </ul>
+
+      <h3>Auto-naming creates poor titles</h3>
+      <ul>
+        <li>Try a more capable model (GPT-4o or Claude 3.5 Sonnet)</li>
+        <li>Customize the auto-naming prompt with more specific instructions</li>
+        <li>Provide more examples in the prompt of desired title styles</li>
+      </ul>
+
+      <h3>Strict Mode creates too few tags</h3>
+      <ul>
+        <li>Your Core Tags list may be too limited</li>
+        <li>Add more tags to Core Tags to give the AI more options</li>
+        <li>Consider using Normal Mode if you need more flexibility</li>
+      </ul>
+
+      <h3>Tags are inconsistent in Normal Mode</h3>
+      <ul>
+        <li>Switch to Strict Mode to enforce consistency</li>
+        <li>Customize the Normal Mode prompt to emphasize reusing existing tags</li>
+        <li>Periodically clean up and consolidate similar tags</li>
+      </ul>
+
+      <h2>Next Steps</h2>
+      <ul>
+        <li><a href="characters.html">Learn how to create engaging characters to tag</a></li>
+        <li><a href="advanced.html">Explore advanced API features</a></li>
+        <li><a href="getting-started.html">Review basic Choral setup</a></li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

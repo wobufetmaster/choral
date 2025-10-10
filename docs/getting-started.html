@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Getting Started - Choral Documentation</title>
+  <link rel="stylesheet" href="css/choral-docs.css">
+</head>
+<body>
+  <div class="docs-container">
+    <nav class="docs-sidebar">
+      <div class="docs-logo">
+        <h1>Choral</h1>
+        <p>Documentation</p>
+      </div>
+      <ul class="docs-nav">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="getting-started.html" class="active">Getting Started</a></li>
+        <li><a href="characters.html">Creating Characters</a></li>
+        <li><a href="macros.html">Macros Reference</a></li>
+        <li><a href="lorebooks.html">Using Lorebooks</a></li>
+        <li><a href="group-chats.html">Group Chats</a></li>
+        <li><a href="personas.html">Personas</a></li>
+        <li><a href="bookkeeping.html">Bookkeeping</a></li>
+        <li><a href="advanced.html">Advanced Features</a></li>
+      </ul>
+    </nav>
+
+    <main class="docs-main">
+      <h1>Getting Started with Choral</h1>
+      <p class="text-secondary">Everything you need to know to start chatting with AI characters</p>
+
+      <h2>Installation</h2>
+      <p>Choral requires Node.js (v16 or higher) to run.</p>
+
+      <div class="example">
+        <div class="example-title">Install and Run</div>
+        <pre><code># Clone or download Choral
+cd choral
+
+# Install dependencies
+npm install
+
+# Run development server (recommended for local use)
+npm run dev
+
+# Or build for production
+npm run build
+npm run server</code></pre>
+      </div>
+
+      <p>The development server will start on two ports:</p>
+      <ul>
+        <li><strong>Frontend (Vite):</strong> <code>http://localhost:5173</code></li>
+        <li><strong>Backend (Express):</strong> <code>http://localhost:3000</code> (or the port specified in <code>config.json</code>)</li>
+      </ul>
+      <p>Access the application at <code>http://localhost:5173</code> during development.</p>
+
+      <h2>Configuration</h2>
+      <p>Edit <code>config.json</code> in the root directory:</p>
+
+      <pre><code>{
+  "port": 3000,
+  "dataDir": "./data",
+  "openRouterApiKey": "your-api-key-here",
+  "activePreset": "default.json"
+}</code></pre>
+
+      <div class="callout info">
+        <div class="callout-title">OpenRouter API Key</div>
+        <p>
+          You'll need an API key from <a href="https://openrouter.ai" target="_blank">OpenRouter</a> to use AI models.
+          You can also set it via the <code>OPENROUTER_API_KEY</code> environment variable.
+        </p>
+      </div>
+
+      <h2>First Steps</h2>
+
+      <h3>1. Import a Character</h3>
+      <p>
+        Choral supports Character Card V3 format (and V2 for backward compatibility). You can import existing
+        character cards or create new ones.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Importing a Character</div>
+        <p class="example-description">
+          Click the <strong>Import Character</strong> button on the home screen and select a PNG character card file.
+          Choral will automatically read the embedded card data and add the character to your roster.
+        </p>
+      </div>
+
+      <h3>2. Configure Your Preset</h3>
+      <p>
+        Presets control how your prompts are formatted and which AI model is used. Click the <strong>⚙️ Settings</strong>
+        button to access preset configuration.
+      </p>
+
+      <div class="screenshot">
+        <img src="images/preset-manager.png" alt="Preset manager showing system prompts and model configuration">
+        <p class="screenshot-caption">The preset manager for configuring models and system prompts</p>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">What's a Preset?</div>
+        <p>
+          A preset combines model settings (temperature, top_p, etc.) with system prompts that guide the AI's behavior.
+          You can create multiple presets for different scenarios (creative writing, roleplay, etc.) and switch between them.
+        </p>
+      </div>
+
+      <h3>3. Start Your First Chat</h3>
+      <p>
+        Click on any character card to open a chat. The character's first message will appear automatically.
+        Type your response and press Enter (or click Send) to continue the conversation.
+      </p>
+
+      <h2>Understanding the Interface</h2>
+
+      <div class="screenshot">
+        <img src="images/character-list.png" alt="Choral character list interface showing Greek mythology characters">
+        <p class="screenshot-caption">The character list with search, filtering, and sorting options</p>
+      </div>
+
+      <h3>Character List</h3>
+      <ul>
+        <li><strong>Search Bar</strong>: Filter characters by name or tags</li>
+        <li><strong>Sort Options</strong>: Sort by recent chats, chat amount, creation date, or random</li>
+        <li><strong>Tag Filters</strong>: Click tags to filter characters (hold multiple for AND filtering)</li>
+        <li><strong>Auto-tag</strong>: Automatically generate tags for characters using AI</li>
+      </ul>
+
+      <h3>Chat Interface</h3>
+
+      <div class="screenshot">
+        <img src="images/chat-interface.png" alt="Chat interface with Athena showing message history and controls">
+        <p class="screenshot-caption">The chat interface with controls sidebar and message display</p>
+      </div>
+
+      <ul>
+        <li><strong>Message History</strong>: Scrollable conversation with your character</li>
+        <li><strong>Input Box</strong>: Type your messages here</li>
+        <li><strong>Settings</strong>: Access preset configuration, model selection, and parameters</li>
+        <li><strong>Streaming Toggle</strong>: Enable/disable real-time response streaming</li>
+      </ul>
+
+      <h3>Tab System</h3>
+      <p>
+        Choral uses a tab-based interface so you can have multiple chats, lorebooks, and settings open simultaneously.
+        Tabs can be reordered by dragging, and closed with the × button.
+      </p>
+
+      <h2>Your First Conversation</h2>
+      <p>Let's try chatting with Athena, goddess of wisdom:</p>
+
+      <div class="example">
+        <div class="example-title">Example Conversation</div>
+        <pre><code><strong>Athena:</strong> Welcome, mortal. *Athena regards you with piercing gray eyes*
+I am Athena, goddess of wisdom and strategy. Few mortals are granted
+audience in my halls. Tell me, what wisdom do you seek?
+
+<strong>You:</strong> I need advice on handling a difficult situation at work.
+
+<strong>Athena:</strong> *She nods approvingly* A wise request. Tell me of your
+dilemma, and hold nothing back. True wisdom comes from understanding
+all facets of a problem. What is the nature of this difficulty?</code></pre>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">Pro Tip: Use Asterisks for Actions</div>
+        <p>
+          Follow the character's style. If they use *asterisks* for actions, do the same! This helps the AI
+          maintain consistent formatting.
+        </p>
+      </div>
+
+      <h2>Managing Your Chats</h2>
+
+      <h3>Chat History</h3>
+      <p>
+        All chats are automatically saved to <code>data/chats/</code>. You can have multiple chat histories
+        with the same character - each is saved separately.
+      </p>
+
+      <h3>Editing Messages</h3>
+      <p>
+        Click the edit button (✏️) on any message to modify it. This is useful for:
+      </p>
+      <ul>
+        <li>Correcting typos</li>
+        <li>Steering the conversation in a different direction</li>
+        <li>Refining character responses</li>
+      </ul>
+
+      <h3>Deleting Messages</h3>
+      <p>
+        Click the delete button (🗑️) to remove a message and all messages after it. Useful for undoing
+        unwanted responses or starting over from a specific point.
+      </p>
+
+      <h2>Personas</h2>
+      <p>
+        Personas represent YOU in the conversation. They let you set your name, description, and other details
+        that characters can reference using the <code>{{user}}</code> macro.
+      </p>
+
+      <div class="callout info">
+        <div class="callout-title">Default Persona</div>
+        <p>
+          If you haven't created a persona, Choral uses "User" as the default name. Create a persona in the
+          settings to customize how characters refer to you.
+        </p>
+      </div>
+
+      <h2>Common Issues</h2>
+
+      <h3>No Response from AI</h3>
+      <ul>
+        <li>Check your OpenRouter API key in <code>config.json</code></li>
+        <li>Verify you have credits available on OpenRouter</li>
+        <li>Check the browser console (F12) for error messages</li>
+      </ul>
+
+      <h3>Character Not Showing Up</h3>
+      <ul>
+        <li>Ensure the PNG file contains valid Character Card data</li>
+        <li>Try refreshing the page</li>
+        <li>Check <code>data/characters/</code> to see if the file was saved</li>
+      </ul>
+
+      <h3>Slow Responses</h3>
+      <ul>
+        <li>Try a faster model (e.g., Claude Haiku instead of Opus)</li>
+        <li>Reduce <code>max_tokens</code> in preset settings</li>
+        <li>Enable streaming for token-by-token responses</li>
+      </ul>
+
+      <h2>Next Steps</h2>
+      <ul>
+        <li><a href="characters.html">Learn how to create your own characters</a></li>
+        <li><a href="macros.html">Master the macro system for dynamic responses</a></li>
+        <li><a href="group-chats.html">Try group chats with multiple characters</a></li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

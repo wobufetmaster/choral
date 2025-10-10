@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Creating Characters - Choral Documentation</title>
+  <link rel="stylesheet" href="css/choral-docs.css">
+</head>
+<body>
+  <div class="docs-container">
+    <nav class="docs-sidebar">
+      <div class="docs-logo">
+        <h1>Choral</h1>
+        <p>Documentation</p>
+      </div>
+      <ul class="docs-nav">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="characters.html" class="active">Creating Characters</a></li>
+        <li><a href="macros.html">Macros Reference</a></li>
+        <li><a href="lorebooks.html">Using Lorebooks</a></li>
+        <li><a href="group-chats.html">Group Chats</a></li>
+        <li><a href="personas.html">Personas</a></li>
+        <li><a href="bookkeeping.html">Bookkeeping</a></li>
+        <li><a href="advanced.html">Advanced Features</a></li>
+      </ul>
+    </nav>
+
+    <main class="docs-main">
+      <h1>Creating Characters</h1>
+      <p class="text-secondary">Learn how to design compelling AI characters with personality and depth</p>
+
+      <div class="callout tip mt-4">
+        <div class="callout-title">Character Card Format</div>
+        <p>
+          Choral uses the <strong>Character Card V3</strong> format, which is compatible with SillyTavern and other
+          character card tools. Characters are stored as PNG images with embedded JSON data.
+        </p>
+      </div>
+
+      <h2>Character Card Structure</h2>
+      <p>A character card consists of several key fields that define who they are and how they behave:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Purpose</th>
+            <th>Required</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>name</code></td>
+            <td>Character's name</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td><code>description</code></td>
+            <td>Physical appearance and background</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>personality</code></td>
+            <td>Traits, behaviors, and speech patterns</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>scenario</code></td>
+            <td>Current situation or setting</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>first_mes</code></td>
+            <td>Character's initial greeting message</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>mes_example</code></td>
+            <td>Example dialogue exchanges</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>creator_notes</code></td>
+            <td>Notes about character design and usage</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>system_prompt</code></td>
+            <td>Instructions for the AI (advanced)</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td><code>tags</code></td>
+            <td>Searchable tags for organization</td>
+            <td>No</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Building a Character: Step by Step</h2>
+      <p>Let's create a character from scratch using Hermes as an example.</p>
+
+      <h3>Step 1: Name and Core Concept</h3>
+      <p>Start with a clear concept:</p>
+      <div class="example">
+        <div class="example-title">Hermes - Core Concept</div>
+        <p><strong>Name:</strong> Hermes</p>
+        <p><strong>Concept:</strong> Swift messenger god who is playful, clever, and always in motion</p>
+        <p><strong>Key Traits:</strong> Quick-witted, mischievous, charming, unpredictable</p>
+      </div>
+
+      <h3>Step 2: Description</h3>
+      <p>Describe physical appearance and background concisely:</p>
+      <pre><code>The swift messenger of the gods, patron of travelers, merchants, and thieves.
+Always on the move with news and mischief.</code></pre>
+
+      <div class="callout tip">
+        <div class="callout-title">Keep it Concise</div>
+        <p>
+          Descriptions don't need to be novels. 2-3 sentences are often enough. The AI can fill in details
+          naturally during conversation.
+        </p>
+      </div>
+
+      <h3>Step 3: Personality</h3>
+      <p>This is where your character comes alive. Be specific about speech patterns and behavior:</p>
+      <pre><code>Quick-witted, playful, and cunning. Hermes is charming and mischievous, never
+staying in one place for long. He enjoys wordplay, tricks, and making deals.
+Despite his playful nature, he takes his duties as messenger seriously.</code></pre>
+
+      <h3>Step 4: Scenario</h3>
+      <p>Set the scene for where/when the user meets this character:</p>
+      <pre><code>Hermes has appeared before you in a flash of golden light, his winged sandals
+still glowing. He seems to have a message - or perhaps he's just looking for
+entertainment.</code></pre>
+
+      <h3>Step 5: First Message</h3>
+      <p>This is crucial - it sets the tone for all future interactions. Use macros to make it dynamic:</p>
+      <pre><code>*In a blur of motion, a young man with winged sandals appears before you*
+Greetings, friend! Hermes, at your service. *He grins mischievously* Well,
+perhaps "at your service" is a bit strong - let's say I'm... in your vicinity.
+I've got messages to deliver, deals to broker, and mischief to make. Which
+interests you most?</code></pre>
+
+      <div class="callout warning">
+        <div class="callout-title">First Message Best Practices</div>
+        <ul>
+          <li>Show, don't tell - use actions (*like this*) to demonstrate personality</li>
+          <li>Include a hook or question to invite engagement</li>
+          <li>Match the tone you want for future conversations</li>
+          <li>Use <code>{{char}}</code> and <code>{{user}}</code> macros appropriately</li>
+        </ul>
+      </div>
+
+      <h3>Step 6: Example Messages</h3>
+      <p>Provide example dialogue to guide the AI's responses. Use the <code>&lt;START&gt;</code> separator:</p>
+      <pre><code>&lt;START&gt;
+{{user}}: Can you deliver a message for me?
+{{char}}: *Hermes perks up* A message? Now you're speaking my language!
+*He produces a golden stylus from thin air* For the right price, I can have
+it delivered {{random:in the blink of an eye,faster than thought itself,before you finish speaking}}.
+What say you?
+&lt;START&gt;
+{{user}}: They say you're the god of thieves.
+{{char}}: *He laughs* Among other things! Messenger, guide of souls, patron
+of merchants... *He winks* I prefer to think of it as "creative redistribution
+of wealth." Though between you and me, I mostly just enjoy the challenge.</code></pre>
+
+      <h2>Personality Design Tips</h2>
+
+      <h3>Speech Patterns</h3>
+      <p>Consistent speech patterns make characters memorable:</p>
+      <ul>
+        <li><strong>Athena:</strong> Formal, measured, uses philosophical language</li>
+        <li><strong>Hermes:</strong> Quick, playful, uses contractions and casual language</li>
+        <li><strong>Artemis:</strong> Direct, blunt, minimal words</li>
+        <li><strong>Dionysus:</strong> Dramatic, theatrical, uses exclamations</li>
+      </ul>
+
+      <h3>Action Descriptions</h3>
+      <p>Use *asterisks* to separate actions from dialogue:</p>
+      <div class="example">
+        <div class="example-title">Good Action Usage</div>
+        <pre><code>*Athena regards you thoughtfully* Your question shows wisdom beyond your years.
+*She gestures to a seat* Sit. Let us discuss this properly.</code></pre>
+      </div>
+
+      <h3>Using Macros in Character Design</h3>
+      <p>Macros make characters feel more dynamic and varied:</p>
+      <ul>
+        <li><code>{{random:}}</code> - For unpredictable characters like Hermes</li>
+        <li><code>{{pick:}}</code> - For character catchphrases or signature moves</li>
+        <li><code>{{roll:}}</code> - For game-like or chaotic characters</li>
+        <li><code>{{hidden_key:}}</code> - To trigger relevant lorebook entries</li>
+      </ul>
+
+      <h2>Complete Example: Artemis</h2>
+      <div class="example">
+        <div class="example-title">Full Character Card</div>
+        <pre><code><strong>Name:</strong> Artemis
+
+<strong>Description:</strong> Goddess of the hunt, wilderness, and the moon. A fierce
+protector of nature and animals, she is independent and untamed.
+
+<strong>Personality:</strong> Independent, fierce, and protective. Artemis is most at home
+in the wild, accompanied by her hunting hounds. She is direct and honest,
+with little patience for flattery or deception. She protects the innocent
+and punishes those who harm nature.
+
+<strong>Scenario:</strong> You have ventured deep into an ancient forest and encountered
+Artemis during a hunt. Her silver bow gleams in the moonlight as she
+considers whether you are friend or trespasser.
+
+<strong>First Message:</strong> *An arrow thuds into the tree beside your head. A silver-haired
+woman emerges from the shadows, bow in hand* You tread in my domain, mortal.
+*{{char}}'s eyes flash dangerously* Speak quickly - are you here to harm my
+forest, or do you come in peace? {{hidden_key:wilderness,nature,forest,hunt}}
+The beasts tell me you have been walking for hours. State your purpose.
+
+<strong>Example Messages:</strong>
+&lt;START&gt;
+{{user}}: I mean no harm to the forest.
+{{char}}: *She lowers her bow slightly* Good. Those who respect the wild earn
+my respect in turn. *A white deer steps out from behind her* The forest is
+home to creatures far older than humanity. Remember that.
+&lt;START&gt;
+{{user}}: Will you teach me to hunt?
+{{char}}: *Artemis sizes you up critically* Hunting is not mere sport - it is
+survival, respect, and skill combined. *She unslings her bow* Very well. But
+know this: take only what you need, waste nothing, and {{roll:d20}} creatures
+you disturb today will remember.</code></pre>
+      </div>
+
+      <h2>Advanced Techniques</h2>
+
+      <h3>System Prompts</h3>
+      <p>
+        For advanced users, system prompts can provide additional instructions to the AI. Use sparingly -
+        personality and examples are usually enough.
+      </p>
+
+      <h3>Alternate Greetings</h3>
+      <p>
+        Provide multiple first messages for variety. Each greeting can present a different scenario or mood.
+      </p>
+
+      <h3>Character Extensions</h3>
+      <p>
+        The V3 format supports custom extensions for additional data like lorebooks, character relationships,
+        or special abilities.
+      </p>
+
+      <h2>Creating Characters in Choral</h2>
+      <p>
+        Click <strong>Create New</strong> on the character list to open the character editor. Fill in the fields,
+        optionally upload an image, and save. Your character will be added to the roster immediately.
+      </p>
+
+      <div class="callout info">
+        <div class="callout-title">Character Images</div>
+        <p>
+          Character images should be PNG format. If you don't provide an image, Choral will create a
+          placeholder. You can update the image later by editing the character.
+        </p>
+      </div>
+
+      <h2>Testing Your Character</h2>
+      <p>After creating a character:</p>
+      <ol>
+        <li>Start a chat and read the first message - does it hook you in?</li>
+        <li>Have a short conversation - does the character stay in voice?</li>
+        <li>Try edge cases - how does the character handle unusual requests?</li>
+        <li>Edit and refine based on what works and what doesn't</li>
+      </ol>
+
+      <h2>Common Mistakes</h2>
+      <ul>
+        <li><strong>Too much backstory</strong> - Keep descriptions focused. The AI can invent details naturally.</li>
+        <li><strong>Inconsistent tone</strong> - If first_mes is playful but personality is serious, it confuses the AI.</li>
+        <li><strong>No examples</strong> - Example messages are your best tool for shaping responses.</li>
+        <li><strong>Over-explaining</strong> - Trust the AI to understand context. "She is happy" is better than "She is happy because..."</li>
+      </ul>
+
+      <h2>Next Steps</h2>
+      <ul>
+        <li><a href="macros.html">Master macros</a> to make your characters more dynamic</li>
+        <li><a href="lorebooks.html">Create lorebooks</a> to add world-building and context</li>
+        <li><a href="group-chats.html">Try group chats</a> with multiple characters</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

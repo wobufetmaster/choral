@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Group Chats - Choral Documentation</title>
+  <link rel="stylesheet" href="css/choral-docs.css">
+</head>
+<body>
+  <div class="docs-container">
+    <nav class="docs-sidebar">
+      <div class="docs-logo">
+        <h1>Choral</h1>
+        <p>Documentation</p>
+      </div>
+      <ul class="docs-nav">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="characters.html">Creating Characters</a></li>
+        <li><a href="macros.html">Macros Reference</a></li>
+        <li><a href="lorebooks.html">Using Lorebooks</a></li>
+        <li><a href="group-chats.html" class="active">Group Chats</a></li>
+        <li><a href="personas.html">Personas</a></li>
+        <li><a href="bookkeeping.html">Bookkeeping</a></li>
+        <li><a href="advanced.html">Advanced Features</a></li>
+      </ul>
+    </nav>
+
+    <main class="docs-main">
+      <h1>Group Chats</h1>
+      <p class="text-secondary">Multi-character conversations and interactions</p>
+
+      <div class="callout tip mt-4">
+        <div class="callout-title">What are Group Chats?</div>
+        <p>
+          Group chats let multiple AI characters participate in the same conversation, each with their own personality
+          and perspective. Perfect for complex scenarios, character interactions, and dynamic storytelling.
+        </p>
+      </div>
+
+      <h2>Creating a Group Chat</h2>
+      <p>Click <strong>Create Group Chat</strong> on the home screen, then:</p>
+      <ol>
+        <li>Select 2 or more characters from your roster</li>
+        <li>Choose a strategy (see below)</li>
+        <li>Click Create Group</li>
+      </ol>
+
+      <h2>Group Chat Strategies</h2>
+      <p>Strategies determine how multiple characters interact:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Strategy</th>
+            <th>Behavior</th>
+            <th>Best For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Join</strong></td>
+            <td>All character descriptions are merged into the system prompt</td>
+            <td>Characters who might naturally interact</td>
+          </tr>
+          <tr>
+            <td><strong>Separate</strong></td>
+            <td>Character contexts are kept distinct</td>
+            <td>Characters from different worlds/settings</td>
+          </tr>
+          <tr>
+            <td><strong>Random</strong></td>
+            <td>AI randomly selects which character responds</td>
+            <td>Chaotic, unpredictable conversations</td>
+          </tr>
+          <tr>
+            <td><strong>Round Robin</strong></td>
+            <td>Characters take turns responding in order</td>
+            <td>Structured discussions or debates</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Example: Council of Olympus</h2>
+      <p>Let's create a group chat with Athena, Hermes, Artemis, and Dionysus:</p>
+
+      <div class="example">
+        <div class="example-title">The Divine Council</div>
+        <div class="example-description">
+          You're summoned to Mount Olympus where four gods debate a mortal's fate. Each brings their unique
+          perspective to the discussion.
+        </div>
+        <pre><code><strong>You:</strong> I seek the wisdom of the gods. A village is in peril from
+a great beast. Should they fight, flee, or try to tame it?
+
+<strong>Athena:</strong> *She steps forward, her gray eyes thoughtful* Strategy
+is key. Tell us - what do you know of this beast? Its nature will
+determine the wisest course.
+
+<strong>Artemis:</strong> *Artemis's hand moves to her bow* If it threatens the
+innocent, it must be stopped. But if it merely defends its territory,
+the mortals are the trespassers.
+
+<strong>Hermes:</strong> *He grins* Or they could hire me to deliver a very
+polite message asking the beast to relocate! {{random:For a small fee,Cheapest solution,Everyone wins}}!
+
+<strong>Dionysus:</strong> *Laughs heartily* Why so serious? Perhaps they should
+throw a festival! Nothing soothes savage beasts like wine and music.
+I speak from experience!</code></pre>
+      </div>
+
+      <div class="callout info">
+        <div class="callout-title">Group Dynamics</div>
+        <p>
+          Characters naturally play off each other. Athena's wisdom contrasts with Dionysus's hedonism, while
+          Artemis's directness balances Hermes's playfulness. The AI understands these dynamics from the
+          character descriptions.
+        </p>
+      </div>
+
+      <h2>Controlling Group Conversations</h2>
+
+      <h3>Addressing Specific Characters</h3>
+      <p>You can direct questions to specific characters:</p>
+      <pre><code>Athena, what would you advise?
+Hermes, can you scout ahead?
+Artemis, what do you sense in the forest?</code></pre>
+
+      <h3>Requesting Multiple Responses</h3>
+      <p>Ask multiple characters to weigh in:</p>
+      <pre><code>What do each of you think about this?
+I'd like to hear everyone's perspective.</code></pre>
+
+      <h3>Encouraging Interaction</h3>
+      <p>Get characters talking to each other, not just to you:</p>
+      <pre><code>Athena, what do you think of Dionysus's suggestion?
+Do you two ever agree on anything?</code></pre>
+
+      <h2>Advanced Group Chat Techniques</h2>
+
+      <h3>Shared Lorebooks</h3>
+      <p>
+        Create a lorebook that all characters in the group can reference. Perfect for:
+      </p>
+      <ul>
+        <li>Shared world-building (locations, events, NPCs)</li>
+        <li>Common history or lore</li>
+        <li>Plot threads that affect multiple characters</li>
+      </ul>
+
+      <h3>Character-Specific Greetings</h3>
+      <p>
+        When starting a group chat, you can use alternate greetings for different scenarios:
+      </p>
+      <ul>
+        <li>Formal council meeting</li>
+        <li>Casual gathering</li>
+        <li>Emergency situation</li>
+      </ul>
+
+      <h3>Managing Large Groups</h3>
+      <p>For groups of 4+ characters:</p>
+      <ul>
+        <li>Use Round Robin to ensure everyone gets a turn</li>
+        <li>Explicitly address characters by name</li>
+        <li>Keep character descriptions concise to save tokens</li>
+        <li>Consider having some characters speak less frequently</li>
+      </ul>
+
+      <h2>Example Scenarios</h2>
+
+      <h3>Scenario 1: The Quest</h3>
+      <p>
+        <strong>Characters:</strong> Athena (strategist), Hermes (scout), Artemis (tracker)<br>
+        <strong>Strategy:</strong> Join<br>
+        <strong>Purpose:</strong> Planning and executing a dangerous mission
+      </p>
+
+      <h3>Scenario 2: The Debate</h3>
+      <p>
+        <strong>Characters:</strong> Athena (logic), Dionysus (emotion), Artemis (nature)<br>
+        <strong>Strategy:</strong> Round Robin<br>
+        <strong>Purpose:</strong> Philosophical discussion with distinct viewpoints
+      </p>
+
+      <h3>Scenario 3: The Party</h3>
+      <p>
+        <strong>Characters:</strong> All four gods<br>
+        <strong>Strategy:</strong> Random<br>
+        <strong>Purpose:</strong> Chaotic, fun social gathering
+      </p>
+
+      <h2>Best Practices</h2>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">Do's ✓</div>
+          <ul>
+            <li>Choose characters with complementary personalities</li>
+            <li>Use clear names when addressing specific characters</li>
+            <li>Let characters disagree and create tension</li>
+            <li>Keep group size manageable (2-5 characters ideal)</li>
+            <li>Use shared lorebooks for common context</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Don'ts ✗</div>
+          <ul>
+            <li>Don't add too many similar characters</li>
+            <li>Don't expect every character to respond to every message</li>
+            <li>Don't forget to give each character space to shine</li>
+            <li>Don't use extremely long character descriptions</li>
+            <li>Don't be surprised by unexpected interactions!</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>Troubleshooting</h2>
+
+      <h3>Characters Sound Too Similar</h3>
+      <p>
+        Ensure each character has distinct speech patterns in their personality and example messages.
+        Use different vocabulary, sentence structure, and formatting.
+      </p>
+
+      <h3>One Character Dominates</h3>
+      <p>
+        Try Round Robin strategy, or explicitly ask for other characters' input.
+        You can also adjust character descriptions to emphasize when they speak vs. listen.
+      </p>
+
+      <h3>Characters Don't Interact</h3>
+      <p>
+        Prompt interaction: "What do you think of what [Character] just said?"
+        or "Do you two agree?" This encourages characters to respond to each other.
+      </p>
+
+      <h2>Creating Group-Specific Characters</h2>
+      <p>Some characters work better in groups than solo:</p>
+      <ul>
+        <li><strong>The Mediator:</strong> Asks others for opinions, facilitates discussion</li>
+        <li><strong>The Provocateur:</strong> Challenges others, creates conflict</li>
+        <li><strong>The Observer:</strong> Comments on group dynamics, provides meta-insights</li>
+        <li><strong>The Wildcard:</strong> Unpredictable, uses {{random:}} heavily</li>
+      </ul>
+
+      <h2>Next Steps</h2>
+      <p>
+        Try creating a group chat with the Greek mythology characters! Experiment with different strategies
+        and see how the gods interact. For more advanced control, check out the
+        <a href="advanced.html">Advanced Features</a> documentation.
+      </p>
+    </main>
+  </div>
+</body>
+</html>
