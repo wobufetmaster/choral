@@ -437,7 +437,7 @@
             :title="'Click for options'"
           />
           <div v-else class="message-avatar user-avatar clickable" @click="showAvatarMenu($event, message, index)" :title="'Click for options'">
-            {{ persona.name[0] }}
+            {{ (persona.nickname || persona.name)[0] }}
           </div>
           <div class="message-bubble">
             <div class="message-actions">
@@ -752,9 +752,10 @@ export default {
           );
 
           // Priority 2: Check if any persona is bound via character tags
-          if (!boundPersona && this.character?.tags) {
+          const characterTags = this.character?.data?.tags || this.character?.tags || [];
+          if (!boundPersona && characterTags.length > 0) {
             boundPersona = personas.find(p =>
-              p.tagBindings?.some(tag => this.character.tags.includes(tag))
+              p.tagBindings?.some(tag => characterTags.includes(tag))
             );
           }
 
@@ -778,6 +779,7 @@ export default {
           this.persona = boundPersona || defaultPersona || personas[0];
 
           // Ensure persona has all fields
+          if (!this.persona.nickname) this.persona.nickname = '';
           if (!this.persona.description) this.persona.description = '';
           if (!this.persona.characterBindings) this.persona.characterBindings = [];
           if (!this.persona.tagBindings) this.persona.tagBindings = [];
@@ -1479,7 +1481,7 @@ export default {
         this.avatarMenu.characterName = this.getMessageCharacterName(message);
         this.avatarMenu.characterFilename = message.characterFilename || this.characterFilename;
       } else {
-        this.avatarMenu.characterName = this.persona.name;
+        this.avatarMenu.characterName = this.persona.nickname || this.persona.name;
         this.avatarMenu.characterFilename = null;
       }
 
@@ -1542,6 +1544,7 @@ export default {
       // Force Vue reactivity by creating a completely new object
       this.persona = {
         name: persona.name || 'User',
+        nickname: persona.nickname || '',
         avatar: persona.avatar || null,
         description: persona.description || '',
         tagBindings: persona.tagBindings || [],
@@ -1550,7 +1553,8 @@ export default {
 
       console.log('ChatView: Updated this.persona to:', this.persona);
 
-      this.$root.$notify(`Now using persona: ${persona.name}`, 'success');
+      const displayName = persona.nickname || persona.name;
+      this.$root.$notify(`Now using persona: ${displayName}`, 'success');
 
       // Save to localStorage as default persona
       localStorage.setItem('default-persona', JSON.stringify(persona));

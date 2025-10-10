@@ -13,7 +13,13 @@
           <div
             v-for="persona in personas"
             :key="persona.name"
-            :class="['persona-item', { active: selectedPersona?.name === persona.name }]"
+            :class="[
+              'persona-item',
+              {
+                active: selectedPersona?.name === persona.name,
+                'in-use': currentPersona?.name === persona.name
+              }
+            ]"
             @click="selectPersona(persona)"
           >
             <img
@@ -23,9 +29,14 @@
               class="persona-avatar"
             />
             <div v-else class="persona-avatar-placeholder">
-              {{ persona.name[0] }}
+              {{ (persona.nickname || persona.name)[0] }}
             </div>
-            <span class="persona-name">{{ persona.name }}</span>
+            <div class="persona-info">
+              <span class="persona-name">{{ persona.nickname || persona.name }}</span>
+              <span v-if="persona.nickname" class="persona-actual-name">{{ persona.name }}</span>
+              <span v-if="currentPersona?.name === persona.name" class="in-use-badge">IN USE</span>
+              <span v-if="isDefaultPersona(persona.name)" class="default-badge">DEFAULT</span>
+            </div>
           </div>
           <button @click="createNewPersona" class="create-btn">+ New Persona</button>
         </div>
@@ -42,7 +53,7 @@
               class="avatar-preview"
             />
             <div v-else class="avatar-preview-placeholder">
-              {{ selectedPersona.name[0] || '?' }}
+              {{ (selectedPersona.nickname || selectedPersona.name)[0] || '?' }}
             </div>
             <div class="avatar-actions">
               <input
@@ -58,8 +69,14 @@
           </div>
 
           <div class="form-group">
-            <label>Persona Name</label>
-            <input v-model="selectedPersona.name" placeholder="Your name" />
+            <label>Display Name (for organization only)</label>
+            <input v-model="selectedPersona.nickname" placeholder="e.g. Forrest - Fantasy" />
+            <p class="hint">Optional nickname for organizing personas (e.g. "Character Name - Setting"). Only shown in UI, never sent to AI.</p>
+          </div>
+
+          <div class="form-group">
+            <label>Persona Name (sent to AI)</label>
+            <input v-model="selectedPersona.name" placeholder="Your actual name" />
           </div>
 
           <div class="form-group">
@@ -125,6 +142,9 @@
           <div class="actions">
             <button @click="usePersona" class="use-btn">Use This Persona</button>
             <button @click="savePersona" class="save-btn">Save Persona</button>
+            <button @click="setAsDefault" class="default-btn" :class="{ active: isDefaultPersona(selectedPersona.name) }">
+              {{ isDefaultPersona(selectedPersona.name) ? '✓ Default' : 'Set as Default' }}
+            </button>
             <button @click="deletePersona" class="delete-btn" v-if="personas.length > 1">Delete</button>
           </div>
         </div>
@@ -145,14 +165,17 @@ export default {
       selectedPersona: null,
       availableCharacters: [],
       newTagBinding: '',
-      tagBindingSuggestions: []
+      tagBindingSuggestions: [],
+      defaultPersona: ''
     }
   },
   computed: {
     allCharacterTags() {
       const tags = new Set();
       this.availableCharacters.forEach(char => {
-        char.tags?.forEach(tag => tags.add(tag));
+        // Handle both char.tags and char.data.tags for flexibility
+        const characterTags = char.tags || char.data?.tags || [];
+        characterTags.forEach(tag => tags.add(tag));
       });
       return Array.from(tags).sort();
     }
@@ -160,6 +183,7 @@ export default {
   async mounted() {
     await this.loadPersonas();
     await this.loadCharacters();
+    await this.loadConfig();
   },
   methods: {
     async loadPersonas() {
@@ -169,12 +193,17 @@ export default {
         if (this.personas.length > 0) {
           // Select current persona or first one
           const current = this.personas.find(p => p.name === this.currentPersona?.name);
-          this.selectedPersona = { ...(current || this.personas[0]) };
+          const persona = current || this.personas[0];
 
-          // Ensure all personas have required fields
-          if (!this.selectedPersona.description) this.selectedPersona.description = '';
-          if (!this.selectedPersona.characterBindings) this.selectedPersona.characterBindings = [];
-          if (!this.selectedPersona.tagBindings) this.selectedPersona.tagBindings = [];
+          // Create a fully initialized copy to ensure reactivity
+          this.selectedPersona = {
+            name: persona.name || '',
+            nickname: persona.nickname || '',
+            avatar: persona.avatar || null,
+            description: persona.description || '',
+            characterBindings: persona.characterBindings || [],
+            tagBindings: persona.tagBindings || []
+          };
         }
       } catch (error) {
         console.error('Failed to load personas:', error);
@@ -189,11 +218,20 @@ export default {
       }
     },
     selectPersona(persona) {
-      this.selectedPersona = { ...persona };
+      // Create a fully initialized copy to ensure reactivity
+      this.selectedPersona = {
+        name: persona.name || '',
+        nickname: persona.nickname || '',
+        avatar: persona.avatar || null,
+        description: persona.description || '',
+        characterBindings: persona.characterBindings || [],
+        tagBindings: persona.tagBindings || []
+      };
     },
     createNewPersona() {
       this.selectedPersona = {
         name: 'New Persona',
+        nickname: '',
         avatar: null,
         description: '',
         characterBindings: [],
@@ -231,21 +269,27 @@ export default {
     },
     addTagBinding() {
       const tag = this.newTagBinding.trim();
+      if (!this.selectedPersona.tagBindings) {
+        this.selectedPersona.tagBindings = [];
+      }
       if (tag && !this.selectedPersona.tagBindings.includes(tag)) {
-        this.selectedPersona.tagBindings.push(tag);
+        this.selectedPersona.tagBindings = [...this.selectedPersona.tagBindings, tag];
         this.newTagBinding = '';
         this.tagBindingSuggestions = [];
       }
     },
     addSuggestedTagBinding(tag) {
+      if (!this.selectedPersona.tagBindings) {
+        this.selectedPersona.tagBindings = [];
+      }
       if (!this.selectedPersona.tagBindings.includes(tag)) {
-        this.selectedPersona.tagBindings.push(tag);
+        this.selectedPersona.tagBindings = [...this.selectedPersona.tagBindings, tag];
         this.newTagBinding = '';
         this.tagBindingSuggestions = [];
       }
     },
     removeTagBinding(index) {
-      this.selectedPersona.tagBindings.splice(index, 1);
+      this.selectedPersona.tagBindings = this.selectedPersona.tagBindings.filter((_, i) => i !== index);
     },
     updateTagBindingSuggestions() {
       if (!this.newTagBinding.trim()) {
@@ -254,10 +298,11 @@ export default {
       }
 
       const query = this.newTagBinding.toLowerCase();
+      const currentBindings = this.selectedPersona.tagBindings || [];
       this.tagBindingSuggestions = this.allCharacterTags
         .filter(tag =>
           tag.toLowerCase().includes(query) &&
-          !this.selectedPersona.tagBindings.includes(tag)
+          !currentBindings.includes(tag)
         )
         .slice(0, 5);
     },
@@ -304,6 +349,34 @@ export default {
       } catch (error) {
         console.error('Failed to delete persona:', error);
         this.$root.$notify('Failed to delete persona', 'error');
+      }
+    },
+    async loadConfig() {
+      try {
+        const response = await fetch('/api/config');
+        const config = await response.json();
+        this.defaultPersona = config.defaultPersona || '';
+      } catch (error) {
+        console.error('Failed to load config:', error);
+      }
+    },
+    isDefaultPersona(personaName) {
+      const filename = `${personaName}.json`;
+      return this.defaultPersona === filename;
+    },
+    async setAsDefault() {
+      try {
+        const filename = `${this.selectedPersona.name}.json`;
+        await fetch('/api/config/default-persona', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona: filename })
+        });
+        this.defaultPersona = filename;
+        this.$root.$notify(`${this.selectedPersona.name} set as default persona`, 'success');
+      } catch (error) {
+        console.error('Failed to set default persona:', error);
+        this.$root.$notify('Failed to set default persona', 'error');
       }
     }
   }
@@ -381,6 +454,12 @@ export default {
   background: var(--bg-tertiary);
 }
 
+.persona-item.in-use {
+  border-color: #4caf50;
+  border-width: 2px;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+}
+
 .persona-avatar,
 .persona-avatar-placeholder {
   width: 40px;
@@ -399,9 +478,42 @@ export default {
   font-weight: 600;
 }
 
-.persona-name {
+.persona-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.persona-name {
   font-weight: 500;
+}
+
+.persona-actual-name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.in-use-badge,
+.default-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  width: fit-content;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.in-use-badge {
+  background: #4caf50;
+  color: white;
+}
+
+.default-badge {
+  background: var(--accent-color);
+  color: white;
 }
 
 .create-btn {
@@ -479,6 +591,18 @@ export default {
   flex: 1;
   background: var(--accent-color);
   color: white;
+}
+
+.default-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s;
+}
+
+.default-btn.active {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
 }
 
 .delete-btn {
