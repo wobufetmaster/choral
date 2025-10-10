@@ -31,8 +31,58 @@
       <p class="text-secondary">Everything you need to know to start chatting with AI characters</p>
 
       <h2>Installation</h2>
-      <p>Choral requires Node.js (v16 or higher) to run.</p>
+      <p>Choral requires Node.js (v18 or higher) to run.</p>
 
+      <div class="callout info">
+        <div class="callout-title">Platform Support</div>
+        <p>
+          Choral works on macOS, Linux, Termux (Android), and Windows. Choose the installation method for your platform below.
+        </p>
+      </div>
+
+      <h3>Quick Install (macOS / Linux / Termux)</h3>
+      <div class="example">
+        <div class="example-title">Automated Installation (Recommended)</div>
+        <pre><code># Clone the repository
+git clone https://github.com/wobufetmaster/choral.git
+cd choral
+
+# Run installation script
+./install.sh
+
+# Configure API key in config.json or:
+export OPENROUTER_API_KEY=your_key_here
+
+# Start the server
+./run.sh</code></pre>
+      </div>
+
+      <h3>Quick Install (Windows) - UNTESTED</h3>
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Windows Scripts Untested</div>
+        <p>
+          The Windows batch scripts have not been tested on a Windows machine. They should work based on standard
+          Windows scripting, but please report any issues on <a href="https://github.com/wobufetmaster/choral/issues" target="_blank">GitHub</a>.
+        </p>
+      </div>
+
+      <div class="example">
+        <div class="example-title">Windows Installation</div>
+        <pre><code>REM Clone the repository
+git clone https://github.com/wobufetmaster/choral.git
+cd choral
+
+REM Run installation script
+install.bat
+
+REM Configure API key in config.json or:
+set OPENROUTER_API_KEY=your_key_here
+
+REM Start the server
+run.bat</code></pre>
+      </div>
+
+      <h3>Manual Installation (All Platforms)</h3>
       <div class="example">
         <div class="example-title">Install and Run</div>
         <pre><code># Clone or download Choral
@@ -55,6 +105,14 @@ npm run server</code></pre>
         <li><strong>Backend (Express):</strong> <code>http://localhost:3000</code> (or the port specified in <code>config.json</code>)</li>
       </ul>
       <p>Access the application at <code>http://localhost:5173</code> during development.</p>
+
+      <div class="callout tip">
+        <div class="callout-title">Detailed Installation Instructions</div>
+        <p>
+          For platform-specific guides including Termux setup and troubleshooting, see the
+          <a href="https://github.com/wobufetmaster/choral/blob/main/INSTALL.md" target="_blank">INSTALL.md</a> file.
+        </p>
+      </div>
 
       <h2>Configuration</h2>
       <p>Edit <code>config.json</code> in the root directory:</p>

@@ -18,6 +18,7 @@
         </button>
         <button @click="$emit('open-tab', 'lorebooks', {}, 'Lorebooks', false)">Lorebooks</button>
         <button @click="$emit('open-tab', 'bookkeeping-settings', {}, 'Bookkeeping', false)">📊 Bookkeeping / Tags</button>
+        <button @click="openDocs">📖 Docs</button>
         <button @click="$emit('open-tab', 'settings', {}, 'Settings', false)">⚙️ Settings</button>
       </div>
     </div>
@@ -987,6 +988,11 @@ export default {
           await this.performAutoTagAll(untaggedCharacters);
         }
       );
+    },
+
+    openDocs() {
+      // Open documentation in a new tab
+      window.open('/docs/index.html', '_blank');
     },
 
     async performAutoTagAll(characters) {

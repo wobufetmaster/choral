@@ -31,26 +31,61 @@ A lightweight, drop-in replacement for SillyTavern. Choral is a Vue 3 + Express 
 
 ### Prerequisites
 
-- Node.js 16+
+- Node.js 18+
 - npm
 
 ### Installation
 
+**Automated Installation (Recommended):**
+
+Choose the installation script for your platform:
+
+**macOS/Linux/Termux:**
 ```bash
 # Clone the repository
 git clone https://github.com/wobufetmaster/choral.git
 cd choral
 
-# Install dependencies
-npm install
+# Run the installation script
+./install.sh
 
-# Configure your API key
-# Copy the example config
-cp config.example.json config.json
-
-# Edit config.json and add your OpenRouter API key
+# Configure your API key (edit config.json)
 # OR set environment variable
 export OPENROUTER_API_KEY=your_key_here
+
+# Start the server
+./run.sh
+```
+
+**Windows (UNTESTED):**
+```batch
+REM Clone the repository
+git clone https://github.com/wobufetmaster/choral.git
+cd choral
+
+REM Run the installation script
+install.bat
+
+REM Configure your API key (edit config.json)
+REM OR set environment variable: set OPENROUTER_API_KEY=your_key_here
+
+REM Start the server
+run.bat
+```
+
+⚠️ **Note:** The Windows scripts (`install.bat` and `run.bat`) are untested as we don't have a Windows machine for testing. They should work based on Windows batch scripting standards, but please report any issues on GitHub.
+
+The installation script will:
+- Check for required dependencies (Node.js, npm, etc.)
+- Verify versions are compatible
+- Install all npm packages
+- Guide you through any issues
+
+**Manual Installation (All Platforms):**
+
+```bash
+# Install dependencies
+npm install
 
 # Start the development server
 npm run dev
@@ -61,6 +96,8 @@ This will start:
 - Vite dev server on http://localhost:5173
 
 Open http://localhost:5173 in your browser to use Choral.
+
+📖 See [INSTALL.md](INSTALL.md) for detailed platform-specific installation instructions and troubleshooting.
 
 ### Installing as a PWA
 

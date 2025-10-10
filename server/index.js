@@ -57,6 +57,9 @@ const upload = multer({ dest: 'uploads/' });
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// Serve documentation
+app.use('/docs', express.static(path.join(__dirname, '../docs')));
+
 const DATA_DIR = path.resolve(config.dataDir || './data');
 const CHARACTERS_DIR = path.join(DATA_DIR, 'characters');
 const CHATS_DIR = path.join(DATA_DIR, 'chats');
