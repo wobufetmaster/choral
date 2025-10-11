@@ -18,9 +18,9 @@
 - [x] **Docs should have a back button to go back to the web application** ✅
 - [x] **In the edit tags screen, typing tags should search for them, like in the persona manager.** ✅
 - [x] **In the edit tags screen, after adding a tag, it should automatically save the added tag.** ✅
-- [ ] **Auto lorebooks don't work in group chats, even if the tags match.
-- [ ] **In the debug screen in chats, it always lists Test_lorebook.json in chats.
-- [ ] **In chats, the lorebook view should put active lorebooks at the top in a seperate section.
+- [x] **Auto lorebooks don't work in group chats, even if the tags match.** ✅
+- [x] **In the debug screen in chats, it always lists Test_lorebook.json in chats.** ✅
+- [x] **In chats, the lorebook view should put active lorebooks at the top in a seperate section.** ✅
 - [x] **In group chats, the swap character cards feature doesn't properly send context.** ✅
 
 
