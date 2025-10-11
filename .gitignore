@@ -15,6 +15,17 @@ data/presets/*
 !data/presets/default.json
 data/tags.json
 
+# Syncthing files and directories
+data/.stfolder/
+data/.stversions/
+data/*.sync-conflict-*
+sync_data.sh
+
+# User-specific settings (these should not be in git)
+data/bookkeeping-settings.json
+data/core-tags.json
+data/tool-settings.json
+
 # Uploads
 uploads/
 
