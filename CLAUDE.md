@@ -298,6 +298,34 @@ Edit `config.json`:
 }
 ```
 
+## Data Synchronization with Syncthing
+
+Choral officially supports **Syncthing** as a method to synchronize user data across multiple devices. This is particularly useful for:
+- Running Choral on Termux (Android) and syncing with a desktop instance
+- Keeping characters, chats, lorebooks, and personas synchronized
+- Automatic conflict resolution with versioning
+
+### How It Works
+- The `data/` directory contains all user-created content
+- Syncthing monitors and syncs this directory across devices
+- Git ignores Syncthing-specific files (`.stfolder/`, `.stversions/`, conflict files)
+- A `sync_data.sh` hook script can be used to ensure sync integrity before/after git operations
+
+### Setup on Termux
+See the README.md and docs/syncthing.html for detailed setup instructions including:
+- Installing Syncthing on Termux
+- Configuring folder sharing between devices
+- Setting up git hooks for automatic syncing
+- Troubleshooting common issues
+
+### Repository Configuration
+The repository is configured to prevent conflicts between git and Syncthing:
+- `.gitignore` excludes all Syncthing metadata (`.stfolder/`, `.stversions/`)
+- `.gitignore` excludes sync conflict files (`*.sync-conflict-*`)
+- `.gitignore` excludes user data and settings files
+- Only default/example files are tracked in git (e.g., `Default-chan.png`, `default.json`)
+- Git is configured to use `pull.rebase = true` for cleaner history
+
 ## Current Project Status
 
 ### ✅ Recently Completed

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Syncthing Synchronization - Choral Documentation</title>
+  <link rel="stylesheet" href="css/choral-docs.css">
+</head>
+<body>
+  <div class="docs-container">
+    <nav class="docs-sidebar">
+      <div class="docs-logo">
+        <h1>Choral</h1>
+        <p>Documentation</p>
+      </div>
+      <a href="/" class="back-to-app">Back to App</a>
+      <ul class="docs-nav">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="characters.html">Creating Characters</a></li>
+        <li><a href="macros.html">Macros Reference</a></li>
+        <li><a href="lorebooks.html">Using Lorebooks</a></li>
+        <li><a href="group-chats.html">Group Chats</a></li>
+        <li><a href="personas.html">Personas</a></li>
+        <li><a href="bookkeeping.html">Bookkeeping</a></li>
+        <li><a href="syncthing.html" class="active">Syncthing</a></li>
+        <li><a href="advanced.html">Advanced Features</a></li>
+      </ul>
+    </nav>
+
+    <main class="docs-main">
+      <h1>Synchronizing Data with Syncthing</h1>
+      <p class="text-secondary">Keep your characters, chats, and settings synchronized across devices</p>
+
+      <div class="callout info">
+        <div class="callout-title">Official Support</div>
+        <p>
+          Choral officially supports <strong>Syncthing</strong> for data synchronization. This guide will help you
+          set up automatic, real-time syncing between your devices (desktop, laptop, Termux/Android, etc.).
+        </p>
+      </div>
+
+      <h2>What is Syncthing?</h2>
+      <p>
+        Syncthing is an open-source, continuous file synchronization tool that keeps files synchronized between multiple
+        devices in real-time. Unlike cloud services, Syncthing is:
+      </p>
+      <ul>
+        <li><strong>Private</strong>: Your data never leaves your devices</li>
+        <li><strong>Peer-to-peer</strong>: No central server or third-party involved</li>
+        <li><strong>Cross-platform</strong>: Works on Linux, macOS, Windows, Android (Termux), and more</li>
+        <li><strong>Automatic</strong>: Changes sync immediately in the background</li>
+        <li><strong>Conflict-aware</strong>: Handles conflicting changes with versioning</li>
+      </ul>
+
+      <h2>Why Syncthing for Choral?</h2>
+      <p>
+        Syncthing is ideal for Choral because:
+      </p>
+      <ul>
+        <li>Your character cards, chats, and lorebooks stay synchronized across all devices</li>
+        <li>Start a conversation on your phone, continue it on your desktop</li>
+        <li>Changes are synced instantly - no manual copying or uploading</li>
+        <li>Works perfectly with git - Choral's repository is configured to ignore Syncthing files</li>
+        <li>Versioning ensures you never lose data to accidental overwrites</li>
+      </ul>
+
+      <h2>Installation</h2>
+
+      <h3>Linux / macOS</h3>
+      <div class="example">
+        <div class="example-title">Install via Package Manager</div>
+        <pre><code># Debian/Ubuntu
+sudo apt install syncthing
+
+# Arch Linux
+sudo pacman -S syncthing
+
+# macOS (via Homebrew)
+brew install syncthing
+
+# Start Syncthing
+syncthing</code></pre>
+      </div>
+
+      <h3>Termux (Android)</h3>
+      <div class="example">
+        <div class="example-title">Install in Termux</div>
+        <pre><code># Update package lists
+pkg update
+
+# Install Syncthing
+pkg install syncthing
+
+# Start Syncthing in background
+syncthing &
+
+# (Optional) Keep Syncthing running after terminal closes
+nohup syncthing > /dev/null 2>&1 &</code></pre>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">Termux Pro Tip</div>
+        <p>
+          To keep Syncthing running permanently on Termux, install <strong>Termux:Boot</strong> from F-Droid and
+          create a boot script: <code>~/.termux/boot/start-syncthing</code> with content <code>#!/data/data/com.termux/files/usr/bin/sh<br>syncthing</code>
+        </p>
+      </div>
+
+      <h3>Windows</h3>
+      <div class="example">
+        <div class="example-title">Windows Installation</div>
+        <p class="example-description">
+          Download the installer from <a href="https://syncthing.net/downloads/" target="_blank">syncthing.net/downloads</a>
+          and run the executable. Syncthing will start automatically and add itself to your system tray.
+        </p>
+      </div>
+
+      <h2>Configuration</h2>
+
+      <h3>Step 1: Access the Web UI</h3>
+      <p>
+        After starting Syncthing, it will display a web address in the terminal (usually <code>http://127.0.0.1:8384</code>).
+        Open this address in your browser. You'll see the Syncthing dashboard.
+      </p>
+
+      <div class="callout warning">
+        <div class="callout-title">Security Note</div>
+        <p>
+          On first launch, Syncthing may prompt you to set a username and password for the web UI. This is highly
+          recommended, especially if Syncthing is exposed to a network.
+        </p>
+      </div>
+
+      <h3>Step 2: Find Your Device ID</h3>
+      <p>
+        In the Syncthing web UI, click <strong>Actions</strong> (top right) → <strong>Show ID</strong>. This displays
+        your unique device ID as both text and a QR code. You'll need this to connect devices.
+      </p>
+
+      <h3>Step 3: Add the Choral Data Folder</h3>
+      <p>
+        On each device where you want to sync Choral data:
+      </p>
+      <ol>
+        <li>Click <strong>Add Folder</strong> in the Syncthing web UI</li>
+        <li>Set <strong>Folder Label</strong> to something like "Choral Data"</li>
+        <li>Set <strong>Folder ID</strong> to <code>choral_data</code> (must be identical on all devices)</li>
+        <li>Set <strong>Folder Path</strong>:
+          <ul>
+            <li>Desktop: <code>/path/to/choral/data</code></li>
+            <li>Termux: <code>/data/data/com.termux/files/home/choral/data</code></li>
+          </ul>
+        </li>
+        <li>Click <strong>Save</strong></li>
+      </ol>
+
+      <div class="example">
+        <div class="example-title">Example Folder Configuration</div>
+        <pre><code>Folder Label: Choral Data
+Folder ID:    choral_data
+Folder Path:  /data/data/com.termux/files/home/choral/data</code></pre>
+      </div>
+
+      <h3>Step 4: Connect Your Devices</h3>
+      <p>
+        To connect two devices (e.g., your desktop and phone):
+      </p>
+      <ol>
+        <li>On Device A, get the Device ID (Actions → Show ID)</li>
+        <li>On Device B, click <strong>Add Remote Device</strong></li>
+        <li>Paste Device A's ID into the <strong>Device ID</strong> field</li>
+        <li>Give it a name (e.g., "Desktop" or "Phone")</li>
+        <li>Under <strong>Sharing</strong>, check the <code>choral_data</code> folder</li>
+        <li>Click <strong>Save</strong></li>
+        <li>On Device A, you'll get a notification asking to accept Device B - click <strong>Add Device</strong></li>
+        <li>Repeat the process from Device A to add Device B</li>
+      </ol>
+
+      <div class="callout tip">
+        <div class="callout-title">QR Code Shortcut</div>
+        <p>
+          On mobile, you can scan the QR code from the "Show ID" screen to quickly add a device ID without typing.
+        </p>
+      </div>
+
+      <h3>Step 5: Wait for Initial Sync</h3>
+      <p>
+        The first sync may take a few minutes depending on how much data you have. Once complete, all your characters,
+        chats, lorebooks, and settings will be synchronized.
+      </p>
+
+      <h2>Advanced Configuration</h2>
+
+      <h3>File Versioning</h3>
+      <p>
+        Syncthing includes file versioning to prevent data loss. To enable it:
+      </p>
+      <ol>
+        <li>Click on the <code>choral_data</code> folder in the Syncthing UI</li>
+        <li>Click <strong>Edit</strong></li>
+        <li>Go to the <strong>File Versioning</strong> tab</li>
+        <li>Select a versioning type:
+          <ul>
+            <li><strong>Staggered File Versioning</strong>: Recommended - keeps versions based on age</li>
+            <li><strong>Simple File Versioning</strong>: Keeps N versions of each file</li>
+          </ul>
+        </li>
+        <li>Click <strong>Save</strong></li>
+      </ol>
+
+      <div class="callout info">
+        <div class="callout-title">Versions Location</div>
+        <p>
+          Versions are stored in <code>data/.stversions/</code> and are automatically excluded from git by Choral's
+          <code>.gitignore</code> file.
+        </p>
+      </div>
+
+      <h3>Ignoring Files</h3>
+      <p>
+        If you want to exclude certain files from syncing (e.g., logs or temporary files), you can add ignore patterns:
+      </p>
+      <ol>
+        <li>Edit the <code>choral_data</code> folder in Syncthing</li>
+        <li>Go to the <strong>Ignore Patterns</strong> tab</li>
+        <li>Add patterns like:
+          <pre><code>*.log
+*.tmp
+.DS_Store</code></pre>
+        </li>
+        <li>Click <strong>Save</strong></li>
+      </ol>
+
+      <h3>Git Hook for Auto-Sync</h3>
+      <p>
+        If you're actively developing Choral and frequently pulling updates from git, you can set up a git hook to
+        ensure data is synced before/after git operations.
+      </p>
+
+      <div class="example">
+        <div class="example-title">Optional: Create sync_data.sh Script</div>
+        <pre><code>#!/bin/bash
+# Save this as sync_data.sh in the Choral root directory
+
+echo "=== Choral Data Sync ==="
+echo "Local:  $(pwd)/data"
+echo "Shared: /path/to/syncthing/folder"
+
+# Sync from Syncthing folder to local data/
+echo "Syncing from shared to local..."
+rsync -av --delete /path/to/syncthing/folder/ ./data/
+
+# Sync from local data/ back to Syncthing folder
+echo "Syncing from local to shared..."
+rsync -av --delete ./data/ /path/to/syncthing/folder/
+
+echo "✓ Sync complete!"</code></pre>
+      </div>
+
+      <div class="example">
+        <div class="example-title">Set Up Git Hooks</div>
+        <pre><code># Make the script executable
+chmod +x sync_data.sh
+
+# Pre-pull hook (sync before pulling from git)
+echo '#!/bin/bash' > .git/hooks/pre-pull
+echo './sync_data.sh' >> .git/hooks/pre-pull
+chmod +x .git/hooks/pre-pull
+
+# Post-checkout hook (sync after checking out branches)
+echo '#!/bin/bash' > .git/hooks/post-checkout
+echo './sync_data.sh' >> .git/hooks/post-checkout
+chmod +x .git/hooks/post-checkout</code></pre>
+      </div>
+
+      <div class="callout warning">
+        <div class="callout-title">Note on Git Hooks</div>
+        <p>
+          Git hooks are optional and only useful if you're actively developing Choral. Most users who just want to
+          sync data across devices <strong>do not need</strong> to set up git hooks.
+        </p>
+      </div>
+
+      <h2>Troubleshooting</h2>
+
+      <h3>Devices Not Connecting</h3>
+      <ul>
+        <li><strong>Check firewalls</strong>: Ensure Syncthing can access the network (default port 22000)</li>
+        <li><strong>Verify Device IDs</strong>: Make sure you copied the full device ID correctly</li>
+        <li><strong>Try relay servers</strong>: Enable "Relay" in Actions → Settings → Connections (slower but works through firewalls)</li>
+        <li><strong>Use local discovery</strong>: If devices are on the same network, enable "Local Discovery"</li>
+      </ul>
+
+      <h3>Sync Conflicts</h3>
+      <p>
+        If you edit the same file on multiple devices simultaneously, Syncthing will create conflict files:
+      </p>
+      <pre><code>tags.sync-conflict-20251008-192251-MVHP7WH.json</code></pre>
+      <p>
+        To resolve:
+      </p>
+      <ol>
+        <li>Open both files (original and conflict)</li>
+        <li>Decide which version to keep or manually merge changes</li>
+        <li>Delete the conflict file</li>
+      </ol>
+
+      <div class="callout tip">
+        <div class="callout-title">Preventing Conflicts</div>
+        <p>
+          Choral's <code>.gitignore</code> automatically excludes sync conflict files from git, so they won't cause
+          issues with version control.
+        </p>
+      </div>
+
+      <h3>High CPU/Battery Usage (Termux)</h3>
+      <ul>
+        <li>Increase <strong>Scan Interval</strong>: Edit folder → Advanced → Scan Interval (default 60s, try 300s or higher)</li>
+        <li>Disable <strong>Watch for Changes</strong>: Edit folder → Advanced → uncheck "Watch for Changes"</li>
+        <li>Pause syncing when not needed: Click "Pause" on folders in the Syncthing UI</li>
+      </ul>
+
+      <h3>Syncthing Not Starting on Termux</h3>
+      <ul>
+        <li>Check if it's already running: <code>pgrep syncthing</code></li>
+        <li>Kill existing process: <code>pkill syncthing</code></li>
+        <li>Restart: <code>syncthing &</code></li>
+        <li>Check logs: <code>~/.config/syncthing/syncthing.log</code></li>
+      </ul>
+
+      <h2>Best Practices</h2>
+
+      <h3>1. Enable File Versioning</h3>
+      <p>
+        Always enable versioning to protect against accidental deletions or overwrites. Staggered versioning is
+        recommended as it keeps multiple versions based on age.
+      </p>
+
+      <h3>2. Monitor Sync Status</h3>
+      <p>
+        Keep an eye on the Syncthing UI to ensure all devices are connected and syncing properly. Look for:
+      </p>
+      <ul>
+        <li><strong>Up to Date</strong>: Folder is fully synced</li>
+        <li><strong>Syncing</strong>: Files are currently being transferred</li>
+        <li><strong>Out of Sync</strong>: Check for errors or conflicts</li>
+      </ul>
+
+      <h3>3. Test Your Setup</h3>
+      <p>
+        After configuring Syncthing, test it:
+      </p>
+      <ol>
+        <li>Create a test character on Device A</li>
+        <li>Wait a few seconds for sync</li>
+        <li>Refresh Choral on Device B - the character should appear</li>
+      </ol>
+
+      <h3>4. Backup Regularly</h3>
+      <p>
+        While Syncthing provides versioning, it's still good practice to back up your <code>data/</code> folder
+        periodically to an external location.
+      </p>
+
+      <h2>Security Considerations</h2>
+
+      <h3>1. Set a Web UI Password</h3>
+      <p>
+        Protect your Syncthing web UI with a password (Actions → Settings → GUI → Authentication).
+      </p>
+
+      <h3>2. Use Device Names Carefully</h3>
+      <p>
+        Choose descriptive but not personally identifiable device names (e.g., "Desktop" instead of "John's Laptop").
+      </p>
+
+      <h3>3. Trust Your Devices</h3>
+      <p>
+        Only connect devices you personally control. Syncthing is designed for peer-to-peer sync, not for sharing with
+        untrusted parties.
+      </p>
+
+      <h3>4. Review Shared Folders</h3>
+      <p>
+        Periodically review which folders are shared with which devices in the Syncthing UI.
+      </p>
+
+      <h2>Alternative Sync Methods</h2>
+      <p>
+        While Syncthing is officially supported, you can also sync your <code>data/</code> folder using:
+      </p>
+      <ul>
+        <li><strong>Cloud services</strong>: Dropbox, Google Drive, OneDrive (symlink the <code>data/</code> folder)</li>
+        <li><strong>rsync</strong>: Manual syncing via SSH</li>
+        <li><strong>Git</strong>: Create a separate private git repo for your <code>data/</code> folder (not recommended due to binary PNGs)</li>
+      </ul>
+
+      <div class="callout info">
+        <div class="callout-title">Why Not Git for Data?</div>
+        <p>
+          Character cards are large PNG files that don't compress well in git. Over time, your repository size would
+          grow significantly. Syncthing is specifically designed for syncing binary files efficiently.
+        </p>
+      </div>
+
+      <h2>Resources</h2>
+      <ul>
+        <li><a href="https://syncthing.net/" target="_blank">Syncthing Official Website</a></li>
+        <li><a href="https://docs.syncthing.net/" target="_blank">Syncthing Documentation</a></li>
+        <li><a href="https://forum.syncthing.net/" target="_blank">Syncthing Community Forum</a></li>
+        <li><a href="https://github.com/syncthing/syncthing" target="_blank">Syncthing on GitHub</a></li>
+      </ul>
+
+      <div class="callout tip">
+        <div class="callout-title">Need Help?</div>
+        <p>
+          If you encounter issues with Syncthing and Choral, please report them on the
+          <a href="https://github.com/wobufetmaster/choral/issues" target="_blank">Choral GitHub repository</a>.
+        </p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

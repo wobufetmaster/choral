@@ -167,7 +167,60 @@ data/
   tags.json     # Character tags
 ```
 
-You can sync this directory across devices using Syncthing, Dropbox, or similar tools.
+### Synchronizing Data with Syncthing
+
+Choral officially supports **Syncthing** for synchronizing your data across multiple devices. This is ideal for running Choral on both desktop and Termux (Android).
+
+**Quick Setup (Termux):**
+
+```bash
+# Install Syncthing
+pkg install syncthing
+
+# Start Syncthing (it will run in the background)
+syncthing &
+
+# Open the web UI (displayed in terminal output)
+# Default: http://127.0.0.1:8384
+```
+
+**Configure Folder Sharing:**
+
+1. Open the Syncthing web UI on both devices
+2. On each device, add the `data/` folder from your Choral installation
+   - Folder path: `/path/to/choral/data` (or `/data/data/com.termux/files/home/choral/data` on Termux)
+   - Folder ID: `choral_data` (use the same ID on all devices)
+3. In the Syncthing UI, go to "Actions" → "Show ID" to get your device ID
+4. On each device, add the other device using its device ID
+5. Accept the folder share request on each device
+
+**Optional: Git Hook for Auto-Sync**
+
+If you already have a `sync_data.sh` script, you can set it up as a git hook to ensure data is synced before/after git operations:
+
+```bash
+# Make the script executable
+chmod +x sync_data.sh
+
+# Set up as a pre-pull hook
+echo '#!/bin/bash' > .git/hooks/pre-pull
+echo './sync_data.sh' >> .git/hooks/pre-pull
+chmod +x .git/hooks/pre-pull
+
+# Set up as a post-pull hook
+echo '#!/bin/bash' > .git/hooks/post-checkout
+echo './sync_data.sh' >> .git/hooks/post-checkout
+chmod +x .git/hooks/post-checkout
+```
+
+**Important Notes:**
+
+- The `data/` directory is excluded from git (via `.gitignore`)
+- Syncthing conflict files and versioning directories are automatically ignored by git
+- If you see "sync conflict" files, they can be safely deleted after reviewing which version to keep
+- File versioning is handled by Syncthing's `.stversions/` directory
+
+📖 For detailed setup instructions, troubleshooting, and advanced configuration, see [docs/syncthing.html](docs/syncthing.html)
 
 ## Character Cards
 
