@@ -493,11 +493,11 @@
           placeholder="Type your message..."
           :disabled="isStreaming"
         ></textarea>
-        <button @click="sendMessage" :disabled="isStreaming || !userInput.trim()">
-          <span v-if="isStreaming">
-            Generating<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
-          </span>
-          <span v-else>Send</span>
+        <button v-if="isStreaming" @click="stopStreaming" class="stop-btn">
+          Stop
+        </button>
+        <button v-else @click="sendMessage" :disabled="!userInput.trim()">
+          Send
         </button>
       </div>
     </div>
@@ -554,6 +554,7 @@ export default {
       userInput: '',
       isStreaming: false,
       streamingContent: '',
+      abortController: null,
       isGeneratingSwipe: false,
       generatingSwipeIndex: null,
       sidebarOpen: true,
@@ -1012,6 +1013,10 @@ export default {
         try {
           await this.streamResponse(context);
         } catch (error) {
+          // Ignore AbortError - user cancelled the request
+          if (error.name === 'AbortError') {
+            return;
+          }
           console.error('Error streaming response:', error);
           this.isStreaming = false;
           this.$root.$notify('Failed to get response', 'error');
@@ -1066,6 +1071,10 @@ export default {
       try {
         await this.streamResponse(context);
       } catch (error) {
+        // Ignore AbortError - user cancelled the request
+        if (error.name === 'AbortError') {
+          return;
+        }
         console.error('Error streaming response:', error);
         this.isStreaming = false;
         this.$root.$notify('Failed to get response', 'error');
@@ -1192,6 +1201,9 @@ export default {
       return context;
     },
     async streamResponse(messages) {
+      // Create AbortController for this request
+      this.abortController = new AbortController();
+
       // Build macro context
       const macroContext = {
         charName: this.character?.data.name || 'Character',
@@ -1268,7 +1280,8 @@ export default {
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal: this.abortController.signal
       });
 
       const reader = response.body.getReader();
@@ -1377,6 +1390,64 @@ export default {
           }
         }
       }
+    },
+    stopStreaming() {
+      if (this.abortController) {
+        this.abortController.abort();
+        this.abortController = null;
+      }
+
+      // Save partial response if any content was generated
+      if (this.streamingContent) {
+        if (this.isGeneratingSwipe && this.generatingSwipeIndex !== null) {
+          // Add partial swipe
+          const message = this.messages[this.generatingSwipeIndex];
+          message.swipes.push(this.streamingContent);
+          message.swipeIndex = message.swipes.length - 1;
+
+          // Track character for group chat swipes
+          if (this.isGroupChat && this.currentSpeaker) {
+            if (!message.swipeCharacters) {
+              message.swipeCharacters = new Array(message.swipes.length - 1).fill(message.characterFilename || null);
+            }
+            message.swipeCharacters.push(this.currentSpeaker);
+          }
+        } else {
+          // Create new message with partial content
+          const newMessage = {
+            role: 'assistant',
+            swipes: [this.streamingContent],
+            swipeIndex: 0
+          };
+
+          // Track character for group chats
+          if (this.isGroupChat && this.currentSpeaker) {
+            newMessage.characterFilename = this.currentSpeaker;
+            newMessage.swipeCharacters = [this.currentSpeaker];
+          }
+
+          this.messages.push(newMessage);
+        }
+      }
+
+      // Clean up state
+      this.streamingContent = '';
+      this.isStreaming = false;
+      this.isGeneratingSwipe = false;
+      this.generatingSwipeIndex = null;
+      this.currentSpeaker = null;
+      this.nextSpeaker = null;
+
+      // Save chat
+      this.$nextTick(async () => {
+        if (this.isGroupChat) {
+          await this.saveGroupChat();
+        } else {
+          await this.saveChat();
+        }
+      });
+
+      this.$root.$notify('Response cancelled', 'info');
     },
     estimateTokens(text) {
       if (!text) return 0;
@@ -1516,6 +1587,10 @@ export default {
       try {
         await this.streamResponse(context);
       } catch (error) {
+        // Ignore AbortError - user cancelled the request
+        if (error.name === 'AbortError') {
+          return;
+        }
         console.error('Error generating swipe:', error);
         this.isStreaming = false;
         this.isGeneratingSwipe = false;
@@ -2190,6 +2265,10 @@ export default {
       try {
         await this.streamResponse(context);
       } catch (error) {
+        // Ignore AbortError - user cancelled the request
+        if (error.name === 'AbortError') {
+          return;
+        }
         console.error('Error generating response:', error);
         this.isStreaming = false;
         this.$root.$notify('Failed to generate response', 'error');
@@ -2783,6 +2862,16 @@ button.active {
 .input-area button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.input-area .stop-btn {
+  background: #dc3545;
+  color: white;
+}
+
+.input-area .stop-btn:hover {
+  background: #c82333;
+  opacity: 1;
 }
 
 .settings-panel {

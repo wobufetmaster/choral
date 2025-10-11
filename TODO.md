@@ -24,8 +24,8 @@
 - [x] **Tabs should be draggable** - Implement drag-and-drop tab reordering ✅
 - [x] **Auto-name chats with bookkeeping model** - Generate chat title from first message/response ✅
 - [x] **Tag searching in character pickers** - Add tag filtering to group chat creation screen (300+ cards need filtering!) ✅
+- [x] **Stop button for streaming** - Add ability to cancel/stop streaming AI responses ✅
 - [ ] **Start new chat from summary** - AI summarizes current chat, creates new chat with same characters and summary as first message
-- [ ] **Stop button for streaming** - Add ability to cancel/stop streaming AI responses
 - [ ] **Maybe tool call results should just be saved in the message that called them if they return anything. 
 - [ ] **If you try to open a tab containing a settings page, if you already have a settings page open, it should just redirect you to the one you already have open, since all of them are identical. 
 - [ ] **All of the prompts that are used for external calls should probably be documented somewhere, eg the tool calling prompts and bookkeeping prompts.
