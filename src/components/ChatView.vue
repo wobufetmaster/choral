@@ -46,9 +46,30 @@
           <button @click="newChat" class="sidebar-btn">📝 New Chat</button>
           <button v-if="!isGroupChat && character" @click="convertToGroupChat" class="sidebar-btn">👥 Convert to Group</button>
           <button @click="showChatHistory = !showChatHistory" :class="{ 'active': showChatHistory }" class="sidebar-btn">📜 History</button>
-          <button @click="showPersonas = true" class="sidebar-btn">👤 Persona</button>
+
+          <!-- Persona Selector -->
+          <div class="selector-section">
+            <label class="selector-label">👤 Persona</label>
+            <div class="selector-row">
+              <select v-model="persona.name" @change="onPersonaChange" class="selector-dropdown">
+                <option v-for="p in availablePersonas" :key="p.name" :value="p.name">{{ p.name }}</option>
+              </select>
+              <button @click="$emit('open-tab', 'personas', {}, 'Personas', false)" class="edit-btn" title="Edit Personas">✏️</button>
+            </div>
+          </div>
+
+          <!-- Preset Selector -->
+          <div class="selector-section">
+            <label class="selector-label">⚙️ Preset</label>
+            <div class="selector-row">
+              <select v-model="currentPresetFilename" @change="onPresetChange" class="selector-dropdown">
+                <option v-for="preset in availablePresets" :key="preset.filename" :value="preset.filename">{{ preset.name }}</option>
+              </select>
+              <button @click="$emit('open-tab', 'presets', {}, 'Presets', false)" class="edit-btn" title="Edit Presets">✏️</button>
+            </div>
+          </div>
+
           <button @click="showLorebooks = true" class="sidebar-btn">📚 Lorebook</button>
-          <button @click="showPresets = true" class="sidebar-btn">⚙️ Presets</button>
           <button @click="showDebug = !showDebug" :class="{ 'active': showDebug }" class="sidebar-btn">🐛 Debug</button>
         </div>
       </div>
@@ -115,20 +136,6 @@
       </div>
       <button @click="showChatHistory = false" class="close-history">Close</button>
     </div>
-
-    <PersonaManager
-      v-if="showPersonas"
-      :currentPersona="persona"
-      @persona-saved="onPersonaSaved"
-      @close="showPersonas = false"
-    />
-
-    <PresetSelector
-      v-if="showPresets"
-      :currentSettings="settings"
-      @apply="applyPreset"
-      @close="showPresets = false"
-    />
 
     <GroupChatManager
       v-if="showGroupManager && isGroupChat"
@@ -526,15 +533,11 @@
 import DOMPurify from 'dompurify';
 import MarkdownIt from 'markdown-it';
 import { processMacrosForDisplay } from '../utils/macros';
-import PresetSelector from './PresetSelector.vue';
-import PersonaManager from './PersonaManager.vue';
 import GroupChatManager from './GroupChatManager.vue';
 
 export default {
   name: 'ChatView',
   components: {
-    PresetSelector,
-    PersonaManager,
     GroupChatManager
   },
   props: {
@@ -559,13 +562,14 @@ export default {
       generatingSwipeIndex: null,
       sidebarOpen: true,
       showSettings: false,
-      showPresets: false,
-      showPersonas: false,
       showChatHistory: false,
       showLorebooks: false,
       showDebug: false,
       showGroupManager: false,
       currentPresetName: null,
+      currentPresetFilename: null,
+      availablePresets: [],
+      availablePersonas: [],
       userHasScrolledUp: false,
       avatarMenu: {
         show: false,
@@ -702,6 +706,10 @@ export default {
 
     // Load default persona
     await this.loadPersona();
+
+    // Load available presets and personas for selectors
+    await this.loadAvailablePresets();
+    await this.loadAvailablePersonas();
 
     // Load existing chat if ID provided
     const chatId = this.tabData?.chatId || this.$route?.params?.id;
@@ -1732,6 +1740,59 @@ export default {
       }
       this.closeAvatarMenu();
     },
+    async loadAvailablePresets() {
+      try {
+        const response = await fetch('/api/presets');
+        this.availablePresets = await response.json();
+      } catch (error) {
+        console.error('Failed to load available presets:', error);
+      }
+    },
+    async loadAvailablePersonas() {
+      try {
+        const response = await fetch('/api/personas');
+        this.availablePersonas = await response.json();
+        // Ensure "User" default persona is available
+        if (!this.availablePersonas.find(p => p.name === 'User')) {
+          this.availablePersonas.unshift({ name: 'User', avatar: null });
+        }
+      } catch (error) {
+        console.error('Failed to load available personas:', error);
+      }
+    },
+    async onPresetChange() {
+      // Load and apply the selected preset
+      if (!this.currentPresetFilename) return;
+
+      try {
+        const response = await fetch(`/api/presets/${this.currentPresetFilename}`);
+        const preset = await response.json();
+        this.applyPreset(preset);
+      } catch (error) {
+        console.error('Failed to load preset:', error);
+        this.$root.$notify('Failed to load preset', 'error');
+      }
+    },
+    async onPersonaChange() {
+      // Load and apply the selected persona
+      if (!this.persona.name) return;
+
+      try {
+        const response = await fetch('/api/personas');
+        const personas = await response.json();
+        const selectedPersona = personas.find(p => p.name === this.persona.name);
+
+        if (selectedPersona) {
+          this.onPersonaSaved(selectedPersona);
+        } else if (this.persona.name === 'User') {
+          // Default User persona
+          this.onPersonaSaved({ name: 'User', avatar: null });
+        }
+      } catch (error) {
+        console.error('Failed to load persona:', error);
+        this.$root.$notify('Failed to load persona', 'error');
+      }
+    },
     applyPreset(preset) {
       // Apply preset settings to current chat
       this.settings = {
@@ -1743,6 +1804,7 @@ export default {
         systemPrompts: preset.prompts || []
       };
       this.currentPresetName = preset.name;
+      this.currentPresetFilename = preset.filename;
       this.$root.$notify(`Applied preset: ${preset.name}`, 'success');
     },
     onPersonaSaved(persona) {
@@ -2638,6 +2700,63 @@ button.active {
 .sidebar-btn.active {
   background-color: var(--accent-color);
   color: white;
+}
+
+/* Selector Sections */
+.selector-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.selector-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 0 4px;
+}
+
+.selector-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.selector-dropdown {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.selector-dropdown:hover {
+  border-color: var(--accent-color);
+}
+
+.selector-dropdown:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.edit-btn {
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.edit-btn:hover {
+  background: var(--hover-color);
+  border-color: var(--accent-color);
 }
 
 /* Avatar Menu */

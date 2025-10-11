@@ -34,6 +34,7 @@ import Settings from './Settings.vue';
 import LorebookManager from './LorebookManager.vue';
 import BookkeepingSettings from './BookkeepingSettings.vue';
 import ToolSettings from './ToolSettings.vue';
+import PersonaManager from './PersonaManager.vue';
 
 export default {
   name: 'TabManager',
@@ -48,6 +49,7 @@ export default {
     LorebookManager,
     BookkeepingSettings,
     ToolSettings,
+    PersonaManager,
   },
   setup() {
     const tabs = ref([]);
@@ -60,6 +62,7 @@ export default {
       'character-editor': CharacterEditor,
       'group-chat': ChatView, // Group chats use ChatView
       'presets': PresetSelector,
+      'personas': PersonaManager,
       'settings': Settings,
       'lorebooks': LorebookManager,
       'bookkeeping-settings': BookkeepingSettings,
@@ -118,6 +121,7 @@ export default {
         'character-editor': 'New Character',
         'group-chat': 'Group Chat',
         'presets': 'Presets',
+        'personas': 'Personas',
         'settings': 'Settings',
         'bookkeeping-settings': 'Bookkeeping',
         'tool-settings': 'Tool Settings',
@@ -137,13 +141,13 @@ export default {
 
     // Open tab or switch to existing
     const openTab = (type, data = {}, label = null, replaceActive = true) => {
-      // For settings pages, check if one already exists and switch to it
-      const settingsTypes = ['settings', 'bookkeeping-settings', 'tool-settings'];
-      if (settingsTypes.includes(type)) {
-        const existingSettingsTab = tabs.value.find(tab => tab.type === type);
-        if (existingSettingsTab) {
-          // Switch to existing settings tab instead of creating new one
-          switchTab(existingSettingsTab.id);
+      // For settings pages and manager pages, check if one already exists and switch to it
+      const singletonTypes = ['settings', 'bookkeeping-settings', 'tool-settings', 'presets', 'personas', 'lorebooks'];
+      if (singletonTypes.includes(type)) {
+        const existingTab = tabs.value.find(tab => tab.type === type);
+        if (existingTab) {
+          // Switch to existing tab instead of creating new one
+          switchTab(existingTab.id);
           return;
         }
       }
