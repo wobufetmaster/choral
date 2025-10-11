@@ -3,9 +3,6 @@
     <div class="chat-header">
       <button v-if="!tabData" @click="$router.push('/')" class="back-button">← Back</button>
       <h2>{{ chatTitle }}</h2>
-      <div class="header-actions">
-        <button v-if="isGroupChat" @click="showGroupManager = !showGroupManager" :class="{ 'active': showGroupManager }">👥 Group</button>
-      </div>
     </div>
 
     <!-- Chat Sidebar -->
@@ -19,6 +16,8 @@
       :show-convert-to-group="!isGroupChat && !!character"
       :show-history="showChatHistory"
       :show-debug="showDebug"
+      :is-group-chat="isGroupChat"
+      :show-group-manager="showGroupManager"
       :persona-name="persona.name"
       :available-personas="availablePersonas"
       :available-presets="availablePresets"
@@ -30,6 +29,7 @@
       @preset-change="handlePresetChange"
       @show-lorebooks="showLorebooks = true"
       @toggle-debug="showDebug = !showDebug"
+      @toggle-group-manager="showGroupManager = !showGroupManager"
       @open-tab="(...args) => $emit('open-tab', ...args)"
     />
 

@@ -70,6 +70,7 @@
         <button @click="$emit('toggle-history')" :class="{ 'active': showHistory }" class="sidebar-btn">📜 History</button>
         <button @click="$emit('show-lorebooks')" class="sidebar-btn">📚 Lorebook</button>
         <button @click="$emit('toggle-debug')" :class="{ 'active': showDebug }" class="sidebar-btn">🐛 Debug</button>
+        <button v-if="isGroupChat" @click="$emit('toggle-group-manager')" :class="{ 'active': showGroupManager }" class="sidebar-btn sidebar-btn-special">👥 Group Manager</button>
       </div>
     </div>
   </div>
@@ -126,6 +127,14 @@ export default {
     availablePresets: {
       type: Array,
       default: () => []
+    },
+    isGroupChat: {
+      type: Boolean,
+      default: false
+    },
+    showGroupManager: {
+      type: Boolean,
+      default: false
     }
   },
   emits: [
@@ -138,6 +147,7 @@ export default {
     'preset-change',
     'show-lorebooks',
     'toggle-debug',
+    'toggle-group-manager',
     'open-tab'
   ],
   data() {
@@ -366,6 +376,16 @@ export default {
   background-color: var(--accent-color);
   color: white;
   border-color: var(--accent-color);
+}
+
+.sidebar-btn-special {
+  border: 2px solid var(--accent-color);
+  border-style: dashed;
+  margin-top: 0.5rem;
+}
+
+.sidebar-btn-special:hover {
+  border-style: solid;
 }
 
 .selector-container {
