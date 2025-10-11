@@ -71,6 +71,9 @@
               <button @click="autoTagAll" :disabled="isAutoTaggingAll" class="auto-tag-all-btn">
                 {{ isAutoTaggingAll ? 'Auto-tagging...' : '✨ Auto-tag All' }}
               </button>
+              <button @click="randomizeAllGrayColors" class="randomize-all-btn">
+                🎨 Randomize Gray Colors
+              </button>
             </div>
             <button v-if="selectedTags.length > 0" @click="clearAllTags" class="clear-tags-btn">Clear All</button>
           </div>
@@ -243,9 +246,6 @@
           <div class="auto-tag-section">
             <button @click="autoGenerateTags" class="auto-tag-btn" :disabled="isAutoTagging">
               {{ isAutoTagging ? 'Generating...' : '✨ Auto-Generate Tags' }}
-            </button>
-            <button @click="randomizeGrayTags" class="randomize-colors-btn">
-              🎨 Randomize Gray Colors
             </button>
           </div>
 
@@ -944,26 +944,6 @@ export default {
         this.isAutoTagging = false;
       }
     },
-    randomizeGrayTags() {
-      const DEFAULT_GRAY = '#6b7280';
-      let randomized = 0;
-
-      // Find all tags with the default gray color and randomize them
-      this.editingTags.forEach(tag => {
-        if (tag.color.toLowerCase() === DEFAULT_GRAY.toLowerCase()) {
-          tag.color = this.generateRandomColor();
-          randomized++;
-        }
-      });
-
-      if (randomized > 0) {
-        this.$root.$notify(`Randomized ${randomized} gray tag${randomized === 1 ? '' : 's'}!`, 'success');
-        // Trigger auto-save
-        this.autoSaveTagChanges();
-      } else {
-        this.$root.$notify('No gray tags found to randomize', 'info');
-      }
-    },
 
     // Group chat methods
     async loadGroupChats() {
@@ -1378,6 +1358,48 @@ export default {
         this.autoTagTotal = 0;
         this.autoTagCurrentCharacter = '';
       }
+    },
+
+    async randomizeAllGrayColors() {
+      const DEFAULT_GRAY = '#6b7280';
+      let totalRandomized = 0;
+
+      // Find all tags with gray color
+      const grayTags = [];
+      for (const [normalizedTag, color] of Object.entries(this.tagColors)) {
+        if (color.toLowerCase() === DEFAULT_GRAY.toLowerCase()) {
+          grayTags.push(normalizedTag);
+        }
+      }
+
+      if (grayTags.length === 0) {
+        this.$root.$notify('No gray tags found to randomize', 'info');
+        return;
+      }
+
+      // Randomize each gray tag's color
+      grayTags.forEach(normalizedTag => {
+        this.tagColors[normalizedTag] = this.generateRandomColor();
+        totalRandomized++;
+      });
+
+      // Save updated tag colors
+      try {
+        await fetch('/api/tags', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.tagColors)
+        });
+
+        this.$root.$notify(`Randomized ${totalRandomized} gray tag${totalRandomized === 1 ? '' : 's'}!`, 'success');
+
+        // Reload to show updated colors
+        await this.loadCharacters();
+        await this.loadGroupChats();
+      } catch (error) {
+        console.error('Failed to randomize colors:', error);
+        this.$root.$notify('Failed to randomize tag colors', 'error');
+      }
     }
   }
 }
@@ -1716,6 +1738,26 @@ export default {
 .auto-tag-all-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.randomize-all-btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  background: #8b5cf6;
+  color: white;
+  border: 1px solid #8b5cf6;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.randomize-all-btn:hover {
+  background: #7c3aed;
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .clear-tags-btn {
@@ -2072,7 +2114,6 @@ export default {
 .auto-tag-section {
   display: flex;
   justify-content: center;
-  gap: 0.75rem;
   padding: 0.5rem 0;
   border-top: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
@@ -2096,23 +2137,6 @@ export default {
 .auto-tag-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.randomize-colors-btn {
-  padding: 0.625rem 1.25rem;
-  background-color: #8b5cf6;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 0.9375rem;
-  transition: all 0.2s;
-}
-
-.randomize-colors-btn:hover {
-  background-color: #7c3aed;
-  opacity: 0.9;
 }
 
 .modal-actions {
