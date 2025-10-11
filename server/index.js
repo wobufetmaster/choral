@@ -204,11 +204,14 @@ app.get('/api/characters', async (req, res) => {
         try {
           const filePath = path.join(CHARACTERS_DIR, file);
           const card = await readCharacterCard(filePath);
+          const stats = await fs.stat(filePath);
           return {
             filename: file,
             name: card.data?.name || 'Unknown',
             tags: card.data?.tags || [],
-            data: card
+            data: card,
+            createdAt: stats.birthtime.getTime(), // Use birthtime (creation time) as milliseconds timestamp
+            modifiedAt: stats.mtime.getTime() // Also include modification time
           };
         } catch (err) {
           console.error(`Error reading ${file}:`, err);

@@ -63,7 +63,7 @@
     <div class="characters-grid">
       <!-- Group Chats -->
       <div
-        v-for="group in groupChats"
+        v-for="group in filteredGroupChats"
         :key="'group-' + group.filename"
         class="character-card group-chat-card"
       >
@@ -287,7 +287,7 @@
       </div>
     </div>
 
-    <div v-if="filteredCharacters.length === 0 && groupChats.length === 0" class="empty-state">
+    <div v-if="filteredCharacters.length === 0 && filteredGroupChats.length === 0" class="empty-state">
       <p>No characters found. Import a character card to get started.</p>
     </div>
   </div>
@@ -366,6 +366,36 @@ export default {
 
       // Sort characters
       return this.sortCharacters(filtered);
+    },
+    filteredGroupChats() {
+      let filtered = this.groupChats;
+
+      // Filter by selected tags (must have ALL selected tags - case insensitive)
+      if (this.selectedTags.length > 0) {
+        filtered = filtered.filter(group =>
+          this.selectedTags.every(selectedTag =>
+            group.tags?.some(groupTag =>
+              this.normalizeTag(groupTag) === this.normalizeTag(selectedTag)
+            )
+          )
+        );
+      }
+
+      // Filter by search query
+      if (this.searchQuery) {
+        const query = this.searchQuery.toLowerCase();
+        filtered = filtered.filter(group => {
+          const groupName = this.getGroupChatName(group).toLowerCase();
+          const matchesName = groupName.includes(query);
+          const matchesTags = group.tags?.some(tag => tag.toLowerCase().includes(query));
+          const matchesMemberNames = group.characters?.some(char =>
+            char.name.toLowerCase().includes(query)
+          );
+          return matchesName || matchesTags || matchesMemberNames;
+        });
+      }
+
+      return filtered;
     },
     allTags() {
       // Get all unique tags across all characters
@@ -908,10 +938,11 @@ export default {
           break;
 
         case 'created':
-          // Sort by filename (which includes timestamp for auto-generated names)
-          // For character cards, use the filename as a proxy for creation date
+          // Sort by actual file creation time (newest first)
           sorted.sort((a, b) => {
-            return b.filename.localeCompare(a.filename);
+            const aTime = a.createdAt || 0;
+            const bTime = b.createdAt || 0;
+            return bTime - aTime;
           });
           break;
 
