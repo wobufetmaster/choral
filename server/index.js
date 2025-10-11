@@ -1773,25 +1773,6 @@ const CREATE_CHARACTER_TOOL_SCHEMA = {
   }
 };
 
-// Tool schema for get_character_card
-const GET_CHARACTER_TOOL_SCHEMA = {
-  type: 'function',
-  function: {
-    name: 'get_character_card',
-    description: 'Retrieves full character card data for an existing character. Use this to read a character\'s current details before updating them.\n\nAvailable characters in this chat:\n{{characters_list}}',
-    parameters: {
-      type: 'object',
-      properties: {
-        filename: {
-          type: 'string',
-          description: 'The character filename (e.g., "Alice.png") - see available characters list above'
-        }
-      },
-      required: ['filename']
-    }
-  }
-};
-
 // Tool schema for add_greetings
 const ADD_GREETINGS_TOOL_SCHEMA = {
   type: 'function',
@@ -1892,12 +1873,6 @@ app.get('/api/tools/available', (req, res) => {
         schema: CREATE_CHARACTER_TOOL_SCHEMA
       },
       {
-        id: 'get_character_card',
-        name: 'Get Character Card',
-        description: 'Allows the character to retrieve existing character card data',
-        schema: GET_CHARACTER_TOOL_SCHEMA
-      },
-      {
         id: 'update_character_card',
         name: 'Update Character Card',
         description: 'Allows the character to update existing character cards',
@@ -1948,10 +1923,6 @@ app.get('/api/tools/schemas/:characterFilename', async (req, res) => {
     if (charConfig.tools.includes('create_character_card')) {
       tools.push(CREATE_CHARACTER_TOOL_SCHEMA);
       console.log('Added create_character_card tool');
-    }
-    if (charConfig.tools.includes('get_character_card')) {
-      tools.push(GET_CHARACTER_TOOL_SCHEMA);
-      console.log('Added get_character_card tool');
     }
     if (charConfig.tools.includes('update_character_card')) {
       tools.push(UPDATE_CHARACTER_TOOL_SCHEMA);
@@ -2046,44 +2017,6 @@ app.post('/api/tools/create-character', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating character:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Execute get_character_card tool
-app.post('/api/tools/get-character', async (req, res) => {
-  try {
-    const { filename } = req.body;
-
-    if (!filename) {
-      return res.status(400).json({
-        error: 'Missing required field: filename'
-      });
-    }
-
-    const filePath = path.join(CHARACTERS_DIR, filename);
-
-    // Check if file exists
-    try {
-      await fs.access(filePath);
-    } catch {
-      return res.status(404).json({
-        error: `Character not found: ${filename}`
-      });
-    }
-
-    // Read character card
-    const card = await readCharacterCard(filePath);
-
-    console.log(`Retrieved character card: ${filename}`);
-
-    res.json({
-      success: true,
-      filename,
-      card: card.data
-    });
-  } catch (error) {
-    console.error('Error getting character:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -2347,8 +2280,6 @@ app.post('/api/chat/stream', async (req, res) => {
         let toolEndpoint;
         if (toolCall.function.name === 'create_character_card') {
           toolEndpoint = 'http://localhost:3000/api/tools/create-character';
-        } else if (toolCall.function.name === 'get_character_card') {
-          toolEndpoint = 'http://localhost:3000/api/tools/get-character';
         } else if (toolCall.function.name === 'update_character_card') {
           toolEndpoint = 'http://localhost:3000/api/tools/update-character';
         } else if (toolCall.function.name === 'add_greetings') {
@@ -2484,8 +2415,6 @@ app.post('/api/chat', async (req, res) => {
       let toolEndpoint;
       if (toolCall.function.name === 'create_character_card') {
         toolEndpoint = 'http://localhost:3000/api/tools/create-character';
-      } else if (toolCall.function.name === 'get_character_card') {
-        toolEndpoint = 'http://localhost:3000/api/tools/get-character';
       } else if (toolCall.function.name === 'update_character_card') {
         toolEndpoint = 'http://localhost:3000/api/tools/update-character';
       } else if (toolCall.function.name === 'add_greetings') {

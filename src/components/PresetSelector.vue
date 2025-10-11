@@ -36,7 +36,21 @@
 
         <!-- Preset Editor -->
         <div class="preset-editor" v-if="selectedPreset">
-          <h3>Edit Preset</h3>
+          <input
+            type="file"
+            ref="fileInput"
+            accept=".json"
+            @change="importConfig"
+            style="display: none"
+          />
+          <div class="editor-header">
+            <h3>Edit Preset</h3>
+            <div class="header-actions">
+              <button @click="$refs.fileInput.click()" class="import-btn">📥 Import</button>
+              <button @click="savePreset" class="save-btn">💾 Save</button>
+              <button @click="setAsActive" class="set-active-btn">⭐ Set as Active</button>
+            </div>
+          </div>
 
           <div class="form-group">
             <label>Preset Name</label>
@@ -93,25 +107,6 @@
           </div>
 
           <button @click="addPrompt" class="add-prompt-btn">+ Add Prompt</button>
-
-          <div class="actions">
-            <button @click="savePreset" class="save-btn">Save Preset</button>
-            <button @click="setAsActive" class="set-active-btn">Set as Active</button>
-            <button @click="applyPreset" class="apply-btn">Apply to Chat</button>
-          </div>
-        </div>
-
-        <!-- Import Section -->
-        <div class="import-section">
-          <h3>Import</h3>
-          <input
-            type="file"
-            ref="fileInput"
-            accept=".json"
-            @change="importConfig"
-            style="display: none"
-          />
-          <button @click="$refs.fileInput.click()">Import Config</button>
         </div>
       </div>
     </div>
@@ -215,7 +210,11 @@ export default {
         const result = await response.json();
         this.selectedPreset.filename = result.filename;
         await this.loadPresets();
-        this.$root.$notify('Preset saved successfully', 'success');
+
+        // Auto-apply the saved preset to the current chat
+        this.$emit('apply', this.selectedPreset);
+
+        this.$root.$notify('Preset saved and applied to chat', 'success');
       } catch (error) {
         console.error('Failed to save preset:', error);
         this.$root.$notify(`Failed to save preset: ${error.message}`, 'error');
@@ -256,10 +255,6 @@ export default {
         console.error('Failed to set active preset:', error);
         this.$root.$notify('Failed to set active preset', 'error');
       }
-    },
-    applyPreset() {
-      this.$emit('apply', this.selectedPreset);
-      this.$emit('close');
     },
     async importConfig(event) {
       const file = event.target.files[0];
@@ -336,7 +331,7 @@ export default {
 
 .preset-body {
   display: grid;
-  grid-template-columns: 250px 1fr 200px;
+  grid-template-columns: 250px 1fr;
   gap: 20px;
   padding: 20px;
   overflow-y: auto;
@@ -452,25 +447,72 @@ export default {
   align-self: flex-start;
 }
 
-.actions {
+.editor-header {
   display: flex;
-  gap: 12px;
-  margin-top: 16px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--border-color);
 }
 
-.save-btn, .apply-btn {
-  flex: 1;
+.editor-header h3 {
+  margin: 0;
 }
 
-.apply-btn {
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.save-btn {
   background: var(--accent-color);
   color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.import-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.save-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.set-active-btn {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border: 2px solid var(--accent-color);
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.set-active-btn:hover {
+  background: var(--accent-color);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.import-btn {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.import-btn:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-color);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 900px) {
