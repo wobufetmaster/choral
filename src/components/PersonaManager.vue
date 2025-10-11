@@ -12,11 +12,11 @@
           <h3>Your Personas</h3>
           <div
             v-for="persona in personas"
-            :key="persona.name"
+            :key="persona.nickname || persona.name"
             :class="[
               'persona-item',
               {
-                active: selectedPersona?.name === persona.name,
+                active: (selectedPersona?.nickname || selectedPersona?.name) === (persona.nickname || persona.name),
                 'in-use': currentPersona?.name === persona.name
               }
             ]"
@@ -35,7 +35,7 @@
               <span class="persona-name">{{ persona.nickname || persona.name }}</span>
               <span v-if="persona.nickname" class="persona-actual-name">{{ persona.name }}</span>
               <span v-if="currentPersona?.name === persona.name" class="in-use-badge">IN USE</span>
-              <span v-if="isDefaultPersona(persona.name)" class="default-badge">DEFAULT</span>
+              <span v-if="isDefaultPersona(persona.nickname || persona.name)" class="default-badge">DEFAULT</span>
             </div>
           </div>
           <button @click="createNewPersona" class="create-btn">+ New Persona</button>
@@ -142,8 +142,8 @@
           <div class="actions">
             <button @click="usePersona" class="use-btn">Use This Persona</button>
             <button @click="savePersona" class="save-btn">Save Persona</button>
-            <button @click="setAsDefault" class="default-btn" :class="{ active: isDefaultPersona(selectedPersona.name) }">
-              {{ isDefaultPersona(selectedPersona.name) ? '✓ Default' : 'Set as Default' }}
+            <button @click="setAsDefault" class="default-btn" :class="{ active: isDefaultPersona(selectedPersona.nickname || selectedPersona.name) }">
+              {{ isDefaultPersona(selectedPersona.nickname || selectedPersona.name) ? '✓ Default' : 'Set as Default' }}
             </button>
             <button @click="deletePersona" class="delete-btn" v-if="personas.length > 1">Delete</button>
           </div>
@@ -186,23 +186,37 @@ export default {
     await this.loadConfig();
   },
   methods: {
-    async loadPersonas() {
+    async loadPersonas(preserveSelection = false) {
       try {
         const response = await fetch('/api/personas');
-        this.personas = await response.json();
+        const data = await response.json();
+
+        // Store personas with their actual filenames from the API
+        // The API now includes _filename which is the real filename on disk
+        this.personas = data;
+
+        // If preserveSelection is true and we have a selected persona, try to keep it selected
+        if (preserveSelection && this.selectedPersona && this.selectedPersona._filename) {
+          const preserved = this.personas.find(p => p._filename === this.selectedPersona._filename);
+          if (preserved) {
+            // Update the selected persona with fresh data but keep the selection
+            this.selectedPersona = {
+              ...preserved,
+              _filename: preserved._filename // Keep tracking the source file
+            };
+            return;
+          }
+        }
+
+        // Default behavior: select current persona or first one
         if (this.personas.length > 0) {
-          // Select current persona or first one
           const current = this.personas.find(p => p.name === this.currentPersona?.name);
           const persona = current || this.personas[0];
 
-          // Create a fully initialized copy to ensure reactivity
+          // Create a copy with filename tracking
           this.selectedPersona = {
-            name: persona.name || '',
-            nickname: persona.nickname || '',
-            avatar: persona.avatar || null,
-            description: persona.description || '',
-            characterBindings: persona.characterBindings || [],
-            tagBindings: persona.tagBindings || []
+            ...persona,
+            _filename: persona._filename // Track which file this came from
           };
         }
       } catch (error) {
@@ -218,25 +232,64 @@ export default {
       }
     },
     selectPersona(persona) {
-      // Create a fully initialized copy to ensure reactivity
+      // Create a copy with filename tracking
       this.selectedPersona = {
-        name: persona.name || '',
-        nickname: persona.nickname || '',
-        avatar: persona.avatar || null,
-        description: persona.description || '',
-        characterBindings: persona.characterBindings || [],
-        tagBindings: persona.tagBindings || []
+        ...persona,
+        _filename: persona._filename // Track which file this came from
       };
     },
-    createNewPersona() {
-      this.selectedPersona = {
-        name: 'New Persona',
-        nickname: '',
-        avatar: null,
-        description: '',
-        characterBindings: [],
-        tagBindings: []
-      };
+    async createNewPersona() {
+      try {
+        // Default name sent to AI
+        const defaultName = 'User';
+
+        // Generate a unique nickname - start with the name field value
+        let baseNickname = defaultName;
+        let uniqueNickname = baseNickname;
+        let counter = 1;
+
+        // Check if nickname already exists
+        while (this.personas.some(p => (p.nickname || p.name) === uniqueNickname)) {
+          uniqueNickname = `${baseNickname} ${counter}`;
+          counter++;
+        }
+
+        // Create the new persona object with default values
+        // Nickname defaults to name field value (but made unique if needed)
+        const newPersona = {
+          nickname: uniqueNickname,
+          name: defaultName,
+          avatar: null,
+          description: '',
+          characterBindings: [],
+          tagBindings: []
+        };
+
+        // Immediately save it to disk
+        const response = await fetch('/api/personas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newPersona)
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create persona');
+        }
+
+        // Reload personas and select the new one
+        await this.loadPersonas();
+
+        // Find and select the newly created persona
+        const created = this.personas.find(p => (p.nickname || p.name) === uniqueNickname);
+        if (created) {
+          this.selectPersona(created); // This will have _filename set from loadPersonas
+        }
+
+        this.$root.$notify('New persona created', 'success');
+      } catch (error) {
+        console.error('Failed to create persona:', error);
+        this.$root.$notify('Failed to create persona', 'error');
+      }
     },
     isCharacterBound(filename) {
       return this.selectedPersona?.characterBindings?.includes(filename);
@@ -258,8 +311,10 @@ export default {
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         this.selectedPersona.avatar = e.target.result;
+        // Auto-save after uploading avatar
+        await this.savePersona();
       };
       reader.readAsDataURL(file);
       event.target.value = '';
@@ -313,36 +368,78 @@ export default {
     },
     async savePersona() {
       try {
-        if (!this.selectedPersona.name.trim()) {
+        // Nickname is now required as the unique identifier
+        if (!this.selectedPersona.nickname || !this.selectedPersona.nickname.trim()) {
+          this.$root.$notify('Display name (nickname) cannot be empty', 'warning');
+          return;
+        }
+
+        // Name is also required (what gets sent to AI)
+        if (!this.selectedPersona.name || !this.selectedPersona.name.trim()) {
           this.$root.$notify('Persona name cannot be empty', 'warning');
           return;
         }
 
+        const newFilename = `${this.selectedPersona.nickname}.json`;
+        const oldFilename = this.selectedPersona._filename;
+
+        // Check for conflicts: if the new filename is different from the old one,
+        // make sure no other persona already has that filename
+        if (newFilename !== oldFilename) {
+          const conflict = this.personas.some(p =>
+            p._filename === newFilename && p._filename !== oldFilename
+          );
+
+          if (conflict) {
+            this.$root.$notify(`A persona with display name "${this.selectedPersona.nickname}" already exists. Please choose a different display name.`, 'error');
+            return;
+          }
+        }
+
+        // If this persona came from a file and the nickname changed, delete the old file
+        if (oldFilename && newFilename !== oldFilename) {
+          try {
+            await fetch(`/api/personas/${oldFilename}`, { method: 'DELETE' });
+          } catch (err) {
+            console.error('Failed to delete old persona file:', err);
+            // Continue with save even if delete fails
+          }
+        }
+
+        // Save the persona (without the internal _filename field)
+        const { _filename, ...personaData } = this.selectedPersona;
         const response = await fetch('/api/personas', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.selectedPersona)
+          body: JSON.stringify(personaData)
         });
 
         if (!response.ok) {
           throw new Error('Failed to save persona');
         }
 
-        await this.loadPersonas();
+        // Update the filename tracking to the new filename
+        this.selectedPersona._filename = newFilename;
+
+        await this.loadPersonas(true); // Preserve selection after save
         this.$root.$notify('Persona saved successfully', 'success');
-        this.$emit('persona-saved', JSON.parse(JSON.stringify(this.selectedPersona)));
+        this.$emit('persona-saved', JSON.parse(JSON.stringify(personaData)));
       } catch (error) {
         console.error('Failed to save persona:', error);
         this.$root.$notify('Failed to save persona', 'error');
       }
     },
     async deletePersona() {
-      if (!confirm(`Delete persona "${this.selectedPersona.name}"?`)) return;
+      if (!confirm(`Delete persona "${this.selectedPersona.nickname || this.selectedPersona.name}"?`)) return;
 
       try {
-        // Delete via filename
-        const filename = `${this.selectedPersona.name}.json`;
-        await fetch(`/api/personas/${filename}`, { method: 'DELETE' });
+        // Delete via the tracked filename
+        if (!this.selectedPersona._filename) {
+          this.$root.$notify('Cannot delete: persona has no associated file', 'error');
+          return;
+        }
+
+        await fetch(`/api/personas/${this.selectedPersona._filename}`, { method: 'DELETE' });
 
         await this.loadPersonas();
         this.$root.$notify('Persona deleted', 'success');
@@ -360,20 +457,21 @@ export default {
         console.error('Failed to load config:', error);
       }
     },
-    isDefaultPersona(personaName) {
-      const filename = `${personaName}.json`;
+    isDefaultPersona(identifier) {
+      const filename = `${identifier}.json`;
       return this.defaultPersona === filename;
     },
     async setAsDefault() {
       try {
-        const filename = `${this.selectedPersona.name}.json`;
+        const identifier = this.selectedPersona.nickname || this.selectedPersona.name;
+        const filename = `${identifier}.json`;
         await fetch('/api/config/default-persona', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ persona: filename })
         });
         this.defaultPersona = filename;
-        this.$root.$notify(`${this.selectedPersona.name} set as default persona`, 'success');
+        this.$root.$notify(`${this.selectedPersona.nickname || this.selectedPersona.name} set as default persona`, 'success');
       } catch (error) {
         console.error('Failed to set default persona:', error);
         this.$root.$notify('Failed to set default persona', 'error');

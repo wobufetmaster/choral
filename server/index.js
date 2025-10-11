@@ -1236,7 +1236,12 @@ app.get('/api/personas', async (req, res) => {
         try {
           const filePath = path.join(PERSONAS_DIR, file);
           const content = await fs.readFile(filePath, 'utf-8');
-          return JSON.parse(content);
+          const persona = JSON.parse(content);
+          // Return persona data along with the actual filename
+          return {
+            ...persona,
+            _filename: file
+          };
         } catch (err) {
           return null;
         }
@@ -1253,7 +1258,16 @@ app.get('/api/personas', async (req, res) => {
 app.post('/api/personas', async (req, res) => {
   try {
     const persona = req.body;
-    const filename = `${persona.name}.json`;
+
+    // Use nickname as the unique identifier for filenames
+    // If no nickname, fall back to name for backward compatibility
+    const identifier = persona.nickname || persona.name;
+
+    if (!identifier || !identifier.trim()) {
+      return res.status(400).json({ error: 'Persona must have a nickname or name' });
+    }
+
+    const filename = `${identifier}.json`;
     const filePath = path.join(PERSONAS_DIR, filename);
 
     await fs.writeFile(filePath, JSON.stringify(persona, null, 2));
