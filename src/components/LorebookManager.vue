@@ -17,22 +17,32 @@
       />
     </div>
 
-    <div class="lorebook-list" :class="{ expanded: !selectedLorebook }">
-      <div
-        v-for="lorebook in lorebooks"
-        :key="lorebook.filename"
-        class="lorebook-item"
-        :class="{ active: selectedLorebook?.filename === lorebook.filename }"
-        @click="selectLorebook(lorebook)"
-      >
-        <div class="lorebook-info">
-          <div class="lorebook-name">{{ lorebook.name }}</div>
-          <div class="lorebook-meta">
-            {{ lorebook.entries?.length || 0 }} entries
-            <span v-if="lorebook.autoSelect" class="auto-badge">AUTO</span>
+    <div class="lorebook-list-container" :class="{ expanded: !selectedLorebook }">
+      <div class="search-section">
+        <input
+          v-model="lorebookSearch"
+          type="text"
+          placeholder="Search lorebooks..."
+          class="search-input"
+        />
+      </div>
+      <div class="lorebook-list">
+        <div
+          v-for="lorebook in filteredLorebooks"
+          :key="lorebook.filename"
+          class="lorebook-item"
+          :class="{ active: selectedLorebook?.filename === lorebook.filename }"
+          @click="selectLorebook(lorebook)"
+        >
+          <div class="lorebook-info">
+            <div class="lorebook-name">{{ lorebook.name }}</div>
+            <div class="lorebook-meta">
+              {{ lorebook.entries?.length || 0 }} entries
+              <span v-if="lorebook.autoSelect" class="auto-badge">AUTO</span>
+            </div>
           </div>
+          <button @click.stop="deleteLorebook(lorebook.filename)" class="btn-delete">×</button>
         </div>
-        <button @click.stop="deleteLorebook(lorebook.filename)" class="btn-delete">×</button>
       </div>
     </div>
 
@@ -55,15 +65,39 @@
           <input type="checkbox" v-model="selectedLorebook.autoSelect" />
           Auto-select for characters with matching tags
         </label>
-        <label v-if="selectedLorebook.autoSelect">
-          Tags to match:
-          <input
-            v-model="selectedLorebook.matchTags"
-            type="text"
-            placeholder="tag1, tag2, tag3"
-            class="tag-input"
-          />
-        </label>
+        <div v-if="selectedLorebook.autoSelect" class="tag-bindings-section">
+          <label>Tags to match:</label>
+          <p class="hint">Auto-select this lorebook for characters with these tags</p>
+          <div class="tag-bindings">
+            <div class="current-tags">
+              <span
+                v-for="tag in (selectedLorebook.matchTags || '').split(',').map(t => t.trim()).filter(t => t)"
+                :key="tag"
+                class="tag"
+              >
+                {{ tag }}
+                <button @click="removeTag(tag)" class="remove-tag">×</button>
+              </span>
+            </div>
+            <input
+              v-model="newTagInput"
+              @keydown.enter="addTag"
+              @input="updateTagSuggestions"
+              placeholder="Add tag (press Enter)"
+              class="tag-input-field"
+            />
+            <div v-if="tagSuggestions.length > 0" class="tag-suggestions">
+              <div
+                v-for="suggestion in tagSuggestions"
+                :key="suggestion"
+                @click="addSuggestedTag(suggestion)"
+                class="tag-suggestion"
+              >
+                {{ suggestion }}
+              </div>
+            </div>
+          </div>
+        </div>
         <label>
           Scan depth (0 = all messages):
           <input v-model.number="selectedLorebook.scanDepth" type="number" min="0" class="scan-depth-input" />
@@ -160,11 +194,35 @@ export default {
   data() {
     return {
       lorebooks: [],
-      selectedLorebook: null
+      selectedLorebook: null,
+      lorebookSearch: '',
+      availableCharacters: [],
+      newTagInput: '',
+      tagSuggestions: []
     };
+  },
+  computed: {
+    filteredLorebooks() {
+      if (!this.lorebookSearch.trim()) {
+        return this.lorebooks;
+      }
+      const query = this.lorebookSearch.toLowerCase();
+      return this.lorebooks.filter(lorebook =>
+        lorebook.name?.toLowerCase().includes(query)
+      );
+    },
+    allCharacterTags() {
+      const tags = new Set();
+      this.availableCharacters.forEach(char => {
+        const characterTags = char.tags || char.data?.tags || [];
+        characterTags.forEach(tag => tags.add(tag));
+      });
+      return Array.from(tags).sort();
+    }
   },
   async mounted() {
     await this.loadLorebooks();
+    await this.loadCharacters();
   },
   methods: {
     async loadLorebooks() {
@@ -340,6 +398,67 @@ export default {
         // Reset file input
         event.target.value = '';
       }
+    },
+    async loadCharacters() {
+      try {
+        const response = await fetch('/api/characters');
+        this.availableCharacters = await response.json();
+      } catch (error) {
+        console.error('Failed to load characters:', error);
+      }
+    },
+    updateTagSuggestions() {
+      if (!this.newTagInput.trim()) {
+        this.tagSuggestions = [];
+        return;
+      }
+
+      const query = this.newTagInput.toLowerCase();
+      const currentTags = this.selectedLorebook.matchTags
+        ? this.selectedLorebook.matchTags.split(',').map(t => t.trim()).filter(t => t)
+        : [];
+
+      this.tagSuggestions = this.allCharacterTags
+        .filter(tag =>
+          tag.toLowerCase().includes(query) &&
+          !currentTags.includes(tag)
+        )
+        .slice(0, 5);
+    },
+    addTag() {
+      const tag = this.newTagInput.trim();
+      if (!tag) return;
+
+      const currentTags = this.selectedLorebook.matchTags
+        ? this.selectedLorebook.matchTags.split(',').map(t => t.trim()).filter(t => t)
+        : [];
+
+      if (!currentTags.includes(tag)) {
+        currentTags.push(tag);
+        this.selectedLorebook.matchTags = currentTags.join(', ');
+        this.newTagInput = '';
+        this.tagSuggestions = [];
+      }
+    },
+    addSuggestedTag(tag) {
+      const currentTags = this.selectedLorebook.matchTags
+        ? this.selectedLorebook.matchTags.split(',').map(t => t.trim()).filter(t => t)
+        : [];
+
+      if (!currentTags.includes(tag)) {
+        currentTags.push(tag);
+        this.selectedLorebook.matchTags = currentTags.join(', ');
+        this.newTagInput = '';
+        this.tagSuggestions = [];
+      }
+    },
+    removeTag(tagToRemove) {
+      const currentTags = this.selectedLorebook.matchTags
+        ? this.selectedLorebook.matchTags.split(',').map(t => t.trim()).filter(t => t)
+        : [];
+
+      const filtered = currentTags.filter(tag => tag !== tagToRemove);
+      this.selectedLorebook.matchTags = filtered.join(', ');
     }
   }
 };
@@ -387,17 +506,45 @@ export default {
   background-color: var(--hover-color);
 }
 
-.lorebook-list {
-  max-height: 200px;
-  overflow-y: auto;
+.lorebook-list-container {
+  display: flex;
+  flex-direction: column;
+  max-height: 250px;
   border: 1px solid var(--border-color);
   border-radius: 4px;
+  overflow: hidden;
   transition: max-height 0.3s ease;
 }
 
-.lorebook-list.expanded {
+.lorebook-list-container.expanded {
   flex: 1;
   max-height: none;
+}
+
+.search-section {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.lorebook-list {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .lorebook-item {
@@ -501,6 +648,113 @@ export default {
   border-radius: 4px;
   background-color: var(--bg-secondary);
   color: var(--text-primary);
+}
+
+.tag-bindings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+.tag-bindings-section label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0;
+}
+
+.tag-bindings-section .hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.tag-bindings {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.current-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tag {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--accent-color);
+  color: white;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.remove-tag {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-tag:hover {
+  opacity: 0.8;
+}
+
+.tag-input-field {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.tag-input-field:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.tag-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 0.25rem;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.tag-suggestion {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 0.875rem;
+}
+
+.tag-suggestion:hover {
+  background: var(--hover-color);
 }
 
 .entries-section {

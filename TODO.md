@@ -12,6 +12,10 @@
 - [ ] **Fix mobile sidebar button position** - Expand sidebar button is in wrong spot on mobile
 - [ ] **Fix persona saving issues** - Address issues with persona save functionality
 - [ ] **Update docs with tool calling** - Document the tool calling system (create_character_card, update_character_card, add_greetings)
+- [ ] **Sorting characters by date created actually sorts them alphabetically Z-A.
+- [ ] **Group chats ignore tag filters and always appear at the top of the character select screen.
+- [ ] **Docs should have a back button to go back to the web application.
+
 
 ### 🟡 Medium Complexity
 - [x] **Set default persona** - Add config option + settings UI ✅
@@ -21,6 +25,14 @@
 - [ ] **Tag searching in character pickers** - Add tag filtering to group chat creation screen (300+ cards need filtering!)
 - [ ] **Start new chat from summary** - AI summarizes current chat, creates new chat with same characters and summary as first message
 - [ ] **Stop button for streaming** - Add ability to cancel/stop streaming AI responses
+- [ ] **Maybe tool call results should just be saved in the message that called them if they return anything. 
+- [ ] **If you try to open a tab containing a settings page, if you already have a settings page open, it should just redirect you to the one you already have open, since all of them are identical. 
+- [ ] **All of the prompts that are used for external calls should probably be documented somewhere, eg the tool calling prompts and bookkeeping prompts.
+- [ ] **Button that gives all of your gray, default colored tags a random color. 
+- [ ] **Auto rename chats seems to run on chats that are already named.
+- [x] **Lorebooks in the lorebook manager screen should be searchable. ✅
+- [x] **When typing in tags in the lorebook manager, they should be searched for, exactly the same as in the persona manager tag field. (high priority) ✅
+
 
 ### 🔴 Complex Features
 - [ ] **Regex replacement system** - Post-process AI responses with regex find/replace
