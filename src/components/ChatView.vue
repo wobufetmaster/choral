@@ -9,68 +9,29 @@
     </div>
 
     <!-- Chat Sidebar -->
-    <div class="chat-sidebar" :class="{ collapsed: !sidebarOpen }">
-      <button @click="sidebarOpen = !sidebarOpen" class="sidebar-toggle" :title="sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'">
-        {{ sidebarOpen ? '◀' : '▶' }}
-      </button>
-
-      <div v-if="sidebarOpen" class="sidebar-content">
-        <div class="sidebar-header">
-          <h3>Chat Controls</h3>
-        </div>
-
-      <!-- Model/Preset Info -->
-      <div class="sidebar-info">
-        <div class="info-row">
-          <span class="info-label">Model:</span>
-          <span class="info-value" :title="settings.model">{{ displayModelName }}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Preset:</span>
-          <span class="info-value">{{ currentPresetName || 'None' }}</span>
-        </div>
-        <div class="context-window">
-          <div class="context-header">
-            <span class="info-label">Context:</span>
-            <span class="context-stats">{{ debugInfo.estimatedTokens.toLocaleString() }} / {{ settings.max_tokens.toLocaleString() }}</span>
-          </div>
-          <div class="context-bar">
-            <div class="context-fill" :style="{ width: contextPercentage + '%' }"></div>
-          </div>
-          <div class="context-percentage">{{ contextPercentage }}%</div>
-        </div>
-      </div>
-
-        <!-- Sidebar Actions -->
-        <div class="sidebar-actions">
-          <button @click="newChat" class="sidebar-btn">📝 New Chat</button>
-          <button @click="startNewChatFromSummary" v-if="messages.length > 0" class="sidebar-btn">📖 New Chat from Summary</button>
-          <button v-if="!isGroupChat && character" @click="convertToGroupChat" class="sidebar-btn">👥 Convert to Group</button>
-          <button @click="showChatHistory = !showChatHistory" :class="{ 'active': showChatHistory }" class="sidebar-btn">📜 History</button>
-
-          <!-- Persona Selector -->
-          <div class="selector-container">
-            <span class="selector-icon">👤</span>
-            <select v-model="persona.name" @change="onPersonaChange" class="selector-dropdown">
-              <option v-for="p in availablePersonas" :key="p.name" :value="p.name">{{ p.name }}</option>
-            </select>
-            <button @click="$emit('open-tab', 'personas', {}, 'Personas', false)" class="selector-edit-btn" title="Edit Personas">✏️</button>
-          </div>
-
-          <!-- Preset Selector -->
-          <div class="selector-container">
-            <span class="selector-icon">⚙️</span>
-            <select v-model="currentPresetFilename" @change="onPresetChange" class="selector-dropdown">
-              <option v-for="preset in availablePresets" :key="preset.filename" :value="preset.filename">{{ preset.name }}</option>
-            </select>
-            <button @click="$emit('open-tab', 'presets', {}, 'Presets', false)" class="selector-edit-btn" title="Edit Presets">✏️</button>
-          </div>
-
-          <button @click="showLorebooks = true" class="sidebar-btn">📚 Lorebook</button>
-          <button @click="showDebug = !showDebug" :class="{ 'active': showDebug }" class="sidebar-btn">🐛 Debug</button>
-        </div>
-      </div>
-    </div>
+    <ChatSidebar
+      v-model:sidebarOpen="sidebarOpen"
+      :settings="settings"
+      :current-preset-name="currentPresetName"
+      :current-preset-filename="currentPresetFilename"
+      :estimated-tokens="debugInfo.estimatedTokens"
+      :has-messages="messages.length > 0"
+      :show-convert-to-group="!isGroupChat && !!character"
+      :show-history="showChatHistory"
+      :show-debug="showDebug"
+      :persona-name="persona.name"
+      :available-personas="availablePersonas"
+      :available-presets="availablePresets"
+      @new-chat="newChat"
+      @new-chat-from-summary="startNewChatFromSummary"
+      @convert-to-group="convertToGroupChat"
+      @toggle-history="showChatHistory = !showChatHistory"
+      @persona-change="handlePersonaChange"
+      @preset-change="handlePresetChange"
+      @show-lorebooks="showLorebooks = true"
+      @toggle-debug="showDebug = !showDebug"
+      @open-tab="(...args) => $emit('open-tab', ...args)"
+    />
 
     <!-- Avatar Menu -->
     <div v-if="avatarMenu.show" class="avatar-menu" :style="{ top: avatarMenu.y + 'px', left: avatarMenu.x + 'px' }" @click.stop>
@@ -251,123 +212,13 @@
       </div>
     </div>
 
-    <!-- Inline Lorebook Editor -->
-    <div v-if="editingLorebook" class="lorebook-editor-modal">
-      <div class="modal-content large">
-        <div class="modal-header">
-          <h3>Edit: {{ editingLorebook.name }}</h3>
-          <button @click="closeLorebookEditor" class="close-button">×</button>
-        </div>
-        <div class="lorebook-editor-content">
-          <div class="editor-field">
-            <label>Lorebook Name:</label>
-            <input v-model="editingLorebook.name" type="text" class="lorebook-name-input" />
-          </div>
-
-          <div class="lorebook-settings">
-            <label>
-              <input type="checkbox" v-model="editingLorebook.autoSelect" />
-              Auto-select for characters with matching tags
-            </label>
-            <label v-if="editingLorebook.autoSelect">
-              Tags to match:
-              <input
-                v-model="editingLorebook.matchTags"
-                type="text"
-                placeholder="tag1, tag2, tag3"
-                class="tag-input"
-              />
-            </label>
-            <label>
-              Scan depth (0 = all messages):
-              <input v-model.number="editingLorebook.scanDepth" type="number" min="0" class="scan-depth-input" />
-            </label>
-          </div>
-
-          <div class="entries-section">
-            <div class="entries-header">
-              <h4>Entries</h4>
-              <button @click="addEntryToEditing" class="btn-primary">Add Entry</button>
-            </div>
-
-            <div
-              v-for="(entry, index) in editingLorebook.entries"
-              :key="index"
-              class="entry-item"
-            >
-              <div class="entry-header">
-                <input
-                  v-model="entry.name"
-                  type="text"
-                  placeholder="Entry Name"
-                  class="entry-name-input"
-                />
-                <div class="entry-controls">
-                  <label class="checkbox-label">
-                    <input type="checkbox" v-model="entry.enabled" />
-                    Enabled
-                  </label>
-                  <label class="checkbox-label">
-                    <input type="checkbox" v-model="entry.constant" />
-                    Always On
-                  </label>
-                  <button @click="removeEntryFromEditing(index)" class="btn-delete">Delete</button>
-                </div>
-              </div>
-
-              <div class="entry-matching">
-                <div class="match-section">
-                  <label>Keywords (case-insensitive):</label>
-                  <input
-                    v-model="entry.keysInput"
-                    @input="updateEntryKeys(entry)"
-                    type="text"
-                    placeholder="keyword1, keyword2, keyword3"
-                    class="keys-input"
-                  />
-                </div>
-
-                <div class="match-section">
-                  <label>Regex Pattern:</label>
-                  <input
-                    v-model="entry.regex"
-                    type="text"
-                    placeholder="^pattern.*"
-                    class="regex-input"
-                  />
-                </div>
-              </div>
-
-              <div class="entry-content">
-                <label>Content:</label>
-                <textarea
-                  v-model="entry.content"
-                  placeholder="Information to inject when matched..."
-                  rows="4"
-                  class="content-textarea"
-                ></textarea>
-              </div>
-
-              <div class="entry-settings">
-                <label>
-                  Priority (higher = injected first):
-                  <input v-model.number="entry.priority" type="number" class="priority-input" />
-                </label>
-              </div>
-            </div>
-
-            <div v-if="!editingLorebook.entries || editingLorebook.entries.length === 0" class="no-entries">
-              No entries yet. Click "Add Entry" to create one.
-            </div>
-          </div>
-
-          <div class="editor-actions">
-            <button @click="saveEditingLorebook" class="btn-primary">Save Changes</button>
-            <button @click="closeLorebookEditor" class="btn-secondary">Cancel</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Lorebook Editor -->
+    <LorebookEditor
+      v-if="editingLorebook"
+      :lorebook="editingLorebook"
+      @close="closeLorebookEditor"
+      @save="saveEditingLorebook"
+    />
 
     <!-- Debug Panel -->
     <div v-if="showDebug" class="debug-panel">
@@ -600,11 +451,15 @@ import DOMPurify from 'dompurify';
 import MarkdownIt from 'markdown-it';
 import { processMacrosForDisplay } from '../utils/macros';
 import GroupChatManager from './GroupChatManager.vue';
+import LorebookEditor from './LorebookEditor.vue';
+import ChatSidebar from './ChatSidebar.vue';
 
 export default {
   name: 'ChatView',
   components: {
-    GroupChatManager
+    GroupChatManager,
+    LorebookEditor,
+    ChatSidebar
   },
   props: {
     tabData: {
@@ -1859,12 +1714,14 @@ export default {
         console.error('Failed to load available personas:', error);
       }
     },
-    async onPresetChange() {
+    async handlePresetChange(filename) {
       // Load and apply the selected preset
-      if (!this.currentPresetFilename) return;
+      if (!filename) return;
+
+      this.currentPresetFilename = filename;
 
       try {
-        const response = await fetch(`/api/presets/${this.currentPresetFilename}`);
+        const response = await fetch(`/api/presets/${filename}`);
         const preset = await response.json();
         this.applyPreset(preset);
       } catch (error) {
@@ -1872,18 +1729,18 @@ export default {
         this.$root.$notify('Failed to load preset', 'error');
       }
     },
-    async onPersonaChange() {
+    async handlePersonaChange(personaName) {
       // Load and apply the selected persona
-      if (!this.persona.name) return;
+      if (!personaName) return;
 
       try {
         const response = await fetch('/api/personas');
         const personas = await response.json();
-        const selectedPersona = personas.find(p => p.name === this.persona.name);
+        const selectedPersona = personas.find(p => p.name === personaName);
 
         if (selectedPersona) {
           this.onPersonaSaved(selectedPersona);
-        } else if (this.persona.name === 'User') {
+        } else if (personaName === 'User') {
           // Default User persona
           this.onPersonaSaved({ name: 'User', avatar: null });
         }
@@ -1891,6 +1748,13 @@ export default {
         console.error('Failed to load persona:', error);
         this.$root.$notify('Failed to load persona', 'error');
       }
+    },
+    // Deprecated: kept for backward compatibility
+    async onPresetChange() {
+      await this.handlePresetChange(this.currentPresetFilename);
+    },
+    async onPersonaChange() {
+      await this.handlePersonaChange(this.persona.name);
     },
     applyPreset(preset) {
       // Apply preset settings to current chat
@@ -2466,32 +2330,19 @@ export default {
       // matched entries will be populated by the server response
     },
     editLorebook(lorebook) {
-      // Deep clone to avoid mutations
-      this.editingLorebook = JSON.parse(JSON.stringify(lorebook));
-
-      // Initialize keysInput for display
-      if (this.editingLorebook.entries) {
-        this.editingLorebook.entries.forEach(entry => {
-          if (!entry.keysInput && entry.keys) {
-            entry.keysInput = entry.keys.join(', ');
-          }
-          if (entry.enabled === undefined) {
-            entry.enabled = true;
-          }
-        });
-      }
-
+      // Set the lorebook to edit (LorebookEditor will handle cloning)
+      this.editingLorebook = lorebook;
       this.showLorebooks = false;
     },
     closeLorebookEditor() {
       this.editingLorebook = null;
     },
-    async saveEditingLorebook() {
+    async saveEditingLorebook(lorebook) {
       try {
         const response = await fetch('/api/lorebooks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.editingLorebook)
+          body: JSON.stringify(lorebook)
         });
 
         const result = await response.json();
@@ -2505,32 +2356,6 @@ export default {
         console.error('Failed to save lorebook:', error);
         this.$root.$notify('Failed to save lorebook', 'error');
       }
-    },
-    addEntryToEditing() {
-      if (!this.editingLorebook.entries) {
-        this.editingLorebook.entries = [];
-      }
-
-      this.editingLorebook.entries.push({
-        name: 'New Entry',
-        enabled: true,
-        constant: false,
-        keys: [],
-        keysInput: '',
-        regex: '',
-        content: '',
-        priority: 0
-      });
-    },
-    removeEntryFromEditing(index) {
-      this.editingLorebook.entries.splice(index, 1);
-    },
-    updateEntryKeys(entry) {
-      // Convert comma-separated string to array
-      entry.keys = entry.keysInput
-        .split(',')
-        .map(k => k.trim())
-        .filter(k => k.length > 0);
     },
     async autoSelectLorebook() {
       try {
@@ -3076,238 +2901,6 @@ button.active {
 .header-actions {
   display: flex;
   gap: 8px;
-}
-
-/* Chat Sidebar */
-.chat-sidebar {
-  position: fixed;
-  left: 0;
-  top: 73px;
-  bottom: 0;
-  width: 280px;
-  background: var(--bg-overlay);
-  backdrop-filter: blur(var(--blur-amount, 12px));
-  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
-  border-right: 1px solid var(--border-color);
-  box-shadow: var(--shadow-md);
-  z-index: 50;
-  transition: width 0.3s ease, background 0.3s ease;
-}
-
-.chat-sidebar.collapsed {
-  width: 40px;
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border-right: none;
-  box-shadow: none;
-}
-
-.sidebar-toggle {
-  position: absolute;
-  right: -28px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  z-index: 10;
-  transition: all 0.2s;
-}
-
-.collapsed .sidebar-toggle {
-  right: 8px;
-  background: var(--bg-overlay);
-  backdrop-filter: blur(var(--blur-amount, 12px));
-  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
-}
-
-.sidebar-toggle:hover {
-  background: var(--hover-color);
-  transform: translateY(-50%) scale(1.1);
-}
-
-.sidebar-content {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 16px 16px 16px;
-  padding-right: 40px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.sidebar-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.sidebar-info {
-  padding: 12px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-
-.info-row:last-child {
-  margin-bottom: 0;
-}
-
-.info-label {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.info-value {
-  color: var(--text-primary);
-  font-weight: 600;
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.context-window {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color);
-}
-
-.context-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.context-stats {
-  font-size: 12px;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.context-bar {
-  height: 8px;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 4px;
-}
-
-.context-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent-color) 0%, #22c55e 50%, #eab308 75%, #ef4444 100%);
-  transition: width 0.3s ease;
-  border-radius: 4px;
-}
-
-.context-percentage {
-  text-align: right;
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.sidebar-actions {
-  flex: 1;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-}
-
-.sidebar-btn {
-  width: 100%;
-  text-align: left;
-  padding: 12px 16px;
-  border-radius: 8px;
-  transition: all 0.2s;
-}
-
-.sidebar-btn:hover {
-  background: var(--hover-color);
-}
-
-.sidebar-btn.active {
-  background-color: var(--accent-color);
-  color: white;
-}
-
-/* Selector Container - matches sidebar buttons */
-.selector-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 12px 16px;
-  background: var(--bg-secondary);
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.selector-container:hover {
-  background: var(--hover-color);
-}
-
-.selector-icon {
-  font-size: 16px;
-  flex-shrink: 0;
-}
-
-.selector-dropdown {
-  flex: 1;
-  padding: 0;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-family: inherit;
-  cursor: pointer;
-  outline: none;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-}
-
-.selector-dropdown::-ms-expand {
-  display: none;
-}
-
-.selector-edit-btn {
-  padding: 4px 8px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 12px;
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-
-.selector-edit-btn:hover {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
-  color: white;
-  opacity: 1;
 }
 
 /* Avatar Menu */
@@ -4006,217 +3599,6 @@ button.active {
   border-color: var(--accent-color);
 }
 
-.lorebook-editor-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1001;
-}
-
-.modal-content.large {
-  max-width: 800px;
-  width: 95%;
-  max-height: 90vh;
-}
-
-.lorebook-editor-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-height: calc(90vh - 120px);
-  overflow-y: auto;
-}
-
-.editor-field label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-}
-
-.lorebook-name-input {
-  width: 100%;
-  padding: 0.5rem;
-  font-size: 1rem;
-}
-
-.lorebook-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
-  background-color: var(--bg-tertiary);
-  border-radius: 4px;
-}
-
-.lorebook-settings label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.tag-input,
-.scan-depth-input {
-  flex: 1;
-  padding: 0.375rem;
-}
-
-.entries-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.entries-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.entries-header h4 {
-  margin: 0;
-}
-
-.entry-item {
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 1rem;
-  background-color: var(--bg-tertiary);
-}
-
-.entry-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-  gap: 1rem;
-}
-
-.entry-name-input {
-  flex: 1;
-  font-weight: 600;
-  padding: 0.375rem;
-}
-
-.entry-controls {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-  margin: 0;
-  cursor: pointer;
-}
-
-.entry-matching {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.match-section label {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.keys-input,
-.regex-input {
-  width: 100%;
-  padding: 0.375rem;
-}
-
-.entry-content label {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.content-textarea {
-  width: 100%;
-  padding: 0.5rem;
-  font-family: inherit;
-  resize: vertical;
-}
-
-.entry-settings {
-  margin-top: 0.75rem;
-}
-
-.priority-input {
-  width: 80px;
-  padding: 0.375rem;
-}
-
-.no-entries {
-  text-align: center;
-  padding: 2rem;
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
-.editor-actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.btn-primary {
-  padding: 0.5rem 1rem;
-  background-color: var(--accent-color);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-}
-
-.btn-secondary {
-  padding: 0.5rem 1rem;
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-secondary:hover {
-  background-color: var(--hover-color);
-}
-
-.btn-delete {
-  padding: 0.25rem 0.5rem;
-  background-color: #dc2626;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.875rem;
-}
-
-.btn-delete:hover {
-  background-color: #b91c1c;
-}
-
 /* Debug Panel */
 .debug-panel {
   position: fixed;
@@ -4532,39 +3914,8 @@ button.active {
     display: none;
   }
 
-  /* Make sidebar overlay instead of pushing content */
-  .chat-sidebar {
-    z-index: 100;
-    box-shadow: var(--shadow-lg);
-  }
-
-  .chat-sidebar.collapsed {
-    transform: translateX(-100%);
-    width: 0;
-  }
-
   .chat-container {
     margin-left: 0 !important;
-  }
-
-  .chat-view:has(.chat-sidebar.collapsed) .chat-container {
-    margin-left: 0 !important;
-  }
-
-  /* Make sidebar toggle more accessible on mobile */
-  .sidebar-toggle {
-    right: -32px;
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
-  }
-
-  .collapsed .sidebar-toggle {
-    right: auto;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    position: fixed;
   }
 
   /* Increase message width on mobile */
