@@ -767,9 +767,7 @@ export default {
     }
 
     // Auto-select lorebook based on character tags (will add to existing manual selections)
-    if (!this.isGroupChat) {
-      await this.autoSelectLorebook();
-    }
+    await this.autoSelectLorebook();
   },
   methods: {
     updateTabData() {
@@ -2467,7 +2465,24 @@ export default {
 
         if (!lorebooks || lorebooks.length === 0) return;
 
-        const characterTags = this.character?.data?.tags || [];
+        // Collect tags based on chat type
+        let allTags = [];
+        if (this.isGroupChat) {
+          // For group chats: collect tags from the group itself and all characters
+          allTags = [...(this.groupChatTags || [])];
+
+          // Add tags from all characters in the group
+          for (const char of this.groupChatCharacters || []) {
+            const charTags = char.data?.tags || char.data?.data?.tags || char.tags || [];
+            allTags.push(...charTags);
+          }
+        } else {
+          // For regular chats: just use the character's tags
+          allTags = this.character?.data?.tags || [];
+        }
+
+        // Remove duplicates and normalize to lowercase
+        const uniqueTags = [...new Set(allTags.map(t => t.toLowerCase()))];
         this.autoSelectedLorebookFilenames = [];
 
         // Find all lorebooks with autoSelect enabled and matching tags
@@ -2478,9 +2493,9 @@ export default {
               .map(t => t.trim().toLowerCase())
               .filter(t => t.length > 0);
 
-            // Check if any character tag matches lorebook tags
-            const hasMatch = characterTags.some(charTag =>
-              lorebookTags.includes(charTag.toLowerCase())
+            // Check if any tag matches lorebook tags
+            const hasMatch = uniqueTags.some(tag =>
+              lorebookTags.includes(tag)
             );
 
             if (hasMatch) {
