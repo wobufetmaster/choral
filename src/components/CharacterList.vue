@@ -244,6 +244,9 @@
             <button @click="autoGenerateTags" class="auto-tag-btn" :disabled="isAutoTagging">
               {{ isAutoTagging ? 'Generating...' : '✨ Auto-Generate Tags' }}
             </button>
+            <button @click="randomizeGrayTags" class="randomize-colors-btn">
+              🎨 Randomize Gray Colors
+            </button>
           </div>
 
           <div class="modal-actions">
@@ -911,6 +914,51 @@ export default {
         this.$root.$notify(error.message || 'Failed to auto-generate tags', 'error');
       } finally {
         this.isAutoTagging = false;
+      }
+    },
+    randomizeGrayTags() {
+      const DEFAULT_GRAY = '#6b7280';
+      let randomized = 0;
+
+      // Find all tags with the default gray color and randomize them
+      this.editingTags.forEach(tag => {
+        if (tag.color.toLowerCase() === DEFAULT_GRAY.toLowerCase()) {
+          // Generate random bright color
+          const hue = Math.floor(Math.random() * 360);
+          const saturation = 60 + Math.floor(Math.random() * 30); // 60-90%
+          const lightness = 45 + Math.floor(Math.random() * 15); // 45-60%
+
+          // Convert HSL to RGB to HEX
+          const h = hue / 360;
+          const s = saturation / 100;
+          const l = lightness / 100;
+
+          const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+          };
+
+          const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          const p = 2 * l - q;
+          const r = Math.round(hue2rgb(p, q, h + 1/3) * 255);
+          const g = Math.round(hue2rgb(p, q, h) * 255);
+          const b = Math.round(hue2rgb(p, q, h - 1/3) * 255);
+
+          tag.color = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+          randomized++;
+        }
+      });
+
+      if (randomized > 0) {
+        this.$root.$notify(`Randomized ${randomized} gray tag${randomized === 1 ? '' : 's'}!`, 'success');
+        // Trigger auto-save
+        this.autoSaveTagChanges();
+      } else {
+        this.$root.$notify('No gray tags found to randomize', 'info');
       }
     },
 
@@ -2021,6 +2069,7 @@ export default {
 .auto-tag-section {
   display: flex;
   justify-content: center;
+  gap: 0.75rem;
   padding: 0.5rem 0;
   border-top: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
@@ -2044,6 +2093,23 @@ export default {
 .auto-tag-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.randomize-colors-btn {
+  padding: 0.625rem 1.25rem;
+  background-color: #8b5cf6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  transition: all 0.2s;
+}
+
+.randomize-colors-btn:hover {
+  background-color: #7c3aed;
+  opacity: 0.9;
 }
 
 .modal-actions {
