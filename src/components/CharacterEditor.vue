@@ -45,28 +45,28 @@
 
             <div class="form-group">
               <label>Description *</label>
-              <textarea v-model="editedCard.data.description" rows="4" required></textarea>
+              <textarea v-model="editedCard.data.description" @input="autoExpand" rows="4" required></textarea>
             </div>
 
             <div class="form-group">
               <label>Personality</label>
-              <textarea v-model="editedCard.data.personality" rows="3"></textarea>
+              <textarea v-model="editedCard.data.personality" @input="autoExpand" rows="3"></textarea>
             </div>
 
             <div class="form-group">
               <label>Scenario</label>
-              <textarea v-model="editedCard.data.scenario" rows="3"></textarea>
+              <textarea v-model="editedCard.data.scenario" @input="autoExpand" rows="3"></textarea>
             </div>
 
             <div class="form-group">
               <label>First Message *</label>
-              <textarea v-model="editedCard.data.first_mes" rows="4" required></textarea>
+              <textarea v-model="editedCard.data.first_mes" @input="autoExpand" rows="4" required></textarea>
             </div>
 
             <div class="form-group">
               <label>Alternate Greetings</label>
               <div v-for="(greeting, index) in editedCard.data.alternate_greetings" :key="index" class="greeting-item">
-                <textarea v-model="editedCard.data.alternate_greetings[index]" rows="2"></textarea>
+                <textarea v-model="editedCard.data.alternate_greetings[index]" @input="autoExpand" rows="2"></textarea>
                 <button @click="removeGreeting(index)" class="remove-btn">Remove</button>
               </div>
               <button @click="addGreeting" class="add-btn">+ Add Greeting</button>
@@ -75,17 +75,17 @@
             <div class="form-group">
               <label>Example Dialogue</label>
               <small>Example conversations to help guide the AI's responses. Use {{char}} and {{user}} placeholders.</small>
-              <textarea v-model="editedCard.data.mes_example" rows="6" placeholder="<START>&#10;{{user}}: Hello!&#10;{{char}}: *waves enthusiastically* Hi there!&#10;&#10;<START>&#10;{{user}}: How are you?&#10;{{char}}: I'm doing great, thanks for asking!"></textarea>
+              <textarea v-model="editedCard.data.mes_example" @input="autoExpand" rows="6" placeholder="<START>&#10;{{user}}: Hello!&#10;{{char}}: *waves enthusiastically* Hi there!&#10;&#10;<START>&#10;{{user}}: How are you?&#10;{{char}}: I'm doing great, thanks for asking!"></textarea>
             </div>
 
             <div class="form-group">
               <label>System Prompt</label>
-              <textarea v-model="editedCard.data.system_prompt" rows="3"></textarea>
+              <textarea v-model="editedCard.data.system_prompt" @input="autoExpand" rows="3"></textarea>
             </div>
 
             <div class="form-group">
               <label>Post History Instructions</label>
-              <textarea v-model="editedCard.data.post_history_instructions" rows="3"></textarea>
+              <textarea v-model="editedCard.data.post_history_instructions" @input="autoExpand" rows="3"></textarea>
             </div>
 
             <div class="form-group">
@@ -117,7 +117,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -201,6 +201,9 @@ watch(() => props.character, (newChar) => {
     } else {
       tagsString.value = ''
     }
+
+    // Expand all textareas to fit content
+    expandAllTextareas()
   } else {
     // Reset for create mode
     resetForm()
@@ -214,38 +217,50 @@ watch(() => props.isOpen, (isOpen) => {
   }
 })
 
-// Watch for tabData.character changes (when opening in edit mode via tab)
-watch(() => props.tabData?.character, (newChar) => {
-  if (newChar) {
+// Watch for tabData changes (when opening in tab mode)
+watch(() => props.tabData, (newTabData) => {
+  if (!newTabData) return
+
+  // Check if we have saved draft data or character data
+  const sourceData = newTabData.draftCard || newTabData.character
+
+  if (sourceData) {
     // Use the character's data card structure
-    if (newChar.data) {
+    if (sourceData.data) {
       editedCard.value = {
-        spec: newChar.spec || 'chara_card_v3',
-        spec_version: newChar.spec_version || '3.0',
+        spec: sourceData.spec || 'chara_card_v3',
+        spec_version: sourceData.spec_version || '3.0',
         data: {
-          name: newChar.data.name || '',
-          nickname: newChar.data.nickname || '',
-          description: newChar.data.description || '',
-          personality: newChar.data.personality || '',
-          scenario: newChar.data.scenario || '',
-          first_mes: newChar.data.first_mes || '',
-          mes_example: newChar.data.mes_example || '',
-          system_prompt: newChar.data.system_prompt || '',
-          post_history_instructions: newChar.data.post_history_instructions || '',
-          alternate_greetings: newChar.data.alternate_greetings || [],
-          tags: newChar.data.tags || [],
-          creator: newChar.data.creator || '',
-          character_version: newChar.data.character_version || '',
-          extensions: newChar.data.extensions || {}
+          name: sourceData.data.name || '',
+          nickname: sourceData.data.nickname || '',
+          description: sourceData.data.description || '',
+          personality: sourceData.data.personality || '',
+          scenario: sourceData.data.scenario || '',
+          first_mes: sourceData.data.first_mes || '',
+          mes_example: sourceData.data.mes_example || '',
+          system_prompt: sourceData.data.system_prompt || '',
+          post_history_instructions: sourceData.data.post_history_instructions || '',
+          alternate_greetings: sourceData.data.alternate_greetings || [],
+          tags: sourceData.data.tags || [],
+          creator: sourceData.data.creator || '',
+          character_version: sourceData.data.character_version || '',
+          extensions: sourceData.data.extensions || {}
         }
       }
     } else {
-      editedCard.value = JSON.parse(JSON.stringify(newChar))
+      editedCard.value = JSON.parse(JSON.stringify(sourceData))
     }
 
-    // Set image preview from character
-    if (newChar.image) {
-      imagePreview.value = newChar.image
+    // Set image preview from character or draft
+    if (newTabData.draftImagePreview) {
+      imagePreview.value = newTabData.draftImagePreview
+    } else if (sourceData.image) {
+      imagePreview.value = sourceData.image
+    }
+
+    // Set image file if available
+    if (newTabData.draftImageFile) {
+      imageFile.value = newTabData.draftImageFile
     }
 
     // Set tags string
@@ -254,9 +269,9 @@ watch(() => props.tabData?.character, (newChar) => {
     } else {
       tagsString.value = ''
     }
-  } else {
-    // Reset for create mode
-    resetForm()
+
+    // Expand all textareas to fit content
+    expandAllTextareas()
   }
 }, { immediate: true })
 
@@ -310,6 +325,24 @@ function removeGreeting(index) {
   editedCard.value.data.alternate_greetings.splice(index, 1)
 }
 
+function autoExpand(event) {
+  const textarea = event.target
+  // Reset height to auto to get the correct scrollHeight
+  textarea.style.height = 'auto'
+  // Set height to scrollHeight to fit content
+  textarea.style.height = textarea.scrollHeight + 'px'
+}
+
+function expandAllTextareas() {
+  nextTick(() => {
+    const textareas = document.querySelectorAll('.character-editor textarea')
+    textareas.forEach(textarea => {
+      textarea.style.height = 'auto'
+      textarea.style.height = textarea.scrollHeight + 'px'
+    })
+  })
+}
+
 function close() {
   emit('close')
 }
@@ -358,9 +391,6 @@ async function save() {
       if (response.ok) {
         const result = await response.json()
 
-        // Update tab label
-        emit('update-tab', { label: editedCard.value.data.name })
-
         // Show success notification
         if (window.$root?.$notify) {
           window.$root.$notify(
@@ -369,11 +399,30 @@ async function save() {
           )
         }
 
-        // If it was a new character, update the tabData to have the filename
+        // If it was a new character, update the tabData to have the filename and clear draft
         if (!characterData.originalFilename && result.filename) {
           emit('update-tab', {
             label: editedCard.value.data.name,
-            data: { character: { ...editedCard.value, filename: result.filename } }
+            data: {
+              character: { ...editedCard.value, filename: result.filename },
+              // Clear draft data since it's now saved
+              draftCard: null,
+              draftImagePreview: null,
+              draftImageFile: null
+            }
+          })
+        } else {
+          // Just update the label and clear draft for existing characters
+          emit('update-tab', {
+            label: editedCard.value.data.name,
+            data: {
+              ...props.tabData,
+              character: { ...editedCard.value, filename: characterData.originalFilename },
+              // Clear draft data since it's now saved
+              draftCard: null,
+              draftImagePreview: null,
+              draftImageFile: null
+            }
           })
         }
       } else {
@@ -400,6 +449,21 @@ watch(() => editedCard.value.data.name, (newName) => {
     emit('update-tab', { label: newName })
   }
 })
+
+// Watch for any changes to editedCard and save as draft in tab mode
+watch([editedCard, imagePreview, imageFile], () => {
+  if (props.tabData) {
+    // Save the current state as a draft
+    emit('update-tab', {
+      data: {
+        ...props.tabData,
+        draftCard: JSON.parse(JSON.stringify(editedCard.value)),
+        draftImagePreview: imagePreview.value,
+        draftImageFile: imageFile.value
+      }
+    })
+  }
+}, { deep: true })
 </script>
 
 <style scoped>
@@ -558,8 +622,10 @@ watch(() => editedCard.value.data.name, (newName) => {
 }
 
 .form-group textarea {
-  resize: vertical;
+  resize: none;
   min-height: 60px;
+  overflow-y: hidden;
+  transition: height 0.1s ease;
 }
 
 .greeting-item {
