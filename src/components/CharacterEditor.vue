@@ -89,8 +89,32 @@
             </div>
 
             <div class="form-group">
-              <label>Tags (comma-separated)</label>
-              <input v-model="tagsString" type="text" placeholder="tag1, tag2, tag3" />
+              <label>Tags</label>
+              <div class="tag-input-container">
+                <div class="current-tags">
+                  <span v-for="(tag, index) in editedCard.data.tags" :key="index" class="tag-chip">
+                    {{ tag }}
+                    <button @click="removeTag(index)" class="remove-tag">×</button>
+                  </span>
+                </div>
+                <input
+                  v-model="newTag"
+                  @keydown.enter.prevent="addTag"
+                  @input="updateTagSuggestions"
+                  placeholder="Add tag (press Enter)"
+                  class="tag-input"
+                />
+                <div v-if="tagSuggestions.length > 0" class="tag-suggestions">
+                  <div
+                    v-for="suggestion in tagSuggestions"
+                    :key="suggestion"
+                    @click="addSuggestedTag(suggestion)"
+                    class="tag-suggestion"
+                  >
+                    {{ suggestion }}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="form-group">
@@ -131,6 +155,9 @@ const imageInput = ref(null)
 const imagePreview = ref('')
 const imageFile = ref(null)
 const tagsString = ref('')
+const newTag = ref('')
+const tagSuggestions = ref([])
+const allCharacterTags = ref([])
 
 const editedCard = ref({
   spec: 'chara_card_v3',
@@ -464,6 +491,115 @@ watch([editedCard, imagePreview, imageFile], () => {
     })
   }
 }, { deep: true })
+
+// Load all character tags for autocomplete
+async function loadAllCharacterTags() {
+  try {
+    const response = await fetch('/api/characters')
+    const characters = await response.json()
+
+    const tags = new Set()
+    characters.forEach(char => {
+      const characterTags = char.data?.tags || char.tags || []
+      characterTags.forEach(tag => tags.add(tag))
+    })
+
+    allCharacterTags.value = Array.from(tags).sort()
+  } catch (error) {
+    console.error('Failed to load character tags:', error)
+  }
+}
+
+function addTag() {
+  const tag = newTag.value.trim()
+  if (!editedCard.value.data.tags) {
+    editedCard.value.data.tags = []
+  }
+  if (tag && !editedCard.value.data.tags.includes(tag)) {
+    editedCard.value.data.tags = [...editedCard.value.data.tags, tag]
+    newTag.value = ''
+    tagSuggestions.value = []
+
+    // Auto-save in tab mode
+    if (props.tabData) {
+      autoSaveTagChange()
+    }
+  }
+}
+
+function addSuggestedTag(tag) {
+  if (!editedCard.value.data.tags) {
+    editedCard.value.data.tags = []
+  }
+  if (!editedCard.value.data.tags.includes(tag)) {
+    editedCard.value.data.tags = [...editedCard.value.data.tags, tag]
+    newTag.value = ''
+    tagSuggestions.value = []
+
+    // Auto-save in tab mode
+    if (props.tabData) {
+      autoSaveTagChange()
+    }
+  }
+}
+
+function removeTag(index) {
+  editedCard.value.data.tags.splice(index, 1)
+
+  // Auto-save in tab mode
+  if (props.tabData) {
+    autoSaveTagChange()
+  }
+}
+
+function updateTagSuggestions() {
+  if (!newTag.value.trim()) {
+    tagSuggestions.value = []
+    return
+  }
+
+  const query = newTag.value.toLowerCase()
+  const currentTags = editedCard.value.data.tags || []
+  tagSuggestions.value = allCharacterTags.value
+    .filter(tag =>
+      tag.toLowerCase().includes(query) &&
+      !currentTags.includes(tag)
+    )
+    .slice(0, 5)
+}
+
+async function autoSaveTagChange() {
+  // Only auto-save if we have a character filename (existing character)
+  if (!props.tabData?.character?.filename) {
+    return
+  }
+
+  try {
+    const formData = new FormData()
+
+    if (imageFile.value) {
+      formData.append('file', imageFile.value)
+    }
+    formData.append('card', JSON.stringify(editedCard.value))
+
+    const response = await fetch(`/api/characters/${props.tabData.character.filename}`, {
+      method: 'PUT',
+      body: formData
+    })
+
+    if (response.ok) {
+      // Silently save - no notification for tag auto-save
+      console.log('Tags auto-saved')
+    }
+  } catch (error) {
+    console.error('Failed to auto-save tags:', error)
+  }
+}
+
+// Load character tags on mount
+onMounted(() => {
+  loadAllCharacterTags()
+})
 </script>
 
 <style scoped>
@@ -755,5 +891,88 @@ watch([editedCard, imagePreview, imageFile], () => {
   padding: 20px;
   overflow-y: auto;
   flex: 1;
+}
+
+/* Tag Input Styles */
+.tag-input-container {
+  position: relative;
+}
+
+.current-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tag-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--accent-color);
+  color: white;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.remove-tag {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-tag:hover {
+  opacity: 0.8;
+}
+
+.tag-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.tag-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.tag-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.tag-suggestion {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tag-suggestion:hover {
+  background: var(--hover-color);
 }
 </style>
