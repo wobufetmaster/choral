@@ -389,10 +389,10 @@
         </div>
 
         <!-- Active Lorebooks -->
-        <div class="debug-section" v-if="selectedLorebookFilenames.length > 0">
-          <h4>📚 Active Lorebooks ({{ selectedLorebookFilenames.length }})</h4>
+        <div class="debug-section" v-if="validSelectedLorebookFilenames.length > 0">
+          <h4>📚 Active Lorebooks ({{ validSelectedLorebookFilenames.length }})</h4>
           <div class="debug-lorebook-list">
-            <div v-for="filename in selectedLorebookFilenames" :key="filename" class="debug-lorebook-item">
+            <div v-for="filename in validSelectedLorebookFilenames" :key="filename" class="debug-lorebook-item">
               <div class="debug-lorebook-header">
                 <span class="debug-lorebook-name">{{ getLorebook(filename)?.name || filename }}</span>
                 <span v-if="isAutoSelected(filename)" class="auto-badge">AUTO</span>
@@ -685,6 +685,12 @@ export default {
       if (!this.settings.max_tokens || this.settings.max_tokens === 0) return 0;
       const percentage = (this.debugInfo.estimatedTokens / this.settings.max_tokens) * 100;
       return Math.min(100, Math.round(percentage));
+    },
+    validSelectedLorebookFilenames() {
+      // Filter out lorebooks that don't exist (e.g., deleted files still in localStorage)
+      return this.selectedLorebookFilenames.filter(filename =>
+        this.lorebooks.some(l => l.filename === filename)
+      );
     }
   },
   watch: {
@@ -2364,6 +2370,22 @@ export default {
       try {
         const response = await fetch('/api/lorebooks');
         this.lorebooks = await response.json();
+
+        // Clean up selectedLorebookFilenames: remove any that don't exist anymore
+        const validFilenames = this.lorebooks.map(l => l.filename);
+        const originalLength = this.selectedLorebookFilenames.length;
+        this.selectedLorebookFilenames = this.selectedLorebookFilenames.filter(filename =>
+          validFilenames.includes(filename)
+        );
+
+        // If we removed any, update localStorage
+        if (this.selectedLorebookFilenames.length < originalLength) {
+          const manuallySelected = this.selectedLorebookFilenames.filter(
+            filename => !this.autoSelectedLorebookFilenames.includes(filename)
+          );
+          localStorage.setItem('manuallySelectedLorebooks', JSON.stringify(manuallySelected));
+          console.log('Cleaned up invalid lorebook references from selection');
+        }
       } catch (error) {
         console.error('Failed to load lorebooks:', error);
       }
