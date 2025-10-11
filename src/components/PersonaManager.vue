@@ -147,7 +147,6 @@
           </div>
         </div>
       </div>
-    </div>
   </div>
 </template>
 
@@ -612,6 +611,7 @@ export default {
   gap: 20px;
   overflow-y: auto;
   min-height: 0;
+  padding-bottom: 20px;
 }
 
 .avatar-section {

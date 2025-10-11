@@ -10,19 +10,39 @@
           @change="uploadCharacter"
           style="display: none"
         />
-        <button @click="$refs.fileInput.click()">Import Character</button>
-        <button @click="createNewCharacter">Create New</button>
-        <button @click="showGroupChatCreator = true">Create Group Chat</button>
-        <button @click="autoTagAll" :disabled="isAutoTaggingAll">
-          {{ isAutoTaggingAll ? 'Auto-tagging...' : '✨ Auto-tag All' }}
-        </button>
-        <button @click="$emit('open-tab', 'presets', {}, 'Presets', false)">⚙️ Presets</button>
-        <button @click="$emit('open-tab', 'personas', {}, 'Personas', false)">👤 Personas</button>
-        <button @click="$emit('open-tab', 'lorebooks', {}, 'Lorebooks', false)">📚 Lorebooks</button>
-        <button @click="$emit('open-tab', 'tool-settings', {}, 'Tool Settings', false)">🔧 Tool Settings</button>
-        <button @click="$emit('open-tab', 'bookkeeping-settings', {}, 'Bookkeeping', false)">📊 Bookkeeping / Tags</button>
-        <button @click="openDocs">📖 Docs</button>
-        <button @click="$emit('open-tab', 'settings', {}, 'Settings', false)">⚙️ Settings</button>
+        <!-- Character Actions -->
+        <div class="action-group">
+          <button @click="$refs.fileInput.click()">📥 Import Character</button>
+          <button @click="createNewCharacter">➕ Create New</button>
+          <button @click="showGroupChatCreator = true">👥 Create Group Chat</button>
+        </div>
+
+        <!-- Management -->
+        <div class="action-group">
+          <button @click="$emit('open-tab', 'presets', {}, 'Presets', false)">⚙️ Presets</button>
+          <button @click="$emit('open-tab', 'personas', {}, 'Personas', false)">👤 Personas</button>
+          <button @click="$emit('open-tab', 'lorebooks', {}, 'Lorebooks', false)">📚 Lorebooks</button>
+        </div>
+
+        <!-- System -->
+        <div class="action-group">
+          <div class="dropdown-container">
+            <button @click="showAdvancedDropdown = !showAdvancedDropdown" class="dropdown-trigger">
+              ⚙️ Settings
+              <span class="dropdown-arrow">{{ showAdvancedDropdown ? '▲' : '▼' }}</span>
+            </button>
+            <div v-if="showAdvancedDropdown" class="dropdown-menu" @click="showAdvancedDropdown = false">
+              <button @click="$emit('open-tab', 'settings', {}, 'Core Settings', false)" class="dropdown-item">⚙️ Core Settings</button>
+              <button @click="$emit('open-tab', 'tool-settings', {}, 'Tool Settings', false)" class="dropdown-item">🔧 Tool Settings</button>
+              <button @click="$emit('open-tab', 'bookkeeping-settings', {}, 'Bookkeeping', false)" class="dropdown-item">📊 Bookkeeping</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Help -->
+        <div class="action-group">
+          <button @click="openDocs">📖 Docs</button>
+        </div>
       </div>
     </div>
 
@@ -45,8 +65,15 @@
         </div>
 
         <div v-if="allTags.length > 0" class="tag-filter">
-          <span class="filter-label">Filter by tag:</span>
-          <button v-if="selectedTags.length > 0" @click="clearAllTags" class="clear-tags-btn">Clear All</button>
+          <div class="tag-filter-header">
+            <div class="tag-filter-left">
+              <span class="filter-label">Filter by tag:</span>
+              <button @click="autoTagAll" :disabled="isAutoTaggingAll" class="auto-tag-all-btn">
+                {{ isAutoTaggingAll ? 'Auto-tagging...' : '✨ Auto-tag All' }}
+              </button>
+            </div>
+            <button v-if="selectedTags.length > 0" @click="clearAllTags" class="clear-tags-btn">Clear All</button>
+          </div>
           <div class="filter-tags">
             <button
               v-for="tag in allTags"
@@ -367,7 +394,9 @@ export default {
       showAutoTagProgress: false,
       autoTagCurrentIndex: 0,
       autoTagTotal: 0,
-      autoTagCurrentCharacter: ''
+      autoTagCurrentCharacter: '',
+      // Dropdown
+      showAdvancedDropdown: false
     }
   },
   computed: {
@@ -1203,6 +1232,8 @@ export default {
   -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
   border-bottom: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
+  position: relative;
+  z-index: 100;
 }
 
 .header h1 {
@@ -1212,8 +1243,86 @@ export default {
 
 .actions {
   display: flex;
-  gap: 8px;
+  gap: 16px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.action-group {
+  display: flex;
+  gap: 8px;
+  padding-right: 16px;
+  border-right: 1px solid var(--border-color);
+}
+
+.action-group:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+
+/* Dropdown Styles */
+.dropdown-container {
+  position: relative;
+}
+
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dropdown-trigger:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-color);
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  transition: transform 0.2s;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  overflow: hidden;
+}
+
+.dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: var(--hover-color);
+  color: var(--accent-color);
 }
 
 @media (max-width: 768px) {
@@ -1236,13 +1345,29 @@ export default {
   }
 
   .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .action-group {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 4px;
     width: 100%;
+    padding-right: 0;
+    border-right: none;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
   }
 
-  .actions button {
+  .action-group:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .action-group button {
     width: 100%;
     padding: 6px 10px;
     font-size: 12px;
@@ -1374,15 +1499,53 @@ export default {
 
 .tag-filter {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.tag-filter-header {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.tag-filter-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .filter-label {
   font-size: 14px;
   color: var(--text-secondary);
   font-weight: 500;
+}
+
+.auto-tag-all-btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  background: var(--accent-color);
+  color: white;
+  border: 1px solid var(--accent-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.auto-tag-all-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.auto-tag-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .clear-tags-btn {

@@ -48,25 +48,21 @@
           <button @click="showChatHistory = !showChatHistory" :class="{ 'active': showChatHistory }" class="sidebar-btn">📜 History</button>
 
           <!-- Persona Selector -->
-          <div class="selector-section">
-            <label class="selector-label">👤 Persona</label>
-            <div class="selector-row">
-              <select v-model="persona.name" @change="onPersonaChange" class="selector-dropdown">
-                <option v-for="p in availablePersonas" :key="p.name" :value="p.name">{{ p.name }}</option>
-              </select>
-              <button @click="$emit('open-tab', 'personas', {}, 'Personas', false)" class="edit-btn" title="Edit Personas">✏️</button>
-            </div>
+          <div class="selector-container">
+            <span class="selector-icon">👤</span>
+            <select v-model="persona.name" @change="onPersonaChange" class="selector-dropdown">
+              <option v-for="p in availablePersonas" :key="p.name" :value="p.name">{{ p.name }}</option>
+            </select>
+            <button @click="$emit('open-tab', 'personas', {}, 'Personas', false)" class="selector-edit-btn" title="Edit Personas">✏️</button>
           </div>
 
           <!-- Preset Selector -->
-          <div class="selector-section">
-            <label class="selector-label">⚙️ Preset</label>
-            <div class="selector-row">
-              <select v-model="currentPresetFilename" @change="onPresetChange" class="selector-dropdown">
-                <option v-for="preset in availablePresets" :key="preset.filename" :value="preset.filename">{{ preset.name }}</option>
-              </select>
-              <button @click="$emit('open-tab', 'presets', {}, 'Presets', false)" class="edit-btn" title="Edit Presets">✏️</button>
-            </div>
+          <div class="selector-container">
+            <span class="selector-icon">⚙️</span>
+            <select v-model="currentPresetFilename" @change="onPresetChange" class="selector-dropdown">
+              <option v-for="preset in availablePresets" :key="preset.filename" :value="preset.filename">{{ preset.name }}</option>
+            </select>
+            <button @click="$emit('open-tab', 'presets', {}, 'Presets', false)" class="selector-edit-btn" title="Edit Presets">✏️</button>
           </div>
 
           <button @click="showLorebooks = true" class="sidebar-btn">📚 Lorebook</button>
@@ -788,7 +784,7 @@ export default {
               const config = await configResponse.json();
               if (config.defaultPersona) {
                 defaultPersona = personas.find(p =>
-                  (p.name + '.json') === config.defaultPersona
+                  p._filename === config.defaultPersona
                 );
               }
             } catch (error) {
@@ -831,6 +827,7 @@ export default {
           prompt_processing: preset.prompt_processing || 'merge_system'
         };
         this.currentPresetName = preset.name;
+        this.currentPresetFilename = activePresetFilename;
       } catch (error) {
         console.error('Failed to load active preset:', error);
         // Continue with default settings if preset fails to load
@@ -2702,61 +2699,63 @@ button.active {
   color: white;
 }
 
-/* Selector Sections */
-.selector-section {
+/* Selector Container - matches sidebar buttons */
+.selector-container {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 0;
-}
-
-.selector-label {
-  font-size: 13px;
-  color: var(--text-secondary);
-  font-weight: 500;
-  padding: 0 4px;
-}
-
-.selector-row {
-  display: flex;
-  gap: 6px;
   align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.selector-container:hover {
+  background: var(--hover-color);
+}
+
+.selector-icon {
+  font-size: 16px;
+  flex-shrink: 0;
 }
 
 .selector-dropdown {
   flex: 1;
-  padding: 8px 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  border: none;
   color: var(--text-primary);
   font-size: 14px;
+  font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s;
-}
-
-.selector-dropdown:hover {
-  border-color: var(--accent-color);
-}
-
-.selector-dropdown:focus {
   outline: none;
-  border-color: var(--accent-color);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
 }
 
-.edit-btn {
-  padding: 8px 12px;
+.selector-dropdown::-ms-expand {
+  display: none;
+}
+
+.selector-edit-btn {
+  padding: 4px 8px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
-  font-size: 14px;
+  font-size: 12px;
+  flex-shrink: 0;
+  opacity: 0.7;
 }
 
-.edit-btn:hover {
-  background: var(--hover-color);
+.selector-edit-btn:hover {
+  background: var(--accent-color);
   border-color: var(--accent-color);
+  color: white;
+  opacity: 1;
 }
 
 /* Avatar Menu */

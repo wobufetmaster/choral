@@ -107,7 +107,6 @@
           <button @click="addPrompt" class="add-prompt-btn">+ Add Prompt</button>
         </div>
       </div>
-    </div>
   </div>
 </template>
 
@@ -386,6 +385,7 @@ export default {
   gap: 16px;
   overflow-y: auto;
   min-height: 0;
+  padding-bottom: 20px;
 }
 
 .form-group {
