@@ -12,6 +12,14 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Parse command line arguments
+HOST_FLAG=""
+for arg in "$@"; do
+    if [ "$arg" = "--host" ]; then
+        HOST_FLAG="--host"
+    fi
+done
+
 echo -e "${BLUE}🎵 Starting Choral...${NC}"
 echo ""
 
@@ -80,9 +88,20 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "Server will be available at:"
 echo -e "  ${GREEN}http://localhost:3000${NC}"
+
+if [ -n "$HOST_FLAG" ]; then
+    echo ""
+    echo -e "${YELLOW}Network access enabled${NC} - server will be accessible from other devices"
+    echo "Find your local IP address to connect from your phone"
+fi
+
 echo ""
 echo -e "Press ${RED}Ctrl+C${NC} to stop"
 echo ""
 
-# Start the server
-npm run dev
+# Start the server with optional host flag
+if [ -n "$HOST_FLAG" ]; then
+    npx concurrently "npm run server" "vite $HOST_FLAG"
+else
+    npm run dev
+fi

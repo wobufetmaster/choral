@@ -3737,8 +3737,8 @@ button.active {
   .collapsed .sidebar-toggle {
     right: auto;
     left: 16px;
-    top: 16px;
-    transform: none;
+    top: 50%;
+    transform: translateY(-50%);
     position: fixed;
   }
 
