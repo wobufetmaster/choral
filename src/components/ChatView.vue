@@ -188,29 +188,64 @@
           <button @click="showLorebooks = false" class="close-button">×</button>
         </div>
         <div class="lorebook-list">
-          <div
-            v-for="lorebook in lorebooks"
-            :key="lorebook.filename"
-            class="lorebook-option"
-            :class="{ 'auto-selected': isAutoSelected(lorebook.filename) }"
-          >
-            <input
-              type="checkbox"
-              :id="'lorebook-' + lorebook.filename"
-              :value="lorebook.filename"
-              v-model="selectedLorebookFilenames"
-              class="lorebook-checkbox"
-            />
-            <label :for="'lorebook-' + lorebook.filename" class="lorebook-checkbox-label">
-              <div class="lorebook-info-wrapper">
-                <div class="lorebook-name">
-                  {{ lorebook.name }}
-                  <span v-if="isAutoSelected(lorebook.filename)" class="auto-tag">AUTO</span>
+          <!-- Active Lorebooks Section -->
+          <div v-if="activeLorebooksForDisplay.length > 0" class="lorebook-section">
+            <div class="lorebook-section-header">
+              <h4>Active ({{ activeLorebooksForDisplay.length }})</h4>
+            </div>
+            <div
+              v-for="lorebook in activeLorebooksForDisplay"
+              :key="lorebook.filename"
+              class="lorebook-option active"
+              :class="{ 'auto-selected': isAutoSelected(lorebook.filename) }"
+            >
+              <input
+                type="checkbox"
+                :id="'lorebook-' + lorebook.filename"
+                :value="lorebook.filename"
+                v-model="selectedLorebookFilenames"
+                class="lorebook-checkbox"
+              />
+              <label :for="'lorebook-' + lorebook.filename" class="lorebook-checkbox-label">
+                <div class="lorebook-info-wrapper">
+                  <div class="lorebook-name">
+                    {{ lorebook.name }}
+                    <span v-if="isAutoSelected(lorebook.filename)" class="auto-tag">AUTO</span>
+                  </div>
+                  <div class="lorebook-meta">{{ lorebook.entries?.length || 0 }} entries</div>
                 </div>
-                <div class="lorebook-meta">{{ lorebook.entries?.length || 0 }} entries</div>
-              </div>
-            </label>
-            <button @click="editLorebook(lorebook)" class="edit-button" title="Edit">✏️</button>
+              </label>
+              <button @click="editLorebook(lorebook)" class="edit-button" title="Edit">✏️</button>
+            </div>
+          </div>
+
+          <!-- Inactive Lorebooks Section -->
+          <div v-if="inactiveLorebooksForDisplay.length > 0" class="lorebook-section">
+            <div class="lorebook-section-header">
+              <h4>Available ({{ inactiveLorebooksForDisplay.length }})</h4>
+            </div>
+            <div
+              v-for="lorebook in inactiveLorebooksForDisplay"
+              :key="lorebook.filename"
+              class="lorebook-option"
+            >
+              <input
+                type="checkbox"
+                :id="'lorebook-' + lorebook.filename"
+                :value="lorebook.filename"
+                v-model="selectedLorebookFilenames"
+                class="lorebook-checkbox"
+              />
+              <label :for="'lorebook-' + lorebook.filename" class="lorebook-checkbox-label">
+                <div class="lorebook-info-wrapper">
+                  <div class="lorebook-name">
+                    {{ lorebook.name }}
+                  </div>
+                  <div class="lorebook-meta">{{ lorebook.entries?.length || 0 }} entries</div>
+                </div>
+              </label>
+              <button @click="editLorebook(lorebook)" class="edit-button" title="Edit">✏️</button>
+            </div>
           </div>
         </div>
       </div>
@@ -690,6 +725,18 @@ export default {
       // Filter out lorebooks that don't exist (e.g., deleted files still in localStorage)
       return this.selectedLorebookFilenames.filter(filename =>
         this.lorebooks.some(l => l.filename === filename)
+      );
+    },
+    activeLorebooksForDisplay() {
+      // Lorebooks that are currently selected/active
+      return this.lorebooks.filter(lorebook =>
+        this.selectedLorebookFilenames.includes(lorebook.filename)
+      );
+    },
+    inactiveLorebooksForDisplay() {
+      // Lorebooks that are not currently selected
+      return this.lorebooks.filter(lorebook =>
+        !this.selectedLorebookFilenames.includes(lorebook.filename)
       );
     }
   },
@@ -3849,6 +3896,27 @@ button.active {
   gap: 0.5rem;
 }
 
+.lorebook-section {
+  margin-bottom: 1rem;
+}
+
+.lorebook-section-header {
+  padding: 0.5rem 1rem;
+  background: var(--bg-tertiary);
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 0.5rem;
+  border-radius: 4px 4px 0 0;
+}
+
+.lorebook-section-header h4 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .lorebook-option {
   display: flex;
   align-items: center;
@@ -3863,6 +3931,11 @@ button.active {
 
 .lorebook-option:hover {
   background-color: var(--hover-color);
+}
+
+.lorebook-option.active {
+  background-color: rgba(90, 159, 212, 0.08);
+  border-left: 3px solid var(--accent-color);
 }
 
 .lorebook-option.auto-selected {
