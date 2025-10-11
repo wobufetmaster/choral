@@ -2144,7 +2144,12 @@ export default {
 
                   // Save the new chat
                   try {
-                    await this.saveGroupChat(false); // Save without notification
+                    // Call appropriate save method based on chat type
+                    if (this.isGroupChat) {
+                      await this.saveGroupChat(false); // Save without notification
+                    } else {
+                      await this.saveChat(false); // Save single character chat
+                    }
                     this.$root.$notify('Summary complete! Chat continued with narrator.', 'success');
                   } catch (saveError) {
                     console.error('Failed to save chat:', saveError);
