@@ -1008,6 +1008,200 @@ app.delete('/api/chats/:filename', async (req, res) => {
   }
 });
 
+// Narrator character definition (special system character for chat summaries)
+const NARRATOR_CHARACTER = {
+  filename: '__narrator__',
+  name: 'Narrator',
+  avatar: '/api/characters/narrator.webp/image',
+  data: {
+    name: 'Narrator',
+    description: 'A neutral narrator that provides summaries of past conversations and events.',
+    personality: 'Objective, concise, and informative.',
+    scenario: '',
+    first_mes: '',
+    mes_example: '',
+    creator_notes: 'System narrator for chat continuations',
+    system_prompt: '',
+    post_history_instructions: '',
+    tags: ['system', 'narrator'],
+    creator: 'Choral System',
+    character_version: '1.0',
+    alternate_greetings: [],
+    extensions: {}
+  }
+};
+
+// Summarize chat and create new chat with summary (streaming)
+app.post('/api/chat/summarize-and-continue', async (req, res) => {
+  try {
+    const { messages, chatTitle, preset, isGroupChat, characterFilenames, characterFilename, context } = req.body;
+
+    console.log('\n========== SUMMARIZE AND CONTINUE ==========');
+    console.log('Chat title:', chatTitle);
+    console.log('Is group chat:', isGroupChat);
+    console.log('Message count:', messages?.length || 0);
+    console.log('Model:', preset?.model);
+    console.log('Preset:', preset?.name);
+    console.log('Character filenames:', characterFilenames);
+    console.log('Character filename:', characterFilename);
+    console.log('==========================================\n');
+
+    // Validate input
+    if (!messages || messages.length === 0) {
+      return res.status(400).json({ error: 'No messages to summarize' });
+    }
+
+    if (!preset || !preset.model) {
+      return res.status(400).json({ error: 'Preset with model is required' });
+    }
+
+    // Build proper message array using preset system prompts
+    let summaryMessages = [];
+
+    // Add preset system prompts
+    if (preset.prompts && Array.isArray(preset.prompts)) {
+      const systemPrompts = preset.prompts
+        .filter(p => p.enabled && p.content && p.content.trim())
+        .sort((a, b) => a.injection_position - b.injection_position)
+        .map(p => ({
+          role: 'system',
+          content: p.content.trim()
+        }));
+      summaryMessages.push(...systemPrompts);
+    }
+
+    // Add all conversation history, filtering out messages with empty content
+    const validMessages = messages
+      .map(msg => {
+        // Get content from the message (handle swipes)
+        let content = msg.content;
+        if (!content && msg.swipes && msg.swipes.length > 0) {
+          const swipeIndex = msg.swipeIndex !== undefined ? msg.swipeIndex : 0;
+          content = msg.swipes[swipeIndex];
+        }
+
+        return {
+          role: msg.role,
+          content: content,
+          character: msg.character // Preserve character name for group chats
+        };
+      })
+      .filter(msg => msg.content && msg.content.trim()); // Only include messages with non-empty content
+
+    summaryMessages.push(...validMessages);
+
+    // Add user's "request" to summarize
+    summaryMessages.push({
+      role: 'user',
+      content: 'Please provide a concise summary of our conversation so far from a neutral narrator\'s perspective. Focus on key events, decisions, character dynamics, and the current situation. Write in third person, past tense. Keep it to 2-4 paragraphs. This summary will be used to continue our conversation in a new chat.'
+    });
+
+    // Process macros if context provided
+    if (context) {
+      summaryMessages = processMessagesWithMacros(summaryMessages, context);
+    }
+
+    // Apply preset's prompt processing mode
+    const processingMode = preset.promptProcessing || 'merge_system';
+    const processedMessages = processPrompt(summaryMessages, processingMode, preset);
+
+    console.log('Generating summary with preset:', preset.name);
+    console.log('Using model:', preset.model);
+    console.log('Message count:', processedMessages.length);
+
+    // Set up SSE headers for streaming
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // Create new chat metadata (before we have the summary)
+    const newTitle = `${chatTitle || 'Chat'} - Continued`;
+    const timestamp = Date.now();
+
+    // Keep only the original characters, don't add narrator permanently
+    let newCharacterFilenames;
+    if (isGroupChat && characterFilenames) {
+      // Group chat: keep existing characters only
+      newCharacterFilenames = [...characterFilenames];
+    } else if (characterFilename) {
+      // Single chat: keep as single character (narrator only appears for first message)
+      newCharacterFilenames = [characterFilename];
+    } else {
+      // Fallback: empty (narrator will just appear for the first message)
+      newCharacterFilenames = [];
+    }
+
+    console.log('New character filenames:', newCharacterFilenames);
+
+    // Send initial chat data with narrator info for the message
+    const initialChatData = {
+      characterFilenames: newCharacterFilenames,
+      messages: [],
+      title: newTitle,
+      timestamp: timestamp,
+      presetFilename: null,
+      isGroupChat: isGroupChat || (characterFilenames && characterFilenames.length > 1)
+    };
+
+    res.write(`data: ${JSON.stringify({
+      type: 'init',
+      chatData: initialChatData,
+      narrator: NARRATOR_CHARACTER
+    })}\n\n`);
+
+    // Stream the summary
+    let fullSummary = '';
+
+    const options = {
+      temperature: preset.temperature,
+      max_tokens: preset.max_tokens,
+      top_p: preset.top_p,
+      top_k: preset.top_k,
+      frequency_penalty: preset.frequency_penalty,
+      presence_penalty: preset.presence_penalty,
+      repetition_penalty: preset.repetition_penalty
+    };
+
+    streamChatCompletion({
+      messages: processedMessages,
+      model: preset.model,
+      options: options,
+      onChunk: (content) => {
+        fullSummary += content;
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`);
+      },
+      onComplete: () => {
+        console.log('\n========== GENERATED SUMMARY ==========');
+        console.log(fullSummary.substring(0, 200) + '...');
+        console.log('======================================\n');
+
+        // Send final message with complete summary
+        const finalMessage = {
+          role: 'assistant',
+          character: NARRATOR_CHARACTER.name,
+          content: fullSummary,
+          timestamp: timestamp,
+          swipes: [fullSummary],
+          swipeIndex: 0
+        };
+
+        res.write(`data: ${JSON.stringify({ type: 'complete', message: finalMessage })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      },
+      onError: (error) => {
+        console.error('Summary generation error:', error);
+        res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+        res.end();
+      }
+    });
+
+  } catch (error) {
+    console.error('Failed to summarize and continue chat:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ===== Group Chat Routes =====
 
 // Get all group chats

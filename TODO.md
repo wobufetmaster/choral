@@ -16,6 +16,14 @@
 - [x] **Sorting characters by date created actually sorts them alphabetically Z-A** ✅
 - [x] **Group chats ignore tag filters and always appear at the top of the character select screen** ✅
 - [x] **Docs should have a back button to go back to the web application** ✅
+- [ ] **In the edit tags screen, typing tags should search for them, like in the persona manager.
+- [ ] **In the edit tags screen, after adding a tag, it should automatically save the added tag.
+- [ ] **Auto lorebooks don't work in group chats, even if the tags match.
+- [ ] **In the debug screen in chats, it always lists Test_lorebook.json in chats. 
+- [ ] **In chats, the lorebook view should put active lorebooks at the top in a seperate section.
+- [ ] **In group chats, the swap character cards feature doesn't properly send context.
+
+
 
 
 ### 🟡 Medium Complexity
@@ -26,11 +34,12 @@
 - [x] **Tag searching in character pickers** - Add tag filtering to group chat creation screen (300+ cards need filtering!) ✅
 - [x] **Stop button for streaming** - Add ability to cancel/stop streaming AI responses ✅
 - [x] **Settings tab deduplication** - If you try to open a tab containing a settings page, redirect to existing one if already open ✅
-- [ ] **Start new chat from summary** - AI summarizes current chat, creates new chat with same characters and summary as first message
+- [x] **Start new chat from summary** - AI summarizes current chat, creates new chat with same characters and summary as first message ✅
 - [ ] **Maybe tool call results should just be saved in the message that called them if they return anything. 
 - [ ] **All of the prompts that are used for external calls should probably be documented somewhere, eg the tool calling prompts and bookkeeping prompts.
 - [ ] **Button that gives all of your gray, default colored tags a random color. 
 - [ ] **Auto rename chats seems to run on chats that are already named.
+- [ ] **ChatView.vue file is probably too big and should be refactored. 
 - [x] **Lorebooks in the lorebook manager screen should be searchable. ✅
 - [x] **When typing in tags in the lorebook manager, they should be searched for, exactly the same as in the persona manager tag field. (high priority) ✅
 
@@ -54,6 +63,7 @@
 - [x] **Markdown rendering** - Full markdown support in messages (bold, italic, code blocks, lists, tables, etc.)
 - [x] **Tab dragging** - Drag-and-drop tab reordering with visual feedback
 - [x] **Auto-name chats** - AI generates chat titles using bookkeeping model
+- [x] **Start new chat from summary** - Creates new chat with AI-generated summary of current conversation, retains characters, streams in real-time
 
 ## ✅ Already Working (Not in original list)
 - **PWA Support** - Manifest and service worker functional, works well on Termux (service worker disabled during dev to prevent cache conflicts, re-enable in production)
@@ -61,4 +71,4 @@
 
 ---
 
-**Last Updated**: 2025-10-10
+**Last Updated**: 2025-10-11

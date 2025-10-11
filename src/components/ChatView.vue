@@ -44,6 +44,7 @@
         <!-- Sidebar Actions -->
         <div class="sidebar-actions">
           <button @click="newChat" class="sidebar-btn">📝 New Chat</button>
+          <button @click="startNewChatFromSummary" v-if="messages.length > 0" class="sidebar-btn">📖 New Chat from Summary</button>
           <button v-if="!isGroupChat && character" @click="convertToGroupChat" class="sidebar-btn">👥 Convert to Group</button>
           <button @click="showChatHistory = !showChatHistory" :class="{ 'active': showChatHistory }" class="sidebar-btn">📜 History</button>
 
@@ -89,7 +90,7 @@
           <button @click="showCharacterCard = false" class="close-button">×</button>
         </div>
         <div class="character-card-content" v-if="viewingCharacter">
-          <img v-if="viewingCharacter.avatar" :src="viewingCharacter.avatar" :alt="viewingCharacter.data.name" class="card-avatar" />
+          <img v-if="viewingCharacter.avatar" :src="viewingCharacter.avatar" :alt="viewingCharacter.data.name" class="card-avatar" @error="setFallbackAvatar($event)" />
           <div class="card-field" v-if="viewingCharacter.data.description">
             <strong>Description:</strong>
             <p>{{ viewingCharacter.data.description }}</p>
@@ -114,21 +115,52 @@
     <div v-if="showChatHistory" class="chat-history-sidebar">
       <h3>Chat History</h3>
       <div class="history-list">
-        <div
-          v-for="chat in chatHistory"
-          :key="chat.filename"
-          :class="['history-item', { active: chat.filename === chatId }]"
-          @click="loadChatFromHistory(chat)"
-        >
-          <div class="history-info">
-            <span class="history-date">{{ formatDate(chat.timestamp) }}</span>
-            <span class="history-preview">{{ getPreview(chat) }}</span>
+        <template v-for="item in chatHistory" :key="item.filename || item.conversationGroup">
+          <!-- Group Header (for multiple related chats) -->
+          <div v-if="item.isGroupHeader" class="history-group">
+            <div class="history-group-header" @click="item.expanded = !item.expanded">
+              <span class="expand-icon">{{ item.expanded ? '▼' : '▶' }}</span>
+              <div class="history-info">
+                <span class="history-date">{{ formatDate(item.latestTimestamp) }}</span>
+                <span class="history-preview">{{ item.chatCount }} conversations</span>
+              </div>
+            </div>
+            <!-- Expanded chat list -->
+            <div v-if="item.expanded" class="history-group-items">
+              <div
+                v-for="chat in item.chats"
+                :key="chat.filename"
+                :class="['history-item', 'grouped', { active: chat.filename === groupChatId }]"
+                @click="loadChatFromHistory(chat)"
+              >
+                <div class="history-info">
+                  <span class="history-date">{{ formatDate(chat.timestamp) }}</span>
+                  <span class="history-preview">{{ getPreview(chat) }}</span>
+                </div>
+                <div class="history-actions">
+                  <button @click.stop="renameChatFromHistory(chat)" class="history-rename" title="Rename chat">✏️</button>
+                  <button @click.stop="deleteChat(chat.filename)" class="history-delete" title="Delete chat">🗑️</button>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="history-actions">
-            <button @click.stop="renameChatFromHistory(chat)" class="history-rename" title="Rename chat">✏️</button>
-            <button @click.stop="deleteChat(chat.filename)" class="history-delete" title="Delete chat">🗑️</button>
+
+          <!-- Single Chat (ungrouped) -->
+          <div
+            v-else
+            :class="['history-item', { active: item.filename === chatId || item.filename === groupChatId }]"
+            @click="loadChatFromHistory(item)"
+          >
+            <div class="history-info">
+              <span class="history-date">{{ formatDate(item.timestamp) }}</span>
+              <span class="history-preview">{{ getPreview(item) }}</span>
+            </div>
+            <div class="history-actions">
+              <button @click.stop="renameChatFromHistory(item)" class="history-rename" title="Rename chat">✏️</button>
+              <button @click.stop="deleteChat(item.filename)" class="history-delete" title="Delete chat">🗑️</button>
+            </div>
           </div>
-        </div>
+        </template>
       </div>
       <button @click="showChatHistory = false" class="close-history">Close</button>
     </div>
@@ -429,6 +461,7 @@
             :alt="getMessageCharacterName(message)"
             class="message-avatar clickable"
             @click="showAvatarMenu($event, message, index)"
+            @error="setFallbackAvatar($event)"
             :title="'Click for options'"
           />
           <img
@@ -437,6 +470,7 @@
             :alt="persona.name"
             class="message-avatar clickable"
             @click="showAvatarMenu($event, message, index)"
+            @error="setFallbackAvatar($event)"
             :title="'Click for options'"
           />
           <div v-else class="message-avatar user-avatar clickable" @click="showAvatarMenu($event, message, index)" :title="'Click for options'">
@@ -477,6 +511,7 @@
             :src="getStreamingAvatar()"
             :alt="getStreamingCharacterName()"
             class="message-avatar"
+            @error="setFallbackAvatar($event)"
           />
           <div class="message-bubble">
             <div v-if="streamingContent" class="message-content" v-html="sanitizeHtml(streamingContent, { characterFilename: currentSpeaker })"></div>
@@ -607,6 +642,7 @@ export default {
       // Group chat specific
       isGroupChat: false,
       groupChatId: null,
+      conversationGroup: null, // UUID shared across related chats (e.g., chat + continuations)
       groupChatCharacters: [],
       groupChatStrategy: 'join',
       groupChatExplicitMode: false,
@@ -614,7 +650,8 @@ export default {
       groupChatTags: [],
       allCharacters: [],
       currentSpeaker: null, // Track who's currently generating
-      nextSpeaker: null // Track who should speak next
+      nextSpeaker: null, // Track who should speak next
+      narratorInfo: null // Store narrator character info for avatar display
     }
   },
   computed: {
@@ -1709,6 +1746,13 @@ export default {
       this.avatarMenu.show = false;
     },
     async viewCharacterCard() {
+      // Don't allow viewing narrator character card
+      if (this.avatarMenu.characterFilename === '__narrator__') {
+        this.$root.$notify('Narrator has no character card', 'info');
+        this.closeAvatarMenu();
+        return;
+      }
+
       if (this.avatarMenu.message?.role === 'assistant' && this.avatarMenu.characterFilename) {
         try {
           // Load character data
@@ -1731,6 +1775,13 @@ export default {
       this.closeAvatarMenu();
     },
     setNextSpeaker() {
+      // Don't allow setting narrator as next speaker
+      if (this.avatarMenu.characterFilename === '__narrator__') {
+        this.$root.$notify('Cannot set narrator as next speaker', 'warning');
+        this.closeAvatarMenu();
+        return;
+      }
+
       if (this.isGroupChat && this.avatarMenu.characterFilename) {
         this.nextSpeaker = this.avatarMenu.characterFilename;
         this.$root.$notify(`Next speaker: ${this.avatarMenu.characterName}`, 'success');
@@ -1832,6 +1883,7 @@ export default {
     async newChat() {
       this.messages = [];
       this.chatDisplayTitle = null; // Reset display title for new chat
+      this.conversationGroup = null; // Start fresh conversation thread (not a continuation)
 
       if (this.isGroupChat) {
         // Don't create a new group chat file, just reset messages
@@ -1848,6 +1900,221 @@ export default {
 
       this.$root.$notify('Started new chat', 'info');
     },
+    async startNewChatFromSummary() {
+      // Show confirmation dialog
+      const confirmed = confirm(
+        'This will create a new chat with a summary of the current conversation. The characters will continue from where the summary leaves off. Continue?'
+      );
+
+      if (!confirmed) return;
+
+      try {
+        this.$root.$notify('Generating summary...', 'info');
+
+        // Load the current preset from the API
+        let preset;
+        if (this.currentPresetFilename) {
+          try {
+            const presetResponse = await fetch(`/api/presets/${this.currentPresetFilename}`);
+            if (presetResponse.ok) {
+              preset = await presetResponse.json();
+            }
+          } catch (err) {
+            console.error('Failed to load preset:', err);
+          }
+        }
+
+        // Fall back to building preset from settings if API load failed
+        if (!preset || !preset.model) {
+          if (!this.settings || !this.settings.model) {
+            throw new Error('No preset is currently selected. Please select a preset first.');
+          }
+
+          preset = {
+            name: this.currentPresetName || 'Current Settings',
+            model: this.settings.model,
+            temperature: this.settings.temperature,
+            max_tokens: this.settings.max_tokens,
+            top_p: this.settings.top_p,
+            top_k: this.settings.top_k,
+            frequency_penalty: this.settings.frequency_penalty,
+            presence_penalty: this.settings.presence_penalty,
+            repetition_penalty: this.settings.repetition_penalty,
+            prompts: this.settings.systemPrompts || [],
+            promptProcessing: this.settings.prompt_processing || 'merge_system'
+          };
+        }
+
+        // Get current chat title
+        const chatTitle = this.chatDisplayTitle || (this.isGroupChat ? 'Group Chat' : this.character?.data?.name || 'Chat');
+
+        // Build context for macro processing
+        const context = {
+          char: this.isGroupChat ? 'Character' : (this.characterName || 'Character'),
+          user: this.persona.name || 'User'
+        };
+
+        // Get character filenames for group chats
+        let characterFilenames = null;
+        if (this.isGroupChat && this.groupChatCharacters) {
+          characterFilenames = this.groupChatCharacters.map(c => c.filename);
+        }
+
+        // Prepare request data with preset and context
+        const requestData = {
+          messages: this.messages,
+          chatTitle: chatTitle,
+          preset: preset,
+          context: context,
+          isGroupChat: this.isGroupChat,
+          characterFilenames: characterFilenames,
+          characterFilename: !this.isGroupChat ? this.character?.filename : null
+        };
+
+        console.log('Requesting summary with preset:', preset.name);
+        console.log('Model:', preset.model);
+        console.log('Character filenames:', characterFilenames);
+
+        // Call API to generate summary (streaming)
+        const response = await fetch('/api/chat/summarize-and-continue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to start summary generation');
+        }
+
+        // Handle streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        let newChatData = null;
+        let narratorCharacter = null;
+        let streamingMessage = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+
+              try {
+                const event = JSON.parse(data);
+
+                if (event.type === 'init') {
+                  // Initialize new chat immediately
+                  newChatData = event.chatData;
+                  narratorCharacter = event.narrator;
+
+                  // Preserve conversationGroup from current chat (for history grouping)
+                  const inheritedConversationGroup = this.conversationGroup;
+
+                  // Clear current chat state
+                  this.messages = [];
+                  this.chatId = null;
+                  this.groupChatId = null; // New chat ID will be generated on save
+                  this.chatDisplayTitle = newChatData.title;
+
+                  // Inherit the conversationGroup to link this continuation to the original
+                  this.conversationGroup = inheritedConversationGroup;
+
+                  // Determine if this should be a group chat or single character chat
+                  const shouldBeGroupChat = newChatData.characterFilenames.length > 1;
+                  this.isGroupChat = shouldBeGroupChat;
+
+                  // Load characters (only the original characters, not the narrator)
+                  const characters = [];
+                  for (const filename of newChatData.characterFilenames) {
+                    try {
+                      const charResponse = await fetch(`/api/characters/${filename}`);
+                      if (charResponse.ok) {
+                        const charData = await charResponse.json();
+                        characters.push({
+                          filename: filename,
+                          name: charData.data.name,
+                          data: charData.data
+                        });
+                      }
+                    } catch (err) {
+                      console.error(`Failed to load character ${filename}:`, err);
+                    }
+                  }
+
+                  if (shouldBeGroupChat) {
+                    this.groupChatCharacters = characters;
+                  } else {
+                    // Single character chat
+                    this.character = characters[0] ? { data: characters[0].data, filename: characters[0].filename } : null;
+                  }
+
+                  // Create placeholder streaming message from narrator
+                  streamingMessage = {
+                    role: 'assistant',
+                    character: narratorCharacter.name,
+                    characterFilename: '__narrator__',
+                    characterAvatar: narratorCharacter.avatar, // Store narrator avatar with the message
+                    content: '',
+                    timestamp: newChatData.timestamp,
+                    swipes: [''],
+                    swipeIndex: 0
+                  };
+                  this.messages.push(streamingMessage);
+
+                  // Store narrator info for avatar display
+                  this.narratorInfo = narratorCharacter;
+
+                  // Update tab data
+                  this.updateTabData();
+
+                  this.$root.$notify('Generating summary...', 'info');
+
+                } else if (event.type === 'chunk' && streamingMessage) {
+                  // Update streaming message
+                  streamingMessage.content += event.content;
+                  streamingMessage.swipes[0] = streamingMessage.content;
+                  this.$forceUpdate();
+
+                } else if (event.type === 'complete') {
+                  // Finalize the message
+                  if (streamingMessage && event.message) {
+                    streamingMessage.content = event.message.content;
+                    streamingMessage.swipes = event.message.swipes;
+                  }
+
+                  // Save the new chat
+                  try {
+                    await this.saveGroupChat(false); // Save without notification
+                    this.$root.$notify('Summary complete! Chat continued with narrator.', 'success');
+                  } catch (saveError) {
+                    console.error('Failed to save chat:', saveError);
+                    this.$root.$notify('Summary complete, but failed to save chat', 'warning');
+                  }
+
+                } else if (event.type === 'error') {
+                  throw new Error(event.error);
+                }
+              } catch (err) {
+                console.error('Failed to parse SSE event:', err);
+              }
+            }
+          }
+        }
+
+      } catch (error) {
+        console.error('Failed to start new chat from summary:', error);
+        this.$root.$notify(`Failed to generate summary: ${error.message}`, 'error');
+      }
+    },
     async loadChatHistory() {
       try {
         if (this.isGroupChat) {
@@ -1855,13 +2122,33 @@ export default {
           const response = await fetch('/api/group-chats');
           const allGroupChats = await response.json();
 
-          // For now, show all group chats (could filter by same character set later)
-          this.chatHistory = allGroupChats
-            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+          // Filter group chats to only show those with the same character set
+          const currentCharacterSet = this.groupChatCharacters
+            ? this.groupChatCharacters.map(c => c.filename).sort().join(',')
+            : '';
+
+          const filteredChats = allGroupChats
+            .filter(gc => {
+              // Get character filenames from the group chat
+              let gcCharFilenames = [];
+              if (gc.characterFilenames) {
+                gcCharFilenames = gc.characterFilenames;
+              } else if (gc.characters) {
+                gcCharFilenames = gc.characters.map(c => c.filename);
+              }
+
+              const gcCharacterSet = gcCharFilenames.sort().join(',');
+              return gcCharacterSet === currentCharacterSet;
+            })
             .map(gc => ({
               ...gc,
               isGroupChat: true
             }));
+
+          // Group chats by conversationGroup, then flatten for display
+          const grouped = this.groupChatsByConversationGroup(filteredChats);
+          this.chatHistory = grouped;
+
         } else {
           // Load regular character chat history
           const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
@@ -1877,6 +2164,49 @@ export default {
         console.error('Failed to load chat history:', error);
       }
     },
+
+    groupChatsByConversationGroup(chats) {
+      // Group chats by conversationGroup
+      const groups = {};
+
+      for (const chat of chats) {
+        const groupId = chat.conversationGroup || chat.filename; // Use filename as fallback for ungrouped chats
+        if (!groups[groupId]) {
+          groups[groupId] = [];
+        }
+        groups[groupId].push(chat);
+      }
+
+      // Flatten groups back into a list, with most recent group first
+      // Within each group, sort by timestamp
+      const result = [];
+      const sortedGroupIds = Object.keys(groups).sort((a, b) => {
+        const maxTimestampA = Math.max(...groups[a].map(c => c.timestamp || 0));
+        const maxTimestampB = Math.max(...groups[b].map(c => c.timestamp || 0));
+        return maxTimestampB - maxTimestampA;
+      });
+
+      for (const groupId of sortedGroupIds) {
+        const groupChats = groups[groupId].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+        if (groupChats.length > 1) {
+          // Multiple chats in group - add a group header
+          result.push({
+            isGroupHeader: true,
+            conversationGroup: groupId,
+            chatCount: groupChats.length,
+            latestTimestamp: Math.max(...groupChats.map(c => c.timestamp || 0)),
+            chats: groupChats,
+            expanded: false // Start collapsed
+          });
+        } else {
+          // Single chat - add directly
+          result.push(groupChats[0]);
+        }
+      }
+
+      return result;
+    },
     async loadChatFromHistory(chat) {
       this.messages = this.normalizeMessages(chat.messages || []);
 
@@ -1890,6 +2220,7 @@ export default {
         this.groupChatExplicitMode = chat.explicitMode || false;
         this.groupChatName = chat.name || '';
         this.groupChatTags = chat.tags || [];
+        this.conversationGroup = chat.conversationGroup || null; // Restore conversation group
       } else {
         this.chatId = chat.filename;
       }
@@ -2186,6 +2517,7 @@ export default {
         this.groupChatExplicitMode = groupChat.explicitMode || false;
         this.groupChatName = groupChat.name || '';
         this.groupChatTags = groupChat.tags || [];
+        this.conversationGroup = groupChat.conversationGroup || null; // Load conversation group
         this.messages = this.normalizeMessages(groupChat.messages || []);
 
         // If no messages, initialize with swipeable greetings
@@ -2240,17 +2572,25 @@ export default {
       console.log('Initialized messages:', this.messages);
     },
 
-    async saveGroupChat() {
+    async saveGroupChat(showNotification = true) {
       try {
+        // Generate conversationGroup UUID if it doesn't exist
+        if (!this.conversationGroup) {
+          this.conversationGroup = this.generateUUID();
+        }
+
         const groupChat = {
           filename: this.groupChatId || `group_chat_${Date.now()}.json`,
           characters: this.groupChatCharacters,
+          characterFilenames: this.groupChatCharacters.map(c => c.filename), // Add for compatibility
+          conversationGroup: this.conversationGroup, // Link related chats together
           strategy: this.groupChatStrategy,
           explicitMode: this.groupChatExplicitMode,
           name: this.groupChatName,
           tags: this.groupChatTags,
           messages: this.messages,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          title: this.chatDisplayTitle // Include title for chat history
         };
 
         const response = await fetch('/api/group-chats', {
@@ -2261,8 +2601,15 @@ export default {
 
         const result = await response.json();
         this.groupChatId = result.filename;
+
+        if (showNotification) {
+          this.$root.$notify('Group chat saved', 'success');
+        }
       } catch (error) {
         console.error('Failed to save group chat:', error);
+        if (showNotification) {
+          this.$root.$notify('Failed to save group chat', 'error');
+        }
       }
     },
 
@@ -2448,6 +2795,11 @@ export default {
     },
 
     getMessageAvatar(message) {
+      // If the message has a direct avatar field (e.g., for narrator), use it
+      if (message.characterAvatar) {
+        return message.characterAvatar;
+      }
+
       if (this.isGroupChat && message.characterFilename) {
         return `/api/characters/${message.characterFilename}/image`;
       }
@@ -2455,7 +2807,23 @@ export default {
       return `/api/characters/${characterFilename}/image`;
     },
 
+    setFallbackAvatar(event) {
+      // Set a fallback SVG when avatar image fails to load
+      const svgQuestionMark = `data:image/svg+xml,${encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+          <rect width="48" height="48" fill="#3a3f4b" rx="12"/>
+          <text x="24" y="32" font-family="Arial, sans-serif" font-size="28" fill="#8b92a8" text-anchor="middle" font-weight="bold">?</text>
+        </svg>
+      `)}`;
+      event.target.src = svgQuestionMark;
+    },
+
     getMessageCharacterName(message) {
+      // If the message has a direct character name (e.g., for narrator), use it
+      if (message.character) {
+        return message.character;
+      }
+
       if (this.isGroupChat && message.characterFilename) {
         const char = this.groupChatCharacters.find(c => c.filename === message.characterFilename);
         return char?.name || 'Unknown';
@@ -2464,6 +2832,11 @@ export default {
     },
 
     getStreamingAvatar() {
+      // Handle narrator during streaming
+      if (this.currentSpeaker === '__narrator__' && this.narratorInfo) {
+        return this.narratorInfo.avatar;
+      }
+
       if (this.isGroupChat && this.currentSpeaker) {
         return `/api/characters/${this.currentSpeaker}/image`;
       }
@@ -2472,11 +2845,25 @@ export default {
     },
 
     getStreamingCharacterName() {
+      // Handle narrator during streaming
+      if (this.currentSpeaker === '__narrator__' && this.narratorInfo) {
+        return this.narratorInfo.name;
+      }
+
       if (this.isGroupChat && this.currentSpeaker) {
         const char = this.groupChatCharacters.find(c => c.filename === this.currentSpeaker);
         return char?.name || 'Unknown';
       }
       return this.characterName;
+    },
+
+    generateUUID() {
+      // Simple UUID v4 generator
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
     }
   }
 }
@@ -3124,6 +3511,46 @@ button.active {
 
 .close-history {
   width: 100%;
+}
+
+/* Grouped conversation styles */
+.history-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.history-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.history-group-header:hover {
+  background: var(--hover-color);
+}
+
+.expand-icon {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 12px;
+}
+
+.history-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 20px;
+}
+
+.history-item.grouped {
+  background: var(--bg-secondary);
 }
 
 .message-edit-container {
