@@ -137,6 +137,17 @@ export default {
 
     // Open tab or switch to existing
     const openTab = (type, data = {}, label = null, replaceActive = true) => {
+      // For settings pages, check if one already exists and switch to it
+      const settingsTypes = ['settings', 'bookkeeping-settings', 'tool-settings'];
+      if (settingsTypes.includes(type)) {
+        const existingSettingsTab = tabs.value.find(tab => tab.type === type);
+        if (existingSettingsTab) {
+          // Switch to existing settings tab instead of creating new one
+          switchTab(existingSettingsTab.id);
+          return;
+        }
+      }
+
       // Don't check for existing tabs - always create new ones or replace current
       // This allows multiple chat tabs with the same character
 

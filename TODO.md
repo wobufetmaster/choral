@@ -25,9 +25,9 @@
 - [x] **Auto-name chats with bookkeeping model** - Generate chat title from first message/response ✅
 - [x] **Tag searching in character pickers** - Add tag filtering to group chat creation screen (300+ cards need filtering!) ✅
 - [x] **Stop button for streaming** - Add ability to cancel/stop streaming AI responses ✅
+- [x] **Settings tab deduplication** - If you try to open a tab containing a settings page, redirect to existing one if already open ✅
 - [ ] **Start new chat from summary** - AI summarizes current chat, creates new chat with same characters and summary as first message
 - [ ] **Maybe tool call results should just be saved in the message that called them if they return anything. 
-- [ ] **If you try to open a tab containing a settings page, if you already have a settings page open, it should just redirect you to the one you already have open, since all of them are identical. 
 - [ ] **All of the prompts that are used for external calls should probably be documented somewhere, eg the tool calling prompts and bookkeeping prompts.
 - [ ] **Button that gives all of your gray, default colored tags a random color. 
 - [ ] **Auto rename chats seems to run on chats that are already named.
