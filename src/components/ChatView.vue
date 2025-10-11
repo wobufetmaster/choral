@@ -2727,6 +2727,15 @@ export default {
     buildGroupChatContext(upToMessageIndex = null) {
       const context = [];
 
+      // Determine which character will be speaking (for swap strategy)
+      const speakerFilename = this.nextSpeaker || this.currentSpeaker;
+      const speakingCharacter = speakerFilename
+        ? this.groupChatCharacters.find(c => c.filename === speakerFilename)
+        : null;
+
+      // Track if character info was injected via placeholders
+      let hasCharacterInfo = false;
+
       // Add system prompts from preset
       if (this.settings.systemPrompts && this.settings.systemPrompts.length > 0) {
         const sortedPrompts = [...this.settings.systemPrompts]
@@ -2735,29 +2744,96 @@ export default {
 
         for (const prompt of sortedPrompts) {
           let content = prompt.content || '';
+          const originalContent = content;
 
-          // For group chats, we'll handle character info differently based on strategy
+          // For group chats, handle character info differently based on strategy
           if (this.groupChatStrategy === 'join') {
             // Replace with combined character info
             const allDescriptions = this.groupChatCharacters.map(c =>
-              `${c.name}: ${c.data?.data?.description || ''}`
+              `${c.name}: ${c.data?.description || c.data?.data?.description || ''}`
             ).join('\n\n');
 
             content = content.replace(/\{\{description\}\}/g, allDescriptions);
             content = content.replace(/\{\{personality\}\}/g,
               this.groupChatCharacters.map(c =>
-                `${c.name}: ${c.data?.data?.personality || ''}`
+                `${c.name}: ${c.data?.personality || c.data?.data?.personality || ''}`
               ).join('\n\n')
             );
             content = content.replace(/\{\{scenario\}\}/g,
-              this.groupChatCharacters.map(c => c.data?.data?.scenario || '').join('\n\n')
+              this.groupChatCharacters.map(c =>
+                c.data?.scenario || c.data?.data?.scenario || ''
+              ).filter(s => s).join('\n\n')
             );
+            content = content.replace(/\{\{system_prompt\}\}/g,
+              this.groupChatCharacters.map(c =>
+                c.data?.system_prompt || c.data?.data?.system_prompt || ''
+              ).filter(s => s).join('\n\n')
+            );
+            content = content.replace(/\{\{dialogue_examples\}\}/g,
+              this.groupChatCharacters.map(c =>
+                c.data?.mes_example || c.data?.data?.mes_example || ''
+              ).filter(s => s).join('\n\n')
+            );
+          } else if (this.groupChatStrategy === 'swap' && speakingCharacter) {
+            // Replace with only the speaking character's info
+            const charData = speakingCharacter.data?.data || speakingCharacter.data || {};
+
+            content = content.replace(/\{\{description\}\}/g, charData.description || '');
+            content = content.replace(/\{\{personality\}\}/g, charData.personality || '');
+            content = content.replace(/\{\{scenario\}\}/g, charData.scenario || '');
+            content = content.replace(/\{\{system_prompt\}\}/g, charData.system_prompt || '');
+            content = content.replace(/\{\{dialogue_examples\}\}/g, charData.mes_example || '');
+          }
+
+          // Check if any placeholders were replaced
+          if (content !== originalContent) {
+            hasCharacterInfo = true;
           }
 
           if (content.trim()) {
             context.push({
               role: prompt.role || 'system',
               content: content.trim()
+            });
+          }
+        }
+      }
+
+      // If no placeholders were used, add character info as fallback
+      if (!hasCharacterInfo) {
+        if (this.groupChatStrategy === 'join') {
+          // Add all character info
+          const characterInfos = this.groupChatCharacters.map(c => {
+            const charData = c.data?.data || c.data || {};
+            let info = `${c.name}:\n`;
+            if (charData.description) info += `Description: ${charData.description}\n`;
+            if (charData.personality) info += `Personality: ${charData.personality}\n`;
+            if (charData.scenario) info += `Scenario: ${charData.scenario}\n`;
+            if (charData.system_prompt) info += `${charData.system_prompt}\n`;
+            if (charData.mes_example) info += `Example Dialogue:\n${charData.mes_example}\n`;
+            return info;
+          }).join('\n\n');
+
+          if (characterInfos.trim()) {
+            context.push({
+              role: 'system',
+              content: characterInfos.trim()
+            });
+          }
+        } else if (this.groupChatStrategy === 'swap' && speakingCharacter) {
+          // Add only the speaking character's info
+          const charData = speakingCharacter.data?.data || speakingCharacter.data || {};
+          let characterInfo = `${speakingCharacter.name}:\n`;
+          if (charData.description) characterInfo += `Description: ${charData.description}\n`;
+          if (charData.personality) characterInfo += `Personality: ${charData.personality}\n`;
+          if (charData.scenario) characterInfo += `Scenario: ${charData.scenario}\n`;
+          if (charData.system_prompt) characterInfo += `${charData.system_prompt}\n`;
+          if (charData.mes_example) characterInfo += `Example Dialogue:\n${charData.mes_example}\n`;
+
+          if (characterInfo.trim() !== `${speakingCharacter.name}:\n`) {
+            context.push({
+              role: 'system',
+              content: characterInfo.trim()
             });
           }
         }
