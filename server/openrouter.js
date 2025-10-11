@@ -34,11 +34,13 @@ function getApiKey() {
  * @param {Array} params.messages - Array of message objects
  * @param {string} params.model - Model name
  * @param {Object} params.options - Additional options (temperature, max_tokens, etc.)
+ * @param {Array} params.tools - Optional tool definitions for tool calling
  * @param {Function} params.onChunk - Callback for each chunk of streamed data
+ * @param {Function} params.onToolCall - Callback when a tool call is detected
  * @param {Function} params.onComplete - Callback when streaming is complete
  * @param {Function} params.onError - Callback for errors
  */
-function streamChatCompletion({ messages, model, options = {}, onChunk, onComplete, onError }) {
+function streamChatCompletion({ messages, model, options = {}, tools, onChunk, onToolCall, onComplete, onError }) {
   const apiKey = getApiKey();
 
   if (!apiKey) {
@@ -46,7 +48,7 @@ function streamChatCompletion({ messages, model, options = {}, onChunk, onComple
     return;
   }
 
-  const requestData = JSON.stringify({
+  const requestBody = {
     model: model || 'anthropic/claude-opus-4',
     messages,
     stream: true,
@@ -56,7 +58,14 @@ function streamChatCompletion({ messages, model, options = {}, onChunk, onComple
     frequency_penalty: options.frequency_penalty ?? 0,
     presence_penalty: options.presence_penalty ?? 0,
     ...options
-  });
+  };
+
+  // Add tools if provided
+  if (tools && tools.length > 0) {
+    requestBody.tools = tools;
+  }
+
+  const requestData = JSON.stringify(requestBody);
 
   const url = new URL(OPENROUTER_API_URL);
 
@@ -84,6 +93,7 @@ function streamChatCompletion({ messages, model, options = {}, onChunk, onComple
     }
 
     let buffer = '';
+    let toolCallBuffer = null; // For accumulating tool call data
 
     res.on('data', (chunk) => {
       buffer += chunk.toString();
@@ -97,16 +107,52 @@ function streamChatCompletion({ messages, model, options = {}, onChunk, onComple
           const data = line.slice(6);
 
           if (data === '[DONE]') {
+            // If we have a tool call, send it before completing
+            if (toolCallBuffer && onToolCall) {
+              onToolCall(toolCallBuffer);
+            }
             onComplete();
             return;
           }
 
           try {
             const parsed = JSON.parse(data);
-            const content = parsed.choices?.[0]?.delta?.content;
+            const delta = parsed.choices?.[0]?.delta;
 
-            if (content) {
-              onChunk(content);
+            // Handle text content
+            if (delta?.content) {
+              onChunk(delta.content);
+            }
+
+            // Handle tool calls
+            if (delta?.tool_calls) {
+              const toolCall = delta.tool_calls[0];
+
+              if (!toolCallBuffer) {
+                // Initialize tool call buffer
+                toolCallBuffer = {
+                  id: toolCall.id || 'call_' + Date.now(),
+                  type: toolCall.type || 'function',
+                  function: {
+                    name: toolCall.function?.name || '',
+                    arguments: toolCall.function?.arguments || ''
+                  }
+                };
+              } else {
+                // Accumulate arguments
+                if (toolCall.function?.arguments) {
+                  toolCallBuffer.function.arguments += toolCall.function.arguments;
+                }
+                if (toolCall.function?.name) {
+                  toolCallBuffer.function.name += toolCall.function.name;
+                }
+              }
+            }
+
+            // Check for finish reason to send tool call
+            if (parsed.choices?.[0]?.finish_reason === 'tool_calls' && toolCallBuffer && onToolCall) {
+              onToolCall(toolCallBuffer);
+              toolCallBuffer = null;
             }
           } catch (err) {
             // Ignore parse errors for incomplete JSON
@@ -133,9 +179,10 @@ function streamChatCompletion({ messages, model, options = {}, onChunk, onComple
 /**
  * Send a non-streaming chat completion request
  * @param {Object} params - Same as streamChatCompletion but without streaming callbacks
- * @returns {Promise<string>} - The complete response text
+ * @param {Array} params.tools - Optional tool definitions for tool calling
+ * @returns {Promise<string|Object>} - The complete response text, or full message object if tool calls present
  */
-function chatCompletion({ messages, model, options = {} }) {
+function chatCompletion({ messages, model, options = {}, tools }) {
   return new Promise((resolve, reject) => {
     const apiKey = getApiKey();
 
@@ -144,7 +191,7 @@ function chatCompletion({ messages, model, options = {} }) {
       return;
     }
 
-    const requestData = JSON.stringify({
+    const requestBody = {
       model: model || 'anthropic/claude-opus-4',
       messages,
       stream: false,
@@ -154,7 +201,14 @@ function chatCompletion({ messages, model, options = {} }) {
       frequency_penalty: options.frequency_penalty ?? 0,
       presence_penalty: options.presence_penalty ?? 0,
       ...options
-    });
+    };
+
+    // Add tools if provided
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools;
+    }
+
+    const requestData = JSON.stringify(requestBody);
 
     const url = new URL(OPENROUTER_API_URL);
 
@@ -184,8 +238,18 @@ function chatCompletion({ messages, model, options = {} }) {
 
         try {
           const parsed = JSON.parse(data);
-          const content = parsed.choices?.[0]?.message?.content || '';
-          resolve(content);
+          const message = parsed.choices?.[0]?.message;
+
+          // If tool calls are present, return the full message object
+          if (message?.tool_calls && message.tool_calls.length > 0) {
+            resolve({
+              content: message.content || '',
+              tool_calls: message.tool_calls
+            });
+          } else {
+            // Otherwise, return just the content for backward compatibility
+            resolve(message?.content || '');
+          }
         } catch (err) {
           reject(new Error(`Failed to parse response: ${err.message}`));
         }

@@ -46,6 +46,14 @@ export function processMacrosForDisplay(text, context) {
     return content.split('').reverse().join('');
   });
 
+  // {{characters_list}} - List of available characters with filenames
+  result = result.replace(/\{\{characters_list\}\}/gi, () => {
+    if (context.characters && Array.isArray(context.characters) && context.characters.length > 0) {
+      return context.characters.map(char => `- ${char.name} (${char.filename})`).join('\n');
+    }
+    return '(no characters available)';
+  });
+
   // {{// A}} - Hidden comment (remove for display)
   result = result.replace(/\{\{\/\/[^}]*\}\}/gi, '');
 

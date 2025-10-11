@@ -600,6 +600,7 @@ export default {
         systemPrompts: []
       },
       chatId: null,
+      chatDisplayTitle: null, // Custom title for the chat (from title field in file)
       editingMessage: null,
       editedContent: '',
       // Group chat specific
@@ -616,7 +617,16 @@ export default {
     }
   },
   computed: {
+    characterFilename() {
+      return this.tabData?.characterId || this.$route?.query?.character;
+    },
     chatTitle() {
+      // Priority 1: Use custom display title if set
+      if (this.chatDisplayTitle) {
+        return this.chatDisplayTitle;
+      }
+
+      // Priority 2: Group chat name
       if (this.isGroupChat) {
         if (this.groupChatName) {
           return this.groupChatName;
@@ -624,6 +634,8 @@ export default {
         const names = this.groupChatCharacters.map(c => c.name).join(', ');
         return `Group: ${names}`;
       }
+
+      // Priority 3: Character name
       return this.characterName;
     },
     displayModelName() {
@@ -838,6 +850,9 @@ export default {
         this.messages = this.normalizeMessages(chat.messages || []);
         this.chatId = chatId;
 
+        // Capture the custom title if it exists
+        this.chatDisplayTitle = chat.title || null;
+
         // Trigger auto-naming if chat has messages and hasn't been named yet
         await this.autoNameChat(chatId, chat);
       } catch (error) {
@@ -873,6 +888,8 @@ export default {
           const result = await response.json();
           if (!result.skipped && result.title) {
             console.log('Auto-named chat:', result.title);
+            // Update display title
+            this.chatDisplayTitle = result.title;
             // Optionally update tab title if in tab mode
             if (this.tabData) {
               this.$emit('update-tab', {
@@ -1197,6 +1214,51 @@ export default {
         debug: this.showDebug
       };
 
+      // Check if characters have tools enabled
+      if (this.isGroupChat) {
+        // For group chats, collect tools from all characters
+        try {
+          const allTools = [];
+          for (const char of this.groupChatCharacters) {
+            const toolsResponse = await fetch(`/api/tools/schemas/${encodeURIComponent(char.filename)}`);
+            const toolsData = await toolsResponse.json();
+            if (toolsData.tools && toolsData.tools.length > 0) {
+              allTools.push(...toolsData.tools);
+              console.log(`Tool calling enabled for ${char.name}:`, toolsData.tools.map(t => t.function.name));
+            }
+          }
+
+          // Remove duplicate tools (same function name)
+          const uniqueTools = [];
+          const seenNames = new Set();
+          for (const tool of allTools) {
+            if (!seenNames.has(tool.function.name)) {
+              uniqueTools.push(tool);
+              seenNames.add(tool.function.name);
+            }
+          }
+
+          if (uniqueTools.length > 0) {
+            requestBody.tools = uniqueTools;
+            console.log('Group chat tools enabled:', uniqueTools.map(t => t.function.name));
+          }
+        } catch (error) {
+          console.error('Failed to fetch tool schemas for group chat:', error);
+        }
+      } else if (this.characterFilename) {
+        // For 1-on-1 chats, check single character
+        try {
+          const toolsResponse = await fetch(`/api/tools/schemas/${encodeURIComponent(this.characterFilename)}`);
+          const toolsData = await toolsResponse.json();
+          if (toolsData.tools && toolsData.tools.length > 0) {
+            requestBody.tools = toolsData.tools;
+            console.log(`Tool calling enabled for ${this.characterFilename}:`, toolsData.tools.map(t => t.function.name));
+          }
+        } catch (error) {
+          console.error('Failed to fetch tool schemas:', error);
+        }
+      }
+
       // Update basic debug info before sending
       this.updateBasicDebugInfo(messages);
 
@@ -1279,6 +1341,28 @@ export default {
                 console.log('Received debug info:', parsed.debug);
                 this.debugInfo.matchedEntries = parsed.debug.matchedEntriesByLorebook || {};
                 console.log('Updated debugInfo.matchedEntries:', this.debugInfo.matchedEntries);
+              } else if (parsed.type === 'tool_call') {
+                // Handle tool call notification
+                console.log('Tool called:', parsed.toolCall);
+                this.streamingContent += `\n\n*[Creating character: ${parsed.toolCall.function.name}...]*\n\n`;
+                this.$nextTick(() => this.scrollToBottom());
+              } else if (parsed.type === 'tool_result') {
+                // Handle tool execution result
+                console.log('Tool result:', parsed.result);
+                if (parsed.result.success) {
+                  this.streamingContent += `\n\n✓ **Created character: ${parsed.result.name}**\n\nThe character has been added to your character list!\n\n`;
+                  this.$root.$notify(`Character created: ${parsed.result.name}`, 'success');
+                } else {
+                  this.streamingContent += `\n\n✗ Failed to create character: ${parsed.result.error}\n\n`;
+                  this.$root.$notify('Failed to create character', 'error');
+                }
+                this.$nextTick(() => this.scrollToBottom());
+              } else if (parsed.type === 'tool_error') {
+                // Handle tool execution error
+                console.error('Tool error:', parsed.error);
+                this.streamingContent += `\n\n✗ Error executing tool: ${parsed.error}\n\n`;
+                this.$root.$notify('Tool execution failed', 'error');
+                this.$nextTick(() => this.scrollToBottom());
               } else if (parsed.content) {
                 this.streamingContent += parsed.content;
                 this.$nextTick(() => this.scrollToBottom());
@@ -1613,6 +1697,7 @@ export default {
     },
     async newChat() {
       this.messages = [];
+      this.chatDisplayTitle = null; // Reset display title for new chat
 
       if (this.isGroupChat) {
         // Don't create a new group chat file, just reset messages
@@ -1661,6 +1746,9 @@ export default {
     async loadChatFromHistory(chat) {
       this.messages = this.normalizeMessages(chat.messages || []);
 
+      // Set display title from chat data
+      this.chatDisplayTitle = chat.title || null;
+
       if (chat.isGroupChat) {
         this.groupChatId = chat.filename;
         this.groupChatCharacters = chat.characters || [];
@@ -1698,8 +1786,9 @@ export default {
           // Update chat history to show the new title
           await this.loadChatHistory();
 
-          // If this is the current chat, update the chatId (filename may have changed)
+          // If this is the current chat, update the display title
           if (chat.filename === this.chatId) {
+            this.chatDisplayTitle = result.title;
             this.chatId = result.filename;
 
             // Update tab data to reflect the new filename and title

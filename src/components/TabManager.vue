@@ -33,6 +33,7 @@ import PresetSelector from './PresetSelector.vue';
 import Settings from './Settings.vue';
 import LorebookManager from './LorebookManager.vue';
 import BookkeepingSettings from './BookkeepingSettings.vue';
+import ToolSettings from './ToolSettings.vue';
 
 export default {
   name: 'TabManager',
@@ -46,6 +47,7 @@ export default {
     Settings,
     LorebookManager,
     BookkeepingSettings,
+    ToolSettings,
   },
   setup() {
     const tabs = ref([]);
@@ -61,6 +63,7 @@ export default {
       'settings': Settings,
       'lorebooks': LorebookManager,
       'bookkeeping-settings': BookkeepingSettings,
+      'tool-settings': ToolSettings,
     };
 
     const activeTab = computed(() => {
@@ -117,6 +120,7 @@ export default {
         'presets': 'Presets',
         'settings': 'Settings',
         'bookkeeping-settings': 'Bookkeeping',
+        'tool-settings': 'Tool Settings',
       };
 
       const tab = {

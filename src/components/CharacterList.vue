@@ -17,6 +17,7 @@
           {{ isAutoTaggingAll ? 'Auto-tagging...' : '✨ Auto-tag All' }}
         </button>
         <button @click="$emit('open-tab', 'lorebooks', {}, 'Lorebooks', false)">Lorebooks</button>
+        <button @click="$emit('open-tab', 'tool-settings', {}, 'Tool Settings', false)">🔧 Tool Settings</button>
         <button @click="$emit('open-tab', 'bookkeeping-settings', {}, 'Bookkeeping', false)">📊 Bookkeeping / Tags</button>
         <button @click="openDocs">📖 Docs</button>
         <button @click="$emit('open-tab', 'settings', {}, 'Settings', false)">⚙️ Settings</button>

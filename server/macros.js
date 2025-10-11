@@ -13,6 +13,7 @@ const pickCache = new Map();
  * @param {string} context.charName - Character name
  * @param {string} context.charNickname - Character nickname (optional)
  * @param {string} context.userName - User/persona name
+ * @param {Array} context.characters - Array of {name, filename} for available characters
  * @param {boolean} removeComments - Whether to remove comments (default: true)
  * @returns {string} - Text with macros replaced
  */
@@ -56,6 +57,14 @@ function processMacros(text, context, removeComments = true) {
   // {{reverse:A}} - Reverse text
   result = result.replace(/\{\{reverse:([^}]+)\}\}/gi, (match, content) => {
     return content.split('').reverse().join('');
+  });
+
+  // {{characters_list}} - List of available characters with filenames
+  result = result.replace(/\{\{characters_list\}\}/gi, () => {
+    if (context.characters && Array.isArray(context.characters) && context.characters.length > 0) {
+      return context.characters.map(char => `- ${char.name} (${char.filename})`).join('\n');
+    }
+    return '(no characters available)';
   });
 
   // {{// A}} - Comment (remove completely)
