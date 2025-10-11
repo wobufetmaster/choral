@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: grbhy-7cplw
+created: 2025-10-08T18:47:42-05:00

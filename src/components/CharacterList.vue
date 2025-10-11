@@ -220,9 +220,35 @@
         <div class="group-chat-creator-content">
           <p class="instructions">Select characters for the group chat (minimum 2):</p>
 
+          <!-- Search and Filter -->
+          <div class="group-chat-filters">
+            <input
+              v-model="groupChatSearchQuery"
+              placeholder="Search characters..."
+              type="text"
+              class="group-chat-search"
+            />
+
+            <div v-if="allTags.length > 0" class="group-chat-tag-filter">
+              <span class="filter-label">Filter by tag:</span>
+              <button v-if="groupChatSelectedTags.length > 0" @click="clearGroupChatTags" class="clear-tags-btn">Clear All</button>
+              <div class="filter-tags">
+                <button
+                  v-for="tag in allTags"
+                  :key="tag"
+                  :class="['filter-tag', { active: groupChatSelectedTags.some(t => normalizeTag(t) === normalizeTag(tag)) }]"
+                  :style="groupChatSelectedTags.some(t => normalizeTag(t) === normalizeTag(tag)) ? { background: getTagColor(tag), borderColor: getTagColor(tag), color: 'white' } : { borderColor: getTagColor(tag), color: getTagColor(tag) }"
+                  @click="toggleGroupChatTagFilter(tag)"
+                >
+                  {{ tag }}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="character-selector-list">
             <div
-              v-for="char in characters"
+              v-for="char in filteredCharactersForGroupChat"
               :key="char.filename"
               :class="['selectable-character', { selected: selectedForGroup.includes(char.filename) }]"
               @click="toggleCharacterSelection(char.filename)"
@@ -326,6 +352,8 @@ export default {
       tagColors: {}, // Store tag colors: { "normalized-tag": "#color" }
       showGroupChatCreator: false,
       selectedForGroup: [],
+      groupChatSearchQuery: '',
+      groupChatSelectedTags: [],
       // Confirmation modal
       showConfirmModal: false,
       confirmTitle: '',
@@ -415,6 +443,31 @@ export default {
     autoTagProgress() {
       if (this.autoTagTotal === 0) return 0;
       return Math.round((this.autoTagCurrentIndex / this.autoTagTotal) * 100);
+    },
+    filteredCharactersForGroupChat() {
+      let filtered = this.characters;
+
+      // Filter by selected tags
+      if (this.groupChatSelectedTags.length > 0) {
+        filtered = filtered.filter(char =>
+          this.groupChatSelectedTags.every(selectedTag =>
+            char.tags?.some(charTag =>
+              this.normalizeTag(charTag) === this.normalizeTag(selectedTag)
+            )
+          )
+        );
+      }
+
+      // Filter by search query
+      if (this.groupChatSearchQuery) {
+        const query = this.groupChatSearchQuery.toLowerCase();
+        filtered = filtered.filter(char =>
+          char.name.toLowerCase().includes(query) ||
+          char.tags?.some(tag => tag.toLowerCase().includes(query))
+        );
+      }
+
+      return filtered;
     }
   },
   async mounted() {
@@ -474,6 +527,19 @@ export default {
     },
     clearAllTags() {
       this.selectedTags = [];
+    },
+    toggleGroupChatTagFilter(tag) {
+      const index = this.groupChatSelectedTags.findIndex(t =>
+        this.normalizeTag(t) === this.normalizeTag(tag)
+      );
+      if (index > -1) {
+        this.groupChatSelectedTags.splice(index, 1);
+      } else {
+        this.groupChatSelectedTags.push(tag);
+      }
+    },
+    clearGroupChatTags() {
+      this.groupChatSelectedTags = [];
     },
     startChat(character) {
       this.$emit('open-tab', 'chat', {
@@ -821,6 +887,8 @@ export default {
     closeGroupChatCreator() {
       this.showGroupChatCreator = false;
       this.selectedForGroup = [];
+      this.groupChatSearchQuery = '';
+      this.groupChatSelectedTags = [];
     },
 
     renameGroupChat(group) {
@@ -1892,5 +1960,52 @@ export default {
 .character-name-select {
   font-weight: 500;
   flex: 1;
+}
+
+/* Group Chat Creator Filters */
+.group-chat-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.group-chat-search {
+  width: 100%;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+}
+
+.group-chat-search:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.group-chat-tag-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.group-chat-tag-filter .filter-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.group-chat-tag-filter .filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-height: 100px;
+  overflow-y: auto;
+  padding: 0.25rem;
 }
 </style>

@@ -1,0 +1,13 @@
+{
+  "enableToolCalling": true,
+  "characterTools": [
+    {
+      "characterFilename": "Character Card Builder.png",
+      "tools": [
+        "create_character_card",
+        "update_character_card",
+        "add_greetings"
+      ]
+    }
+  ]
+}
