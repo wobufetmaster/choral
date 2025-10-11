@@ -839,13 +839,7 @@ export default {
             console.log('Auto-named chat:', result.title);
             // Update display title
             this.chatDisplayTitle = result.title;
-            // Optionally update tab title if in tab mode
-            if (this.tabData) {
-              this.$emit('update-tab', {
-                id: this.tabData.id,
-                title: result.title
-              });
-            }
+            // Don't update tab title - keep it constant
           }
         }
       } catch (error) {

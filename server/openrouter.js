@@ -76,7 +76,7 @@ function streamChatCompletion({ messages, model, options = {}, tools, onChunk, o
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://github.com/choral',
+      'HTTP-Referer': 'https://github.com/wobufetmaster/choral',
       'X-Title': 'Choral',
       'Content-Length': Buffer.byteLength(requestData)
     }
@@ -219,7 +219,7 @@ function chatCompletion({ messages, model, options = {}, tools }) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://github.com/choral',
+        'HTTP-Referer': 'https://github.com/wobufetmaster/choral',
         'X-Title': 'Choral',
         'Content-Length': Buffer.byteLength(requestData)
       }
