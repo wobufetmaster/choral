@@ -192,12 +192,27 @@
                 class="tag-item"
                 :style="{ borderColor: getTagColor(tag.name) }"
               >
-                <input
-                  v-model="tag.name"
-                  type="text"
-                  class="tag-input"
-                  placeholder="Tag name"
-                />
+                <div class="tag-input-wrapper">
+                  <input
+                    v-model="tag.name"
+                    type="text"
+                    class="tag-input"
+                    placeholder="Tag name"
+                    @input="updateTagInputSuggestions(index)"
+                    @focus="currentTagInputIndex = index"
+                    @blur="clearTagInputSuggestions"
+                  />
+                  <div v-if="tagInputSuggestions.length > 0 && currentTagInputIndex === index" class="tag-input-suggestions">
+                    <div
+                      v-for="suggestion in tagInputSuggestions"
+                      :key="suggestion"
+                      @mousedown.prevent="applyTagSuggestion(index, suggestion)"
+                      class="tag-input-suggestion"
+                    >
+                      {{ suggestion }}
+                    </div>
+                  </div>
+                </div>
                 <input
                   v-model="tag.color"
                   type="color"
@@ -379,6 +394,8 @@ export default {
       editingTags: [],
       isAutoTagging: false,
       tagColors: {}, // Store tag colors: { "normalized-tag": "#color" }
+      tagInputSuggestions: [], // Autocomplete suggestions for tag inputs
+      currentTagInputIndex: null, // Track which tag input is focused
       showGroupChatCreator: false,
       selectedForGroup: [],
       groupChatSearchQuery: '',
@@ -677,18 +694,120 @@ export default {
       this.isTagEditorOpen = false;
       this.characterBeingTagged = null;
       this.editingTags = [];
+      this.tagInputSuggestions = [];
+      this.currentTagInputIndex = null;
     },
     addTag() {
       this.editingTags.push({ name: '', color: '#6b7280' });
     },
     removeTag(index) {
       this.editingTags.splice(index, 1);
+      // Auto-save when tag is removed
+      this.autoSaveTagChanges();
     },
     addExistingTag(tag) {
       this.editingTags.push({
         name: tag,
         color: this.getTagColor(tag)
       });
+      // Auto-save when tag is added
+      this.autoSaveTagChanges();
+    },
+    updateTagInputSuggestions(index) {
+      const tag = this.editingTags[index];
+      if (!tag || !tag.name || !tag.name.trim()) {
+        this.tagInputSuggestions = [];
+        return;
+      }
+
+      const query = tag.name.toLowerCase();
+      const currentTagsNormalized = this.editingTags.map(t => this.normalizeTag(t.name));
+
+      this.tagInputSuggestions = this.allTags
+        .filter(existingTag =>
+          existingTag.toLowerCase().includes(query) &&
+          !currentTagsNormalized.includes(this.normalizeTag(existingTag))
+        )
+        .slice(0, 5);
+    },
+    applyTagSuggestion(index, suggestion) {
+      this.editingTags[index].name = suggestion;
+      this.editingTags[index].color = this.getTagColor(suggestion);
+      this.tagInputSuggestions = [];
+      // Auto-save when tag is applied
+      this.autoSaveTagChanges();
+    },
+    clearTagInputSuggestions() {
+      // Small delay to allow click events to fire
+      setTimeout(() => {
+        this.tagInputSuggestions = [];
+        this.currentTagInputIndex = null;
+      }, 200);
+    },
+    async autoSaveTagChanges() {
+      // Debounce auto-save
+      if (this.autoSaveTimeout) {
+        clearTimeout(this.autoSaveTimeout);
+      }
+
+      this.autoSaveTimeout = setTimeout(async () => {
+        try {
+          // Filter out empty tags and get unique tag names
+          const tags = this.editingTags
+            .filter(t => t.name && t.name.trim())
+            .map(t => t.name.trim());
+
+          // Update tag colors
+          const updatedColors = {};
+          this.editingTags.forEach(tag => {
+            if (tag.name && tag.name.trim()) {
+              const normalized = this.normalizeTag(tag.name);
+              updatedColors[normalized] = tag.color;
+            }
+          });
+
+          // Merge with existing colors
+          this.tagColors = { ...this.tagColors, ...updatedColors };
+
+          // Save tags to character or group chat
+          if (this.characterBeingTagged.isGroupChat) {
+            // Update group chat tags
+            const updatedGroup = {
+              ...this.characterBeingTagged,
+              tags
+            };
+            delete updatedGroup.isGroupChat; // Remove temporary flag
+
+            await fetch('/api/group-chats', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updatedGroup)
+            });
+
+            await this.loadGroupChats();
+          } else {
+            // Update character tags
+            await fetch(`/api/characters/${this.characterBeingTagged.filename}/tags`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tags })
+            });
+
+            await this.loadCharacters();
+          }
+
+          // Save tag colors
+          await fetch('/api/tags', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.tagColors)
+          });
+
+          console.log('Tags auto-saved');
+        } catch (error) {
+          console.error('Failed to auto-save tags:', error);
+        }
+      }, 1000); // 1 second debounce
     },
     async saveTagChanges() {
       try {
@@ -1795,13 +1914,44 @@ export default {
   background-color: var(--bg-tertiary);
 }
 
-.tag-input {
+.tag-input-wrapper {
+  position: relative;
   flex: 1;
+}
+
+.tag-input {
+  width: 100%;
   padding: 0.375rem;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background-color: var(--bg-primary);
   color: var(--text-primary);
+}
+
+.tag-input-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.tag-input-suggestion {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: var(--text-primary);
+}
+
+.tag-input-suggestion:hover {
+  background: var(--hover-color);
 }
 
 .color-picker {

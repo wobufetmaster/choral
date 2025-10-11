@@ -911,9 +911,10 @@ onMounted(() => {
   gap: 6px;
   padding: 4px 10px;
   background: var(--accent-color);
-  color: white;
+  color: white !important;
   border-radius: 12px;
   font-size: 13px;
+  font-weight: 500;
 }
 
 .remove-tag {
