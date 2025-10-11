@@ -1,12 +1,10 @@
 <template>
-  <div class="persona-modal" @click.self="$emit('close')">
-    <div class="persona-content">
-      <div class="persona-header">
-        <h2>Persona Manager</h2>
-        <button @click="$emit('close')" class="close-btn">×</button>
-      </div>
+  <div class="persona-manager">
+    <div class="persona-header">
+      <h2>Persona Manager</h2>
+    </div>
 
-      <div class="persona-body">
+    <div class="persona-body">
         <!-- Persona List -->
         <div class="persona-list">
           <h3>Your Personas</h3>
@@ -482,28 +480,13 @@ export default {
 </script>
 
 <style scoped>
-.persona-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.persona-content {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  width: 90%;
-  max-width: 900px;
-  max-height: 90vh;
+.persona-manager {
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .persona-header {
@@ -512,13 +495,15 @@ export default {
   align-items: center;
   padding: 20px;
   border-bottom: 1px solid var(--border-color);
+  background: var(--bg-overlay);
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
 }
 
-.close-btn {
+.persona-header h2 {
+  margin: 0;
   font-size: 24px;
-  padding: 4px 12px;
-  background: transparent;
-  border: none;
+  font-weight: 600;
 }
 
 .persona-body {
@@ -526,14 +511,17 @@ export default {
   grid-template-columns: 250px 1fr;
   gap: 20px;
   padding: 20px;
-  overflow-y: auto;
+  overflow: hidden;
   flex: 1;
+  min-height: 0;
 }
 
 .persona-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .persona-item {
@@ -622,6 +610,8 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .avatar-section {
