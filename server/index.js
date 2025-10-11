@@ -1093,7 +1093,7 @@ app.post('/api/chat/summarize-and-continue', async (req, res) => {
     // Add user's "request" to summarize
     summaryMessages.push({
       role: 'user',
-      content: 'Please provide a concise summary of our conversation so far from a neutral narrator\'s perspective. Focus on key events, decisions, character dynamics, and the current situation. Write in third person, past tense. Keep it to 2-4 paragraphs. This summary will be used to continue our conversation in a new chat.'
+      content: 'Please provide a concise summary of this story so far from a neutral narrator\'s perspective. Focus on key events, decisions, character dynamics, and the current situation. Write in third person, past tense. Keep it to 2-4 paragraphs. This summary will be used to continue the story in a new chapter.'
     });
 
     // Process macros if context provided
