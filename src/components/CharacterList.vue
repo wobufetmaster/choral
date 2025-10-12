@@ -548,6 +548,23 @@ export default {
       const file = event.target.files[0];
       if (!file) return;
 
+      // Check for problematic characters in filename
+      const problematicChars = /["':<>?*|\/\\]/;
+      const hasProblematicChars = problematicChars.test(file.name);
+
+      if (hasProblematicChars) {
+        // Show warning about filename sanitization
+        const originalName = file.name;
+        const sanitizedName = this.sanitizeFilename(file.name);
+
+        const message = `The filename "${originalName}" contains special characters that may cause sync issues.\n\nIt will be automatically renamed to: "${sanitizedName}"\n\nDo you want to continue?`;
+
+        if (!confirm(message)) {
+          event.target.value = '';
+          return;
+        }
+      }
+
       const formData = new FormData();
       formData.append('file', file);
 
@@ -559,11 +576,37 @@ export default {
 
         this.loadCharacters();
         event.target.value = '';
-        this.$root.$notify('Character imported successfully', 'success');
+
+        if (hasProblematicChars) {
+          this.$root.$notify('Character imported and filename sanitized for compatibility', 'success');
+        } else {
+          this.$root.$notify('Character imported successfully', 'success');
+        }
       } catch (error) {
         console.error('Failed to upload character:', error);
         this.$root.$notify('Failed to upload character', 'error');
       }
+    },
+    sanitizeFilename(filename) {
+      // Client-side preview of what the server will do
+      const lastDot = filename.lastIndexOf('.');
+      const ext = lastDot > 0 ? filename.substring(lastDot) : '';
+      let nameWithoutExt = lastDot > 0 ? filename.substring(0, lastDot) : filename;
+
+      nameWithoutExt = nameWithoutExt
+        .replace(/"/g, '')
+        .replace(/'/g, '')
+        .replace(/:/g, '-')
+        .replace(/[<>]/g, '')
+        .replace(/[?*|]/g, '')
+        .replace(/[\/\\]/g, '-')
+        .trim();
+
+      if (!nameWithoutExt) {
+        nameWithoutExt = 'character';
+      }
+
+      return nameWithoutExt + ext;
     },
     toggleTagFilter(tag) {
       // Case-insensitive tag filter toggle

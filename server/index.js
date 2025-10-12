@@ -247,8 +247,39 @@ app.get('/api/characters/:filename/image', async (req, res) => {
   }
 });
 
+// Helper function to sanitize filename for cross-platform compatibility
+// Removes or replaces characters that are problematic on Android/Linux filesystems
+function sanitizeFilename(filename) {
+  const ext = path.extname(filename);
+  let nameWithoutExt = path.basename(filename, ext);
+
+  // List of characters that are problematic on various filesystems
+  // Especially important for Android/Linux compatibility with macOS/Windows
+  const problematicChars = /["':<>?*|\/\\]/g;
+
+  // Replace problematic characters with safe alternatives or remove them
+  nameWithoutExt = nameWithoutExt
+    .replace(/"/g, '') // Remove double quotes
+    .replace(/'/g, '') // Remove single quotes
+    .replace(/:/g, '-') // Replace colons with dashes
+    .replace(/[<>]/g, '') // Remove angle brackets
+    .replace(/[?*|]/g, '') // Remove wildcards and pipes
+    .replace(/[\/\\]/g, '-') // Replace slashes with dashes
+    .trim();
+
+  // Ensure the filename isn't empty after sanitization
+  if (!nameWithoutExt) {
+    nameWithoutExt = 'character';
+  }
+
+  return nameWithoutExt + ext;
+}
+
 // Helper function to generate unique filename
 async function getUniqueFilename(baseFilename, directory) {
+  // Sanitize first to ensure cross-platform compatibility
+  baseFilename = sanitizeFilename(baseFilename);
+
   const ext = path.extname(baseFilename);
   const nameWithoutExt = path.basename(baseFilename, ext);
 

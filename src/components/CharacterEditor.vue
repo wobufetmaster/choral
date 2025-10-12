@@ -36,6 +36,11 @@
             <div class="form-group">
               <label>Name *</label>
               <input v-model="editedCard.data.name" type="text" required />
+              <div v-if="hasProblematicCharsInName" class="filename-warning">
+                ⚠️ Name contains special characters (" ' : < > ? * | / \) that will be removed or replaced for cross-platform compatibility.
+                <br>
+                <small>Filename will be: <strong>{{ sanitizedFilename }}</strong></small>
+              </div>
             </div>
 
             <div class="form-group">
@@ -141,7 +146,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, getCurrentInstance } from 'vue'
+
+const instance = getCurrentInstance()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -158,6 +165,8 @@ const tagsString = ref('')
 const newTag = ref('')
 const tagSuggestions = ref([])
 const allCharacterTags = ref([])
+const hasUnsavedChanges = ref(false)
+const originalCardState = ref(null)
 
 const editedCard = ref({
   spec: 'chara_card_v3',
@@ -186,6 +195,32 @@ const isValid = computed(() => {
   return editedCard.value.data.name.trim() !== '' &&
          editedCard.value.data.description.trim() !== '' &&
          editedCard.value.data.first_mes.trim() !== ''
+})
+
+// Check if character name has problematic characters for filename
+const hasProblematicCharsInName = computed(() => {
+  const problematicChars = /["':<>?*|\/\\]/
+  return problematicChars.test(editedCard.value.data.name)
+})
+
+// Show what the sanitized filename will be
+const sanitizedFilename = computed(() => {
+  let name = editedCard.value.data.name
+
+  name = name
+    .replace(/"/g, '')
+    .replace(/'/g, '')
+    .replace(/:/g, '-')
+    .replace(/[<>]/g, '')
+    .replace(/[?*|]/g, '')
+    .replace(/[\/\\]/g, '-')
+    .trim()
+
+  if (!name) {
+    name = 'character'
+  }
+
+  return name + '.png'
 })
 
 // Watch for character prop changes (when opening in edit mode)
@@ -297,6 +332,13 @@ watch(() => props.tabData, (newTabData) => {
       tagsString.value = ''
     }
 
+    // Save original state for change detection
+    originalCardState.value = JSON.stringify({
+      card: editedCard.value,
+      imagePreview: imagePreview.value
+    })
+    hasUnsavedChanges.value = !!newTabData.draftCard // If there's a draft, there are unsaved changes
+
     // Expand all textareas to fit content
     expandAllTextareas()
   }
@@ -354,19 +396,35 @@ function removeGreeting(index) {
 
 function autoExpand(event) {
   const textarea = event.target
+  const scrollContainer = textarea.closest('.tab-body, .modal-body')
+  const scrollPosBefore = scrollContainer ? scrollContainer.scrollTop : 0
+
   // Reset height to auto to get the correct scrollHeight
   textarea.style.height = 'auto'
   // Set height to scrollHeight to fit content
   textarea.style.height = textarea.scrollHeight + 'px'
+
+  // Restore scroll position if it changed
+  if (scrollContainer) {
+    scrollContainer.scrollTop = scrollPosBefore
+  }
 }
 
 function expandAllTextareas() {
   nextTick(() => {
+    const scrollContainer = document.querySelector('.character-editor .tab-body, .character-editor .modal-body')
+    const scrollPosBefore = scrollContainer ? scrollContainer.scrollTop : 0
+
     const textareas = document.querySelectorAll('.character-editor textarea')
     textareas.forEach(textarea => {
       textarea.style.height = 'auto'
       textarea.style.height = textarea.scrollHeight + 'px'
     })
+
+    // Restore scroll position after all expansions
+    if (scrollContainer) {
+      scrollContainer.scrollTop = scrollPosBefore
+    }
   })
 }
 
@@ -418,10 +476,17 @@ async function save() {
       if (response.ok) {
         const result = await response.json()
 
+        // Clear unsaved changes flag and update original state
+        hasUnsavedChanges.value = false
+        originalCardState.value = JSON.stringify({
+          card: editedCard.value,
+          imagePreview: imagePreview.value
+        })
+
         // Show success notification
-        if (window.$root?.$notify) {
-          window.$root.$notify(
-            characterData.originalFilename ? 'Character updated successfully' : 'Character created successfully',
+        if (instance?.appContext?.config?.globalProperties?.$root?.$notify) {
+          instance.appContext.config.globalProperties.$root.$notify(
+            characterData.originalFilename ? 'Character saved successfully' : 'Character created successfully',
             'success'
           )
         }
@@ -454,14 +519,14 @@ async function save() {
         }
       } else {
         const error = await response.json()
-        if (window.$root?.$notify) {
-          window.$root.$notify(`Failed to save character: ${error.error}`, 'error')
+        if (instance?.appContext?.config?.globalProperties?.$root?.$notify) {
+          instance.appContext.config.globalProperties.$root.$notify(`Failed to save character: ${error.error}`, 'error')
         }
       }
     } catch (error) {
       console.error('Failed to save character:', error)
-      if (window.$root?.$notify) {
-        window.$root.$notify('Failed to save character', 'error')
+      if (instance?.appContext?.config?.globalProperties?.$root?.$notify) {
+        instance.appContext.config.globalProperties.$root.$notify('Failed to save character', 'error')
       }
     }
   } else {
@@ -470,18 +535,36 @@ async function save() {
   }
 }
 
-// Watch for character name changes in tab mode
-watch(() => editedCard.value.data.name, (newName) => {
-  if (props.tabData && newName) {
-    emit('update-tab', { label: newName })
-  }
-})
-
-// Watch for any changes to editedCard and save as draft in tab mode
+// Debounced watcher for draft saving and unsaved changes detection
+let updateTimeout = null
 watch([editedCard, imagePreview, imageFile], () => {
-  if (props.tabData) {
-    // Save the current state as a draft
+  if (!props.tabData) return
+
+  // Clear any pending updates
+  if (updateTimeout) {
+    clearTimeout(updateTimeout)
+  }
+
+  // Debounce the update to avoid interfering with typing
+  updateTimeout = setTimeout(() => {
+    // Check if there are unsaved changes
+    const currentState = JSON.stringify({
+      card: editedCard.value,
+      imagePreview: imagePreview.value
+    })
+
+    const hasChanges = originalCardState.value && currentState !== originalCardState.value
+
+    if (hasChanges !== hasUnsavedChanges.value) {
+      hasUnsavedChanges.value = hasChanges
+    }
+
+    const charName = editedCard.value.data.name || 'Untitled'
+    const label = hasUnsavedChanges.value ? `${charName} *` : charName
+
+    // Save the current state as a draft and update label
     emit('update-tab', {
+      label,
       data: {
         ...props.tabData,
         draftCard: JSON.parse(JSON.stringify(editedCard.value)),
@@ -489,7 +572,7 @@ watch([editedCard, imagePreview, imageFile], () => {
         draftImageFile: imageFile.value
       }
     })
-  }
+  }, 300) // 300ms debounce
 }, { deep: true })
 
 // Load all character tags for autocomplete
@@ -740,6 +823,12 @@ onMounted(() => {
   font-size: 14px;
 }
 
+.form-group small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: -2px;
+}
+
 .form-group input,
 .form-group textarea {
   padding: 8px 12px;
@@ -975,5 +1064,29 @@ onMounted(() => {
 
 .tag-suggestion:hover {
   background: var(--hover-color);
+}
+
+/* Filename warning styles */
+.filename-warning {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 4px;
+  color: #f59e0b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.filename-warning small {
+  color: rgba(251, 191, 36, 0.9);
+  font-size: 12px;
+  display: block;
+  margin-top: 4px;
+}
+
+.filename-warning strong {
+  color: #fbbf24;
+  font-weight: 600;
 }
 </style>
