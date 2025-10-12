@@ -761,17 +761,32 @@ export default {
         if (msg.role === 'assistant') {
           // If already has swipes, use as-is
           if (msg.swipes) {
-            return {
+            const normalized = {
               ...msg,
               swipeIndex: msg.swipeIndex ?? 0
             };
+
+            // For group chat messages, ensure swipeCharacters array exists and matches swipes length
+            if (this.isGroupChat && !normalized.swipeCharacters && normalized.characterFilename) {
+              normalized.swipeCharacters = new Array(normalized.swipes.length).fill(normalized.characterFilename);
+            }
+
+            return normalized;
           }
           // Convert old format
-          return {
+          const normalized = {
             role: 'assistant',
             swipes: [msg.content],
             swipeIndex: 0
           };
+
+          // For group chat messages, initialize swipeCharacters
+          if (this.isGroupChat && msg.characterFilename) {
+            normalized.characterFilename = msg.characterFilename;
+            normalized.swipeCharacters = [msg.characterFilename];
+          }
+
+          return normalized;
         }
         // User messages stay as-is
         return msg;
@@ -1163,7 +1178,9 @@ export default {
                 // Track character for group chat swipes
                 if (this.isGroupChat && this.currentSpeaker) {
                   if (!message.swipeCharacters) {
-                    message.swipeCharacters = new Array(message.swipes.length - 1).fill(message.characterFilename || null);
+                    // Initialize array with the original character for all existing swipes
+                    const originalCharacter = message.characterFilename || this.currentSpeaker;
+                    message.swipeCharacters = new Array(message.swipes.length - 1).fill(originalCharacter);
                   }
                   message.swipeCharacters.push(this.currentSpeaker);
                 }
@@ -1265,7 +1282,9 @@ export default {
           // Track character for group chat swipes
           if (this.isGroupChat && this.currentSpeaker) {
             if (!message.swipeCharacters) {
-              message.swipeCharacters = new Array(message.swipes.length - 1).fill(message.characterFilename || null);
+              // Initialize array with the original character for all existing swipes
+              const originalCharacter = message.characterFilename || this.currentSpeaker;
+              message.swipeCharacters = new Array(message.swipes.length - 1).fill(originalCharacter);
             }
             message.swipeCharacters.push(this.currentSpeaker);
           }
@@ -1373,12 +1392,14 @@ export default {
         message.swipeIndex--;
 
         // Update character filename for group chats
-        if (this.isGroupChat && message.swipeCharacters) {
+        if (this.isGroupChat && message.swipeCharacters && message.swipeCharacters[message.swipeIndex]) {
           message.characterFilename = message.swipeCharacters[message.swipeIndex];
+          // Force Vue to re-render the avatar
+          this.$forceUpdate();
         }
 
         if (this.isGroupChat) {
-          await this.saveGroupChat();
+          await this.saveGroupChat(false); // Save without notification
         } else {
           await this.saveChat();
         }
@@ -1398,12 +1419,14 @@ export default {
         }
 
         // Update character filename for group chats
-        if (this.isGroupChat && message.swipeCharacters) {
+        if (this.isGroupChat && message.swipeCharacters && message.swipeCharacters[message.swipeIndex]) {
           message.characterFilename = message.swipeCharacters[message.swipeIndex];
+          // Force Vue to re-render the avatar
+          this.$forceUpdate();
         }
 
         if (this.isGroupChat) {
-          await this.saveGroupChat();
+          await this.saveGroupChat(false); // Save without notification
         } else {
           await this.saveChat();
         }
@@ -1414,12 +1437,14 @@ export default {
           message.swipeIndex++;
 
           // Update character filename for group chats
-          if (this.isGroupChat && message.swipeCharacters) {
+          if (this.isGroupChat && message.swipeCharacters && message.swipeCharacters[message.swipeIndex]) {
             message.characterFilename = message.swipeCharacters[message.swipeIndex];
+            // Force Vue to re-render the avatar
+            this.$forceUpdate();
           }
 
           if (this.isGroupChat) {
-            await this.saveGroupChat();
+            await this.saveGroupChat(false); // Save without notification
           } else {
             await this.saveChat();
           }
@@ -2243,11 +2268,14 @@ export default {
       const chatKey = this.isGroupChat ? this.groupChatId : this.chatId;
       if (!chatKey) return;
 
+      // Use processed messages from server if available, otherwise use original request messages
+      const finalMessages = debugInfoFromServer?.processedMessages || requestBody.messages;
+
       const debugData = {
         timestamp: Date.now(),
         // Request info
         model: requestBody.model,
-        messages: requestBody.messages,
+        messages: finalMessages, // These are the FINAL messages sent to the API after processing
         options: requestBody.options,
         promptProcessing: requestBody.promptProcessing,
         lorebookFilenames: requestBody.lorebookFilenames || [],
