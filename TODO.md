@@ -35,16 +35,28 @@
 - [x] **Stop button for streaming** - Add ability to cancel/stop streaming AI responses ✅
 - [x] **Settings tab deduplication** - If you try to open a tab containing a settings page, redirect to existing one if already open ✅
 - [x] **Start new chat from summary** - AI summarizes current chat, creates new chat with same characters and summary as first message ✅
-- [ ] **Maybe tool call results should just be saved in the message that called them if they return anything. 
+- [x] **Group chats cache character data** - When loading group chats, refresh character data from actual PNG files ✅
+- [ ] **Maybe tool call results should just be saved in the message that called them if they return anything.
 - [ ] **All of the prompts that are used for external calls should probably be documented somewhere, eg the tool calling prompts and bookkeeping prompts.
-- [ ] **Button that gives all of your gray, default colored tags a random color. 
+- [ ] **Document the prompt structure and order more accurately, ie, where do tool calls go, where do lorebook entries get injected, etc etc.
+- [x] **Revamp debug menu screen. Instead of just dumping the raw request, format it, have different sections that tell you exactly what is being sent.** ✅
+  - Debug data updates immediately when sending messages
+  - Character sections are collapsible in group chats
+- [ ] **Button that gives all of your gray, default colored tags a random color.
 - [?] **Auto rename chats seems to run on chats that are already named. (Possibly fixed)
-- [ ] **ChatView.vue file is probably too big and should be refactored. 
+- [ ] **ChatView.vue file is probably too big and should be refactored.
 - [x] **Lorebooks in the lorebook manager screen should be searchable. ✅
 - [x] **When typing in tags in the lorebook manager, they should be searched for, exactly the same as in the persona manager tag field. (high priority) ✅
 
 
 ### 🔴 Complex Features
+- [ ] **Context limit handling** - Implement token-aware context management
+  - The `max_context` preset setting exists but is currently unused
+  - No message truncation when approaching context limits
+  - Should count tokens and exclude older messages when approaching `max_context`
+  - Should respect `@@ignore_on_max_context` lorebook decorator (V3 spec)
+  - Should show UI warning when context is being trimmed
+  - Consider sliding window approach (always keep system prompts + recent messages)
 - [ ] **Regex replacement system** - Post-process AI responses with regex find/replace
   - UI for managing regex patterns
   - Pattern storage (config/separate file)

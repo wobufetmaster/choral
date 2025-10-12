@@ -220,121 +220,14 @@
       @save="saveEditingLorebook"
     />
 
-    <!-- Debug Panel -->
-    <div v-if="showDebug" class="debug-panel">
-      <div class="debug-header">
-        <h3>🐛 Debug Information</h3>
-        <button @click="showDebug = false" class="close-debug">×</button>
-      </div>
+    <!-- Debug Modal -->
+    <DebugModal
+      :show="showDebug"
+      :debugData="persistedDebugData"
+      @close="showDebug = false"
+    />
 
-      <div class="debug-content">
-        <!-- Token Information -->
-        <div class="debug-section">
-          <h4>📊 Token Usage</h4>
-          <div class="debug-info">
-            <div class="debug-row">
-              <span class="debug-label">Estimated Tokens Sent:</span>
-              <span class="debug-value">{{ debugInfo.estimatedTokens || 'N/A' }}</span>
-            </div>
-            <div class="debug-row">
-              <span class="debug-label">Model Max Tokens:</span>
-              <span class="debug-value">{{ settings.max_tokens || 'N/A' }}</span>
-            </div>
-            <div class="debug-row">
-              <span class="debug-label">Model:</span>
-              <span class="debug-value">{{ settings.model }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Active Preset -->
-        <div class="debug-section">
-          <h4>⚙️ Active Preset</h4>
-          <div class="debug-info">
-            <div class="debug-row">
-              <span class="debug-label">Temperature:</span>
-              <span class="debug-value">{{ settings.temperature }}</span>
-            </div>
-            <div class="debug-row">
-              <span class="debug-label">Top P:</span>
-              <span class="debug-value">{{ settings.top_p }}</span>
-            </div>
-            <div class="debug-row">
-              <span class="debug-label">Top K:</span>
-              <span class="debug-value">{{ settings.top_k }}</span>
-            </div>
-            <div class="debug-row">
-              <span class="debug-label">Prompt Processing:</span>
-              <span class="debug-value">{{ settings.prompt_processing || 'merge_system' }}</span>
-            </div>
-            <div class="debug-row">
-              <span class="debug-label">System Prompts:</span>
-              <span class="debug-value">{{ settings.systemPrompts?.length || 0 }} prompts</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Active Lorebooks -->
-        <div class="debug-section" v-if="validSelectedLorebookFilenames.length > 0">
-          <h4>📚 Active Lorebooks ({{ validSelectedLorebookFilenames.length }})</h4>
-          <div class="debug-lorebook-list">
-            <div v-for="filename in validSelectedLorebookFilenames" :key="filename" class="debug-lorebook-item">
-              <div class="debug-lorebook-header">
-                <span class="debug-lorebook-name">{{ getLorebook(filename)?.name || filename }}</span>
-                <span v-if="isAutoSelected(filename)" class="auto-badge">AUTO</span>
-              </div>
-              <div v-if="debugInfo.matchedEntries && debugInfo.matchedEntries[filename]" class="matched-entries">
-                <div class="matched-entries-title">Matched Entries ({{ debugInfo.matchedEntries[filename].length }}):</div>
-                <div v-for="(entry, idx) in debugInfo.matchedEntries[filename]" :key="idx" class="matched-entry">
-                  <div class="matched-entry-header">
-                    <span class="entry-name">{{ entry.name }}</span>
-                    <span class="entry-priority">Priority: {{ entry.priority || 0 }}</span>
-                  </div>
-                  <div class="matched-keywords" v-if="entry.matchedKeys && entry.matchedKeys.length > 0">
-                    <span class="keywords-label">Matched Keywords:</span>
-                    <span v-for="key in entry.matchedKeys" :key="key" class="matched-keyword">{{ key }}</span>
-                  </div>
-                  <div class="entry-content-preview">{{ entry.content?.substring(0, 100) }}{{ entry.content?.length > 100 ? '...' : '' }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Message Structure -->
-        <div class="debug-section">
-          <h4>📝 Message Structure</h4>
-          <div class="debug-info">
-            <div class="debug-row">
-              <span class="debug-label">Total Messages:</span>
-              <span class="debug-value">{{ debugInfo.messageCount || messages.length }}</span>
-            </div>
-            <div class="debug-row">
-              <span class="debug-label">System Messages:</span>
-              <span class="debug-value">{{ debugInfo.systemMessageCount || 0 }}</span>
-            </div>
-            <div class="debug-row">
-              <span class="debug-label">User Messages:</span>
-              <span class="debug-value">{{ debugInfo.userMessageCount || 0 }}</span>
-            </div>
-            <div class="debug-row">
-              <span class="debug-label">Assistant Messages:</span>
-              <span class="debug-value">{{ debugInfo.assistantMessageCount || 0 }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Last Request Details -->
-        <div class="debug-section" v-if="debugInfo.lastRequest">
-          <h4>🔍 Last Request</h4>
-          <div class="debug-code">
-            <pre>{{ JSON.stringify(debugInfo.lastRequest, null, 2) }}</pre>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="chat-container" :class="{ 'with-debug': showDebug }">
+    <div class="chat-container">
       <div class="messages" ref="messagesContainer" @scroll="handleScroll">
         <div
           v-for="(message, index) in messages"
@@ -453,13 +346,15 @@ import { processMacrosForDisplay } from '../utils/macros';
 import GroupChatManager from './GroupChatManager.vue';
 import LorebookEditor from './LorebookEditor.vue';
 import ChatSidebar from './ChatSidebar.vue';
+import DebugModal from './DebugModal.vue';
 
 export default {
   name: 'ChatView',
   components: {
     GroupChatManager,
     LorebookEditor,
-    ChatSidebar
+    ChatSidebar,
+    DebugModal
   },
   props: {
     tabData: {
@@ -593,6 +488,19 @@ export default {
       return this.lorebooks.filter(lorebook =>
         !this.selectedLorebookFilenames.includes(lorebook.filename)
       );
+    },
+    persistedDebugData() {
+      // Load debug data from localStorage
+      const chatKey = this.isGroupChat ? this.groupChatId : this.chatId;
+      if (!chatKey) return null;
+
+      try {
+        const stored = localStorage.getItem(`debug_${chatKey}`);
+        return stored ? JSON.parse(stored) : null;
+      } catch (err) {
+        console.error('Failed to load persisted debug data:', err);
+        return null;
+      }
     }
   },
   watch: {
@@ -1165,7 +1073,7 @@ export default {
         context: macroContext,
         promptProcessing: this.settings.prompt_processing || 'merge_system',
         lorebookFilenames: this.selectedLorebookFilenames,
-        debug: this.showDebug
+        debug: true // Always collect debug data for persistence
       };
 
       // Check if characters have tools enabled
@@ -1218,6 +1126,10 @@ export default {
 
       // Store last request for debugging
       this.debugInfo.lastRequest = requestBody;
+
+      // Save debug data immediately (before streaming) so it's available right away
+      // The lorebook matches will be updated when we receive the debug response from server
+      this.saveDebugData(requestBody, {});
 
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
@@ -1296,6 +1208,9 @@ export default {
                 console.log('Received debug info:', parsed.debug);
                 this.debugInfo.matchedEntries = parsed.debug.matchedEntriesByLorebook || {};
                 console.log('Updated debugInfo.matchedEntries:', this.debugInfo.matchedEntries);
+
+                // Save complete debug data to localStorage
+                this.saveDebugData(requestBody, parsed.debug);
               } else if (parsed.type === 'tool_call') {
                 // Handle tool call notification
                 console.log('Tool called:', parsed.toolCall);
@@ -2323,6 +2238,42 @@ export default {
 
       // matched entries will be populated by the server response
     },
+    saveDebugData(requestBody, debugInfoFromServer) {
+      // Build complete debug data object for persistence
+      const chatKey = this.isGroupChat ? this.groupChatId : this.chatId;
+      if (!chatKey) return;
+
+      const debugData = {
+        timestamp: Date.now(),
+        // Request info
+        model: requestBody.model,
+        messages: requestBody.messages,
+        options: requestBody.options,
+        promptProcessing: requestBody.promptProcessing,
+        lorebookFilenames: requestBody.lorebookFilenames || [],
+        tools: requestBody.tools || [],
+        // Context info (persona)
+        context: requestBody.context || {},
+        personaName: this.persona?.name || 'User',
+        personaNickname: this.persona?.nickname || '',
+        personaDescription: this.persona?.description || '',
+        // Debug info from server
+        matchedEntriesByLorebook: debugInfoFromServer?.matchedEntriesByLorebook || {},
+        // Computed info
+        estimatedTokens: this.debugInfo.estimatedTokens,
+        messageCount: this.debugInfo.messageCount,
+        systemMessageCount: this.debugInfo.systemMessageCount,
+        userMessageCount: this.debugInfo.userMessageCount,
+        assistantMessageCount: this.debugInfo.assistantMessageCount
+      };
+
+      try {
+        localStorage.setItem(`debug_${chatKey}`, JSON.stringify(debugData));
+        console.log('Saved debug data for', chatKey);
+      } catch (err) {
+        console.error('Failed to save debug data:', err);
+      }
+    },
     editLorebook(lorebook) {
       // Set the lorebook to edit (LorebookEditor will handle cloning)
       this.editingLorebook = lorebook;
@@ -2420,7 +2371,31 @@ export default {
         const response = await fetch(`/api/group-chats/${groupChatId}`);
         const groupChat = await response.json();
 
-        this.groupChatCharacters = groupChat.characters || [];
+        // Refresh character data from actual PNG files to get latest edits
+        const refreshedCharacters = [];
+        for (const cachedChar of groupChat.characters || []) {
+          try {
+            const charResponse = await fetch(`/api/characters/${cachedChar.filename}`);
+            if (charResponse.ok) {
+              const freshCharData = await charResponse.json();
+              refreshedCharacters.push({
+                filename: cachedChar.filename,
+                name: freshCharData.data.name,
+                data: freshCharData.data  // Store just the data object, not the whole character
+              });
+            } else {
+              // If character file is missing, keep the cached version
+              console.warn(`Character ${cachedChar.filename} not found, using cached data`);
+              refreshedCharacters.push(cachedChar);
+            }
+          } catch (err) {
+            console.error(`Failed to refresh character ${cachedChar.filename}:`, err);
+            // Fall back to cached data if refresh fails
+            refreshedCharacters.push(cachedChar);
+          }
+        }
+
+        this.groupChatCharacters = refreshedCharacters;
         this.groupChatStrategy = groupChat.strategy || 'join';
         this.groupChatExplicitMode = groupChat.explicitMode || false;
         this.groupChatName = groupChat.name || '';
@@ -2656,32 +2631,34 @@ export default {
 
           // For group chats, handle character info differently based on strategy
           if (this.groupChatStrategy === 'join') {
-            // Replace with combined character info
-            const allDescriptions = this.groupChatCharacters.map(c =>
-              `${c.name}: ${c.data?.description || c.data?.data?.description || ''}`
-            ).join('\n\n');
+            // Check if any character placeholders exist
+            const hasCharPlaceholders = /\{\{(description|personality|scenario|system_prompt|dialogue_examples)\}\}/g.test(content);
 
-            content = content.replace(/\{\{description\}\}/g, allDescriptions);
-            content = content.replace(/\{\{personality\}\}/g,
-              this.groupChatCharacters.map(c =>
-                `${c.name}: ${c.data?.personality || c.data?.data?.personality || ''}`
-              ).join('\n\n')
-            );
-            content = content.replace(/\{\{scenario\}\}/g,
-              this.groupChatCharacters.map(c =>
-                c.data?.scenario || c.data?.data?.scenario || ''
-              ).filter(s => s).join('\n\n')
-            );
-            content = content.replace(/\{\{system_prompt\}\}/g,
-              this.groupChatCharacters.map(c =>
-                c.data?.system_prompt || c.data?.data?.system_prompt || ''
-              ).filter(s => s).join('\n\n')
-            );
-            content = content.replace(/\{\{dialogue_examples\}\}/g,
-              this.groupChatCharacters.map(c =>
-                c.data?.mes_example || c.data?.data?.mes_example || ''
-              ).filter(s => s).join('\n\n')
-            );
+            if (hasCharPlaceholders) {
+              // Build complete info for each character, then join them
+              const allCharacterInfo = this.groupChatCharacters.map(c => {
+                const charData = c.data || {};
+                let info = `=== Character: ${c.name} ===\n`;
+
+                if (charData.description) info += `Description: ${charData.description}\n`;
+                if (charData.personality) info += `Personality: ${charData.personality}\n`;
+                if (charData.scenario) info += `Scenario: ${charData.scenario}\n`;
+                if (charData.system_prompt) info += `${charData.system_prompt}\n`;
+                if (charData.mes_example) info += `Example Dialogue:\n${charData.mes_example}\n`;
+
+                return info.trim();
+              }).join('\n');
+
+              // Replace the FIRST placeholder with all character info, remove the rest
+              let replacedFirst = false;
+              content = content.replace(/\{\{(description|personality|scenario|system_prompt|dialogue_examples)\}\}/g, (match) => {
+                if (!replacedFirst) {
+                  replacedFirst = true;
+                  return allCharacterInfo;
+                }
+                return ''; // Remove subsequent placeholders
+              });
+            }
           } else if (this.groupChatStrategy === 'swap' && speakingCharacter) {
             // Replace with only the speaking character's info
             const charData = speakingCharacter.data?.data || speakingCharacter.data || {};
@@ -2712,7 +2689,7 @@ export default {
         if (this.groupChatStrategy === 'join') {
           // Add all character info
           const characterInfos = this.groupChatCharacters.map(c => {
-            const charData = c.data?.data || c.data || {};
+            const charData = c.data || {};
             let info = `${c.name}:\n`;
             if (charData.description) info += `Description: ${charData.description}\n`;
             if (charData.personality) info += `Personality: ${charData.personality}\n`;
@@ -3593,221 +3570,6 @@ button.active {
   border-color: var(--accent-color);
 }
 
-/* Debug Panel */
-.debug-panel {
-  position: fixed;
-  right: 0;
-  top: 60px;
-  bottom: 0;
-  width: 400px;
-  background-color: var(--bg-overlay);
-  backdrop-filter: blur(var(--blur-amount, 12px));
-  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
-  border-left: 1px solid var(--border-color);
-  overflow-y: auto;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-lg);
-}
-
-.debug-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid var(--border-color);
-  background-color: var(--bg-tertiary);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.debug-header h3 {
-  margin: 0;
-  font-size: 1.125rem;
-}
-
-.close-debug {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.close-debug:hover {
-  background-color: var(--hover-color);
-}
-
-.debug-content {
-  padding: 1rem;
-  flex: 1;
-}
-
-.debug-section {
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background-color: var(--bg-tertiary);
-  border-radius: 6px;
-}
-
-.debug-section h4 {
-  margin: 0 0 0.75rem 0;
-  font-size: 1rem;
-  color: var(--accent-color);
-}
-
-.debug-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.debug-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.375rem 0;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.debug-row:last-child {
-  border-bottom: none;
-}
-
-.debug-label {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.debug-value {
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  font-family: monospace;
-}
-
-.debug-lorebook-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.debug-lorebook-item {
-  padding: 0.75rem;
-  background-color: var(--bg-primary);
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-}
-
-.debug-lorebook-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.debug-lorebook-name {
-  font-weight: 600;
-  font-size: 0.9375rem;
-}
-
-.matched-entries {
-  margin-top: 0.75rem;
-}
-
-.matched-entries-title {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
-}
-
-.matched-entry {
-  padding: 0.625rem;
-  background-color: var(--bg-secondary);
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
-  border-left: 3px solid var(--accent-color);
-}
-
-.matched-entry-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.375rem;
-}
-
-.entry-name {
-  font-weight: 600;
-  font-size: 0.875rem;
-}
-
-.entry-priority {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-family: monospace;
-}
-
-.matched-keywords {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.keywords-label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.matched-keyword {
-  font-size: 0.75rem;
-  padding: 0.125rem 0.5rem;
-  background-color: var(--accent-color);
-  color: white;
-  border-radius: 12px;
-  font-family: monospace;
-}
-
-.entry-content-preview {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  font-style: italic;
-  line-height: 1.4;
-}
-
-.debug-code {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.75rem;
-  max-height: 400px;
-  overflow: auto;
-}
-
-.debug-code pre {
-  margin: 0;
-  font-size: 0.75rem;
-  font-family: monospace;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.chat-container.with-debug {
-  margin-right: 400px;
-}
-
 /* Typing indicator animation */
 .typing-indicator {
   padding: 12px 16px;
@@ -3898,16 +3660,6 @@ button.active {
 }
 
 @media (max-width: 768px) {
-  .debug-panel {
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .chat-container.with-debug {
-    margin-right: 0;
-    display: none;
-  }
-
   .chat-container {
     margin-left: 0 !important;
   }
