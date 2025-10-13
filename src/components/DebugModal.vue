@@ -594,9 +594,12 @@ export default {
   background: var(--bg-tertiary);
   border-radius: 4px;
   white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
   font-family: 'Courier New', monospace;
   font-size: 0.9rem;
   overflow-x: auto;
+  line-height: 1.5;
 }
 
 .lorebook-group {
@@ -673,8 +676,11 @@ export default {
   background: var(--bg-tertiary);
   border-radius: 4px;
   white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
   font-family: 'Courier New', monospace;
   font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .tool-item {
@@ -767,8 +773,11 @@ export default {
   background: var(--bg-tertiary);
   border-radius: 4px;
   white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
   font-family: 'Courier New', monospace;
   font-size: 0.9rem;
+  line-height: 1.5;
   overflow-x: auto;
 }
 

@@ -59,6 +59,23 @@ function processMacros(text, context, removeComments = true) {
     return content.split('').reverse().join('');
   });
 
+  // {{date}} - Current date with month name (e.g., "October 11, 2025")
+  result = result.replace(/\{\{date\}\}/gi, () => {
+    return new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  });
+
+  // {{isotime}} - Current time in HH:MM format (e.g., "14:30")
+  result = result.replace(/\{\{isotime\}\}/gi, () => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  });
+
   // {{characters_list}} - List of available characters with filenames
   result = result.replace(/\{\{characters_list\}\}/gi, () => {
     if (context.characters && Array.isArray(context.characters) && context.characters.length > 0) {

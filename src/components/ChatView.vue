@@ -557,6 +557,23 @@ export default {
       typographer: true, // Enable smart quotes and other typography
     });
 
+    // Custom renderer for code blocks to add language classes
+    const defaultRender = this.md.renderer.rules.fence || function(tokens, idx, options, env, self) {
+      return self.renderToken(tokens, idx, options);
+    };
+
+    this.md.renderer.rules.fence = function(tokens, idx, options, env, self) {
+      const token = tokens[idx];
+      const info = token.info ? token.info.trim() : '';
+      const langName = info ? info.split(/\s+/g)[0] : '';
+
+      if (langName) {
+        token.attrSet('class', `language-${langName}`);
+      }
+
+      return defaultRender(tokens, idx, options, env, self);
+    };
+
     // Support both tab data and route query params (for backward compatibility)
     const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
     const groupChatId = this.tabData?.groupChatId || this.$route?.query?.groupChat;
@@ -1506,6 +1523,10 @@ export default {
       return message.swipes?.length || 1;
     },
     canSwipeLeft(message) {
+      // For first messages (greetings), always allow swiping left to loop
+      if (message.isFirstMessage) {
+        return true;
+      }
       return (message.swipeIndex ?? 0) > 0;
     },
     canSwipeRight(message) {
@@ -1515,8 +1536,16 @@ export default {
     },
     async swipeLeft(index) {
       const message = this.messages[index];
-      if (this.canSwipeLeft(message)) {
-        message.swipeIndex--;
+      const currentIndex = message.swipeIndex ?? 0;
+      const totalSwipes = message.swipes?.length || 1;
+
+      if (message.isFirstMessage) {
+        // For the first message, cycle back to the last greeting
+        if (currentIndex > 0) {
+          message.swipeIndex--;
+        } else {
+          message.swipeIndex = totalSwipes - 1; // Cycle back to last greeting
+        }
 
         // Update character filename for group chats
         if (this.isGroupChat && message.swipeCharacters && message.swipeCharacters[message.swipeIndex]) {
@@ -1529,6 +1558,24 @@ export default {
           await this.saveGroupChat(false); // Save without notification
         } else {
           await this.saveChat();
+        }
+      } else {
+        // For other messages, normal swipe behavior
+        if (this.canSwipeLeft(message)) {
+          message.swipeIndex--;
+
+          // Update character filename for group chats
+          if (this.isGroupChat && message.swipeCharacters && message.swipeCharacters[message.swipeIndex]) {
+            message.characterFilename = message.swipeCharacters[message.swipeIndex];
+            // Force Vue to re-render the avatar
+            this.$forceUpdate();
+          }
+
+          if (this.isGroupChat) {
+            await this.saveGroupChat(false); // Save without notification
+          } else {
+            await this.saveChat();
+          }
         }
       }
     },
@@ -3217,6 +3264,73 @@ button.active {
   background: var(--assistant-bubble, var(--bg-secondary));
   border: 1px solid var(--border-color);
   border-radius: 6px 18px 18px 18px;
+}
+
+/* Terminal-style code blocks */
+.message-content :deep(pre) {
+  position: relative;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 0;
+  margin: 12px 0;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.message-content :deep(pre code) {
+  display: block;
+  padding: 16px;
+  overflow-x: auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #d4d4d4;
+  background: transparent;
+  border: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Console-specific styling */
+.message-content :deep(pre code.language-console::before),
+.message-content :deep(pre code.language-bash::before),
+.message-content :deep(pre code.language-shell::before),
+.message-content :deep(pre code.language-terminal::before) {
+  content: '●●●';
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #666;
+}
+
+.message-content :deep(pre code.language-console),
+.message-content :deep(pre code.language-bash),
+.message-content :deep(pre code.language-shell),
+.message-content :deep(pre code.language-terminal) {
+  padding-top: 32px;
+  background: linear-gradient(to bottom, #2d2d2d 28px, #1e1e1e 28px);
+  color: #00ff00;
+  text-shadow: 0 0 2px rgba(0, 255, 0, 0.3);
+}
+
+/* Inline code styling */
+.message-content :deep(code) {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  font-size: 0.9em;
+}
+
+.message-content :deep(pre code) {
+  padding: 16px;
+  background: transparent;
+  border: none;
 }
 
 .message-actions {

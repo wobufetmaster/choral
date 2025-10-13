@@ -42,9 +42,7 @@
 - [x] **Revamp debug menu screen. Instead of just dumping the raw request, format it, have different sections that tell you exactly what is being sent.** ✅
   - Debug data updates immediately when sending messages
   - Character sections are collapsible in group chats
-- [ ] **Button that gives all of your gray, default colored tags a random color.
 - [?] **Auto rename chats seems to run on chats that are already named. (Possibly fixed)
-- [ ] **ChatView.vue file is probably too big and should be refactored.
 - [x] **Lorebooks in the lorebook manager screen should be searchable. ✅
 - [x] **When typing in tags in the lorebook manager, they should be searched for, exactly the same as in the persona manager tag field. (high priority) ✅
 

@@ -2238,7 +2238,8 @@ app.post('/api/tools/create-character', async (req, res) => {
       success: true,
       filename,
       name: params.name,
-      message: `Successfully created character: ${params.name}`
+      message: `Successfully created character: ${params.name}`,
+      details: `Character file: ${filename}. You must use this exact filename when referencing this character in other tool calls.`
     });
   } catch (error) {
     console.error('Error creating character:', error);
@@ -2296,7 +2297,9 @@ app.post('/api/tools/add-greetings', async (req, res) => {
     res.json({
       success: true,
       filename,
+      characterName: card.data.name,
       addedCount: greetings.length,
+      addedGreetings: greetings,
       totalGreetings: card.data.alternate_greetings.length,
       message: `Successfully added ${greetings.length} greeting(s) to ${card.data.name}`
     });
@@ -2377,6 +2380,8 @@ app.post('/api/tools/update-character', async (req, res) => {
     res.json({
       success: true,
       filename: params.filename,
+      characterName: card.data.name,
+      updatedFields: Object.keys(params).filter(k => k !== 'filename' && params[k] !== undefined),
       message: `Successfully updated character: ${card.data.name}`
     });
   } catch (error) {
@@ -2461,6 +2466,9 @@ app.post('/api/chat/stream', async (req, res) => {
   const processingMode = promptProcessing || 'merge_system';
   processedMessages = processPrompt(processedMessages, processingMode, options);
 
+  // Add processed messages to debug info
+  debugInfo.processedMessages = processedMessages;
+
   // Log the request
   logRequest({
     model,
@@ -2493,6 +2501,11 @@ app.post('/api/chat/stream', async (req, res) => {
       fullResponse += content;
       logStreamChunk(content);
       res.write(`data: ${JSON.stringify({ content })}\n\n`);
+    },
+    onToolCallStart: (toolName) => {
+      // Notify client as soon as we detect tool call is starting to stream
+      console.log('Tool call starting:', toolName);
+      res.write(`data: ${JSON.stringify({ type: 'tool_call_start', toolName })}\n\n`);
     },
     onToolCall: async (toolCall) => {
       try {
