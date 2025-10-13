@@ -40,7 +40,7 @@ function getApiKey() {
  * @param {Function} params.onComplete - Callback when streaming is complete
  * @param {Function} params.onError - Callback for errors
  */
-function streamChatCompletion({ messages, model, options = {}, tools, onChunk, onToolCall, onComplete, onError }) {
+function streamChatCompletion({ messages, model, options = {}, tools, onChunk, onToolCall, onToolCallStart, onComplete, onError }) {
   const apiKey = getApiKey();
 
   if (!apiKey) {
@@ -94,6 +94,9 @@ function streamChatCompletion({ messages, model, options = {}, tools, onChunk, o
 
     let buffer = '';
     let toolCallBuffer = null; // For accumulating tool call data
+    let pendingToolCall = null; // Promise for async tool execution
+    let toolCallStartNotified = false; // Track if we've notified client about tool call start
+    let completed = false; // Track if onComplete has been called
 
     res.on('data', (chunk) => {
       buffer += chunk.toString();
@@ -109,9 +112,29 @@ function streamChatCompletion({ messages, model, options = {}, tools, onChunk, o
           if (data === '[DONE]') {
             // If we have a tool call, send it before completing
             if (toolCallBuffer && onToolCall) {
-              onToolCall(toolCallBuffer);
+              pendingToolCall = Promise.resolve(onToolCall(toolCallBuffer));
             }
-            onComplete();
+
+            // Wait for any pending tool call to complete before calling onComplete
+            if (pendingToolCall) {
+              pendingToolCall.then(() => {
+                if (!completed) {
+                  completed = true;
+                  onComplete();
+                }
+              }).catch((err) => {
+                console.error('Tool call error:', err);
+                if (!completed) {
+                  completed = true;
+                  onComplete();
+                }
+              });
+            } else {
+              if (!completed) {
+                completed = true;
+                onComplete();
+              }
+            }
             return;
           }
 
@@ -138,6 +161,16 @@ function streamChatCompletion({ messages, model, options = {}, tools, onChunk, o
                     arguments: toolCall.function?.arguments || ''
                   }
                 };
+
+                // Notify client immediately when tool call starts streaming
+                if (!toolCallStartNotified && onToolCallStart && toolCallBuffer.function.name) {
+                  try {
+                    onToolCallStart(toolCallBuffer.function.name);
+                    toolCallStartNotified = true;
+                  } catch (err) {
+                    console.error('Error in onToolCallStart:', err);
+                  }
+                }
               } else {
                 // Accumulate arguments
                 if (toolCall.function?.arguments) {
@@ -145,13 +178,23 @@ function streamChatCompletion({ messages, model, options = {}, tools, onChunk, o
                 }
                 if (toolCall.function?.name) {
                   toolCallBuffer.function.name += toolCall.function.name;
+
+                  // If we just got the name, notify now
+                  if (!toolCallStartNotified && onToolCallStart) {
+                    try {
+                      onToolCallStart(toolCallBuffer.function.name);
+                      toolCallStartNotified = true;
+                    } catch (err) {
+                      console.error('Error in onToolCallStart:', err);
+                    }
+                  }
                 }
               }
             }
 
             // Check for finish reason to send tool call
             if (parsed.choices?.[0]?.finish_reason === 'tool_calls' && toolCallBuffer && onToolCall) {
-              onToolCall(toolCallBuffer);
+              pendingToolCall = Promise.resolve(onToolCall(toolCallBuffer));
               toolCallBuffer = null;
             }
           } catch (err) {
@@ -165,7 +208,26 @@ function streamChatCompletion({ messages, model, options = {}, tools, onChunk, o
     });
 
     res.on('end', () => {
-      onComplete();
+      // Wait for any pending tool call before completing
+      if (pendingToolCall) {
+        pendingToolCall.then(() => {
+          if (!completed) {
+            completed = true;
+            onComplete();
+          }
+        }).catch((err) => {
+          console.error('Tool call error:', err);
+          if (!completed) {
+            completed = true;
+            onComplete();
+          }
+        });
+      } else {
+        if (!completed) {
+          completed = true;
+          onComplete();
+        }
+      }
     });
 
     res.on('error', onError);

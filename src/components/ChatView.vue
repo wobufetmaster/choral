@@ -260,6 +260,12 @@
               <button @click="editMessage(index)" title="Edit">✏️</button>
               <button @click="copyMessage(getCurrentContent(message))" title="Copy">📋</button>
               <button @click="deleteMessage(index)" title="Delete">🗑️</button>
+              <button
+                v-if="index < messages.length - 1"
+                @click="deleteMessagesBelow(index)"
+                title="Delete all messages below this one"
+                class="delete-below-button"
+              >🗑️↓</button>
             </div>
             <div v-if="editingMessage === index" class="message-edit-container">
               <div
@@ -293,8 +299,17 @@
             @error="setFallbackAvatar($event)"
           />
           <div class="message-bubble">
+            <!-- Show streaming content if it exists -->
             <div v-if="streamingContent" class="message-content" v-html="sanitizeHtml(streamingContent, { characterFilename: currentSpeaker })"></div>
-            <div v-else class="message-content typing-indicator">
+
+            <!-- Show tool call indicator (can appear alongside content or alone) -->
+            <div v-if="currentToolCall" class="message-content tool-call-indicator">
+              <span class="tool-call-icon">🔧</span>
+              <span class="tool-call-text">Calling {{ currentToolCall }}... ({{ formatElapsedTime(toolCallElapsedTime) }})</span>
+            </div>
+
+            <!-- Show typing indicator only if no content and no tool call -->
+            <div v-if="!streamingContent && !currentToolCall" class="message-content typing-indicator">
               <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
             </div>
           </div>
@@ -376,6 +391,10 @@ export default {
       abortController: null,
       isGeneratingSwipe: false,
       generatingSwipeIndex: null,
+      currentToolCall: null,
+      toolCallStartTime: null,
+      toolCallElapsedTime: 0,
+      toolCallTimerInterval: null,
       sidebarOpen: true,
       showSettings: false,
       showChatHistory: false,
@@ -525,6 +544,10 @@ export default {
       deep: true
     }
   },
+  beforeUnmount() {
+    // Clean up timer when component is destroyed
+    this.stopToolCallTimer();
+  },
   async mounted() {
     // Initialize markdown renderer
     this.md = new MarkdownIt({
@@ -586,6 +609,32 @@ export default {
     await this.autoSelectLorebook();
   },
   methods: {
+    formatElapsedTime(ms) {
+      if (!ms || ms < 0) return '0.0s';
+      const seconds = Math.floor(ms / 1000);
+      const tenths = Math.floor((ms % 1000) / 100);
+      return `${seconds}.${tenths}s`;
+    },
+    startToolCallTimer() {
+      // Clear any existing timer
+      if (this.toolCallTimerInterval) {
+        clearInterval(this.toolCallTimerInterval);
+      }
+
+      // Update elapsed time every 100ms
+      this.toolCallTimerInterval = setInterval(() => {
+        if (this.toolCallStartTime) {
+          this.toolCallElapsedTime = Date.now() - this.toolCallStartTime;
+        }
+      }, 100);
+    },
+    stopToolCallTimer() {
+      if (this.toolCallTimerInterval) {
+        clearInterval(this.toolCallTimerInterval);
+        this.toolCallTimerInterval = null;
+      }
+      this.toolCallElapsedTime = 0;
+    },
     updateTabData() {
       // Update tab data when chat state changes (only in tab mode)
       if (this.tabData) {
@@ -601,9 +650,17 @@ export default {
       try {
         const response = await fetch(`/api/characters/${filename}`);
         this.character = await response.json();
-        this.characterName = this.character.data.name;
+
+        // Handle both V3 format (with data) and direct format
+        if (this.character.data) {
+          this.characterName = this.character.data.name;
+        } else {
+          // Fallback for non-V3 format
+          this.characterName = this.character.name || 'Character';
+        }
       } catch (error) {
         console.error('Failed to load character:', error);
+        this.$root.$notify('Failed to load character', 'error');
       }
     },
     async loadPersona() {
@@ -687,8 +744,10 @@ export default {
     initializeChat() {
       if (!this.character) return;
 
-      const firstMessage = this.character.data.first_mes || 'Hello!';
-      const alternateGreetings = this.character.data.alternate_greetings || [];
+      // Handle both V3 format (with data) and direct format
+      const characterData = this.character.data || this.character;
+      const firstMessage = characterData.first_mes || 'Hello!';
+      const alternateGreetings = characterData.alternate_greetings || [];
 
       // Combine first message with alternate greetings
       const allGreetings = [firstMessage, ...alternateGreetings];
@@ -1206,6 +1265,9 @@ export default {
               this.isGeneratingSwipe = false;
               this.generatingSwipeIndex = null;
               this.currentSpeaker = null;
+              this.currentToolCall = null;
+              this.toolCallStartTime = null;
+              this.stopToolCallTimer();
               this.nextSpeaker = null;
               this.$nextTick(() => this.scrollToBottom());
 
@@ -1228,20 +1290,82 @@ export default {
 
                 // Save complete debug data to localStorage
                 this.saveDebugData(requestBody, parsed.debug);
+              } else if (parsed.type === 'tool_call_start') {
+                // Handle early tool call notification (as soon as streaming detects it)
+                console.log('Tool call starting:', parsed.toolName);
+                console.log('Setting currentToolCall to:', parsed.toolName);
+                this.currentToolCall = parsed.toolName;
+                this.toolCallStartTime = Date.now();
+                this.startToolCallTimer();
+                console.log('currentToolCall is now:', this.currentToolCall);
+                console.log('isStreaming:', this.isStreaming);
+                this.$nextTick(() => {
+                  console.log('After nextTick, currentToolCall:', this.currentToolCall);
+                  this.scrollToBottom();
+                });
               } else if (parsed.type === 'tool_call') {
-                // Handle tool call notification
+                // Handle full tool call notification (complete with arguments)
                 console.log('Tool called:', parsed.toolCall);
-                this.streamingContent += `\n\n*[Creating character: ${parsed.toolCall.function.name}...]*\n\n`;
+                // currentToolCall should already be set from tool_call_start
+                // Don't add to streamingContent yet - let the indicator show
+                // The tool result will add the execution message
                 this.$nextTick(() => this.scrollToBottom());
               } else if (parsed.type === 'tool_result') {
                 // Handle tool execution result
                 console.log('Tool result:', parsed.result);
+
+                // Ensure indicator is visible for at least 500ms
+                const elapsedTime = Date.now() - (this.toolCallStartTime || 0);
+                const minDisplayTime = 500; // milliseconds
+                const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
+
+                setTimeout(() => {
+                  this.currentToolCall = null; // Clear tool call indicator
+                  this.stopToolCallTimer(); // Stop the timer
+                }, remainingTime);
+
                 if (parsed.result.success) {
-                  this.streamingContent += `\n\n✓ **Created character: ${parsed.result.name}**\n\nThe character has been added to your character list!\n\n`;
-                  this.$root.$notify(`Character created: ${parsed.result.name}`, 'success');
+                  // Format success message based on which tool was called
+                  let successMessage = '';
+
+                  if (parsed.result.name && parsed.result.filename && parsed.result.details) {
+                    // create_character_card response
+                    successMessage = `\n\n✓ **create_character_card succeeded!**\n\n`;
+                    successMessage += `**Character Name:** ${parsed.result.name}\n`;
+                    successMessage += `**Filename:** \`${parsed.result.filename}\`\n\n`;
+                    successMessage += `*${parsed.result.details}*\n\n`;
+                    this.$root.$notify(`Character created: ${parsed.result.name}`, 'success');
+                  } else if (parsed.result.addedGreetings && parsed.result.characterName) {
+                    // add_greetings response
+                    successMessage = `\n\n✓ **add_greetings succeeded!**\n\n`;
+                    successMessage += `**Character:** ${parsed.result.characterName}\n`;
+                    successMessage += `**Added ${parsed.result.addedCount} greeting(s)** (Total: ${parsed.result.totalGreetings})\n\n`;
+
+                    // Show the full greeting text(s) formatted like regular messages
+                    parsed.result.addedGreetings.forEach((greeting, idx) => {
+                      if (parsed.result.addedCount > 1) {
+                        successMessage += `**Greeting ${idx + 1}:**\n\n`;
+                      }
+                      successMessage += greeting + '\n\n';
+                    });
+
+                    this.$root.$notify(`Added ${parsed.result.addedCount} greeting(s)`, 'success');
+                  } else if (parsed.result.updatedFields && parsed.result.characterName) {
+                    // update_character_card response
+                    successMessage = `\n\n✓ **update_character_card succeeded!**\n\n`;
+                    successMessage += `**Character:** ${parsed.result.characterName}\n`;
+                    successMessage += `**Updated Fields:** ${parsed.result.updatedFields.join(', ')}\n\n`;
+                    this.$root.$notify(`Updated ${parsed.result.characterName}`, 'success');
+                  } else {
+                    // Generic success message
+                    successMessage = `\n\n✓ **Tool succeeded!**\n\n${parsed.result.message || 'Operation completed successfully'}\n\n`;
+                    this.$root.$notify('Tool executed successfully', 'success');
+                  }
+
+                  this.streamingContent += successMessage;
                 } else {
-                  this.streamingContent += `\n\n✗ Failed to create character: ${parsed.result.error}\n\n`;
-                  this.$root.$notify('Failed to create character', 'error');
+                  this.streamingContent += `\n\n✗ **Tool failed:** ${parsed.result.error}\n\n`;
+                  this.$root.$notify('Tool execution failed', 'error');
                 }
                 this.$nextTick(() => this.scrollToBottom());
               } else if (parsed.type === 'tool_error') {
@@ -1312,6 +1436,9 @@ export default {
       this.isGeneratingSwipe = false;
       this.generatingSwipeIndex = null;
       this.currentSpeaker = null;
+      this.currentToolCall = null;
+      this.toolCallStartTime = null;
+      this.stopToolCallTimer();
       this.nextSpeaker = null;
 
       // Save chat
@@ -1509,7 +1636,14 @@ export default {
           // Update current swipe for assistant messages
           message.swipes[message.swipeIndex] = this.editedContent;
         }
-        await this.saveChat();
+
+        // Save the chat (handles both regular and group chats)
+        if (this.isGroupChat) {
+          await this.saveGroupChat(false); // Save without notification
+        } else {
+          await this.saveChat();
+        }
+
         this.cancelEdit();
       }
     },
@@ -1553,7 +1687,32 @@ export default {
     async deleteMessage(index) {
       if (confirm('Delete this message?')) {
         this.messages.splice(index, 1);
-        await this.saveChat();
+
+        // Save the chat (handles both regular and group chats)
+        if (this.isGroupChat) {
+          await this.saveGroupChat(false); // Save without notification
+        } else {
+          await this.saveChat();
+        }
+      }
+    },
+    async deleteMessagesBelow(index) {
+      const messagesToDelete = this.messages.length - index - 1;
+      if (messagesToDelete <= 0) return;
+
+      const confirmMessage = `Delete ${messagesToDelete} message${messagesToDelete > 1 ? 's' : ''} below this one?`;
+      if (confirm(confirmMessage)) {
+        // Delete all messages after this index (keep the message at index)
+        this.messages.splice(index + 1);
+
+        // Save the chat (handles both regular and group chats)
+        if (this.isGroupChat) {
+          await this.saveGroupChat(false); // Save without notification
+        } else {
+          await this.saveChat();
+        }
+
+        this.$root.$notify(`Deleted ${messagesToDelete} message${messagesToDelete > 1 ? 's' : ''}`, 'success');
       }
     },
     branch(index) {
@@ -2510,6 +2669,11 @@ export default {
           body: JSON.stringify(groupChat)
         });
 
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+
         const result = await response.json();
         this.groupChatId = result.filename;
 
@@ -2529,11 +2693,12 @@ export default {
 
       // Convert current character chat to group chat
       const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
+      const characterData = this.character.data || this.character;
       this.isGroupChat = true;
       this.groupChatCharacters = [{
         filename: characterFilename,
-        name: this.character.data.name,
-        data: this.character.data
+        name: characterData.name,
+        data: characterData
       }];
       this.groupChatStrategy = 'join';
 
@@ -3085,6 +3250,17 @@ button.active {
   border-color: var(--accent-color);
 }
 
+.message-actions .delete-below-button {
+  color: #ff6b6b;
+  font-weight: bold;
+}
+
+.message-actions .delete-below-button:hover {
+  background: rgba(255, 107, 107, 0.1);
+  border-color: #ff6b6b;
+  color: #ff4757;
+}
+
 .input-area {
   display: flex;
   gap: 8px;
@@ -3631,6 +3807,36 @@ button.active {
   }
   30% {
     opacity: 1;
+  }
+}
+
+/* Tool Call Indicator */
+.tool-call-indicator {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.tool-call-icon {
+  font-size: 18px;
+  animation: tool-call-pulse 1.5s infinite;
+}
+
+.tool-call-text {
+  font-size: 14px;
+}
+
+@keyframes tool-call-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
   }
 }
 
