@@ -1,8 +1,14 @@
 <template>
   <div class="character-list">
     <div class="header">
-      <h1>Choral</h1>
-      <div class="actions">
+      <div class="header-top">
+        <h1>Choral</h1>
+        <button @click="showHeaderActions = !showHeaderActions" class="header-toggle-mobile">
+          <span>☰</span>
+          <span class="toggle-arrow">{{ showHeaderActions ? '▲' : '▼' }}</span>
+        </button>
+      </div>
+      <div class="actions" :class="{ 'actions-collapsed': !showHeaderActions }">
         <input
           type="file"
           ref="fileInput"
@@ -416,7 +422,9 @@ export default {
       autoTagTotal: 0,
       autoTagCurrentCharacter: '',
       // Dropdown
-      showAdvancedDropdown: false
+      showAdvancedDropdown: false,
+      // Mobile header toggle
+      showHeaderActions: false
     }
   },
   computed: {
@@ -1560,6 +1568,17 @@ export default {
   color: var(--accent-color);
 }
 
+/* Hide mobile toggle on desktop */
+.header-toggle-mobile {
+  display: none;
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 @media (max-width: 768px) {
   .character-list {
     height: 100vh;
@@ -1569,9 +1588,16 @@ export default {
   .header {
     flex-direction: column;
     align-items: stretch;
-    gap: 6px;
+    gap: 0;
     padding: 8px;
     flex-shrink: 0;
+  }
+
+  .header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
   }
 
   .header h1 {
@@ -1579,17 +1605,51 @@ export default {
     margin: 0;
   }
 
+  .header-toggle-mobile {
+    display: flex !important;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .header-toggle-mobile:active {
+    background: var(--bg-tertiary);
+    transform: scale(0.98);
+  }
+
+  .toggle-arrow {
+    font-size: 10px;
+  }
+
   .actions {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
+    max-height: 1000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out, margin-top 0.2s ease-in-out;
+    opacity: 1;
+    margin-top: 8px;
+  }
+
+  .actions-collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
   }
 
   .action-group {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     width: 100%;
     padding-right: 0;
     border-right: none;
@@ -1602,10 +1662,12 @@ export default {
     padding-bottom: 0;
   }
 
-  .action-group button {
+  .action-group button,
+  .action-group .dropdown-trigger {
     width: 100%;
-    padding: 6px 10px;
-    font-size: 12px;
+    padding: 10px 12px;
+    font-size: 14px;
+    justify-content: center;
   }
 
   .search-bar {

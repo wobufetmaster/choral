@@ -196,6 +196,11 @@ async function ensureDirectories() {
 // Get all characters
 app.get('/api/characters', async (req, res) => {
   try {
+    // Prevent caching on mobile browsers
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const files = await fs.readdir(CHARACTERS_DIR);
     const pngFiles = files.filter(f => f.endsWith('.png'));
 
@@ -205,13 +210,25 @@ app.get('/api/characters', async (req, res) => {
           const filePath = path.join(CHARACTERS_DIR, file);
           const card = await readCharacterCard(filePath);
           const stats = await fs.stat(filePath);
+
+          // On Linux/Android, birthtime may not be supported and falls back to ctime
+          // Use mtime (modification time) as a fallback for "createdAt" since it's more reliable
+          // If birthtime == ctime, it means we don't have real creation time support
+          const birthtimeMs = stats.birthtime.getTime();
+          const ctimeMs = stats.ctime.getTime();
+          const mtimeMs = stats.mtime.getTime();
+
+          // If birthtime equals ctime, the filesystem doesn't support real creation time
+          // Use mtime as a better indicator of when the file was originally created
+          const createdAt = (birthtimeMs === ctimeMs) ? mtimeMs : birthtimeMs;
+
           return {
             filename: file,
             name: card.data?.name || 'Unknown',
             tags: card.data?.tags || [],
             data: card,
-            createdAt: stats.birthtime.getTime(), // Use birthtime (creation time) as milliseconds timestamp
-            modifiedAt: stats.mtime.getTime() // Also include modification time
+            createdAt: createdAt, // Use mtime if birthtime not supported
+            modifiedAt: mtimeMs // Also include modification time
           };
         } catch (err) {
           console.error(`Error reading ${file}:`, err);
