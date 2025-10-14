@@ -1,14 +1,23 @@
 <template>
   <div class="tab-manager">
-    <TabBar
-      :tabs="tabs"
-      :activeTabId="activeTabId"
-      @switch-tab="switchTab"
-      @close-tab="closeTab"
-      @new-tab="newTab"
-      @reorder-tabs="reorderTabs"
-      @rename-tab="renameTab"
-    />
+    <div class="tab-bar-container">
+      <TabBar
+        :tabs="tabs"
+        :activeTabId="activeTabId"
+        @switch-tab="switchTab"
+        @close-tab="closeTab"
+        @new-tab="newTab"
+        @reorder-tabs="reorderTabs"
+        @rename-tab="renameTab"
+      />
+      <MobileTabSwitcher
+        :tabs="tabs"
+        :activeTabId="activeTabId"
+        @switch-tab="switchTab"
+        @close-tab="closeTab"
+        @new-tab="newTab"
+      />
+    </div>
     <div class="tab-content">
       <component
         :is="activeTabComponent"
@@ -25,6 +34,7 @@
 <script>
 import { ref, computed, watch, onMounted } from 'vue';
 import TabBar from './TabBar.vue';
+import MobileTabSwitcher from './MobileTabSwitcher.vue';
 import CharacterList from './CharacterList.vue';
 import ChatView from './ChatView.vue';
 import CharacterEditor from './CharacterEditor.vue';
@@ -40,6 +50,7 @@ export default {
   name: 'TabManager',
   components: {
     TabBar,
+    MobileTabSwitcher,
     CharacterList,
     ChatView,
     CharacterEditor,
@@ -298,8 +309,34 @@ export default {
   width: 100%;
 }
 
+.tab-bar-container {
+  display: flex;
+  align-items: center;
+  background: var(--bg-overlay, rgba(26, 26, 26, 0.85));
+  backdrop-filter: blur(var(--blur-amount, 12px));
+  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
+  border-bottom: 1px solid var(--border-color, #333);
+  height: 40px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+
 .tab-content {
   flex: 1;
   overflow: hidden;
+}
+
+/* Hide TabBar on mobile, show MobileTabSwitcher */
+@media (max-width: 768px) {
+  .tab-bar-container :deep(.tab-bar) {
+    display: none;
+  }
+}
+
+/* Hide MobileTabSwitcher on desktop, show TabBar */
+@media (min-width: 769px) {
+  .tab-bar-container :deep(.mobile-tab-switcher) {
+    display: none;
+  }
 }
 </style>
