@@ -180,20 +180,50 @@ export default {
         prompts: []
       };
     },
-    duplicatePreset(preset) {
-      // Create a deep copy of the preset
-      const duplicated = JSON.parse(JSON.stringify(preset));
+    async duplicatePreset(preset) {
+      try {
+        // Create a deep copy of the preset
+        const duplicated = JSON.parse(JSON.stringify(preset));
 
-      // Remove the filename so it will be saved as a new preset
-      delete duplicated.filename;
+        // Remove the filename so it will be saved as a new preset
+        delete duplicated.filename;
 
-      // Update the name to indicate it's a copy
-      duplicated.name = `${preset.name} (Copy)`;
+        // Update the name to indicate it's a copy
+        duplicated.name = `${preset.name} (Copy)`;
 
-      // Select the duplicated preset for editing
-      this.selectedPreset = duplicated;
+        // Ensure prompts array exists
+        if (!duplicated.prompts) {
+          duplicated.prompts = [];
+        }
 
-      this.$root.$notify(`Duplicated "${preset.name}". Edit and save to create the new preset.`, 'success');
+        // Save the duplicated preset immediately
+        const response = await fetch('/api/presets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(duplicated)
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to duplicate preset');
+        }
+
+        const result = await response.json();
+
+        // Reload the preset list to show the new preset
+        await this.loadPresets();
+
+        // Select the newly created preset
+        const newPreset = this.presets.find(p => p.filename === result.filename);
+        if (newPreset) {
+          this.selectedPreset = { ...newPreset };
+        }
+
+        this.$root.$notify(`Created "${duplicated.name}"`, 'success');
+      } catch (error) {
+        console.error('Failed to duplicate preset:', error);
+        this.$root.$notify(`Failed to duplicate preset: ${error.message}`, 'error');
+      }
     },
     addPrompt() {
       if (!this.selectedPreset.prompts) {
