@@ -21,13 +21,23 @@
               <span>{{ preset.name }}</span>
               <span v-if="preset.filename === activePresetFilename" class="active-badge">Active</span>
             </div>
-            <button
-              @click.stop="deletePreset(preset.filename)"
-              class="delete-btn"
-              v-if="preset.filename !== 'default.json'"
-            >
-              🗑️
-            </button>
+            <div class="preset-actions">
+              <button
+                @click.stop="duplicatePreset(preset)"
+                class="duplicate-btn"
+                title="Duplicate preset"
+              >
+                📋
+              </button>
+              <button
+                @click.stop="deletePreset(preset.filename)"
+                class="delete-btn"
+                v-if="preset.filename !== 'default.json'"
+                title="Delete preset"
+              >
+                🗑️
+              </button>
+            </div>
           </div>
           <button @click="createNewPreset" class="create-btn">+ New Preset</button>
         </div>
@@ -169,6 +179,21 @@ export default {
         prompt_processing: 'merge_system',
         prompts: []
       };
+    },
+    duplicatePreset(preset) {
+      // Create a deep copy of the preset
+      const duplicated = JSON.parse(JSON.stringify(preset));
+
+      // Remove the filename so it will be saved as a new preset
+      delete duplicated.filename;
+
+      // Update the name to indicate it's a copy
+      duplicated.name = `${preset.name} (Copy)`;
+
+      // Select the duplicated preset for editing
+      this.selectedPreset = duplicated;
+
+      this.$root.$notify(`Duplicated "${preset.name}". Edit and save to create the new preset.`, 'success');
     },
     addPrompt() {
       if (!this.selectedPreset.prompts) {
@@ -368,11 +393,30 @@ export default {
   font-weight: 600;
 }
 
-.delete-btn, .remove-btn {
-  padding: 2px 6px;
+.preset-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.duplicate-btn, .delete-btn, .remove-btn {
+  padding: 4px 8px;
   background: transparent;
   border: none;
   cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+  border-radius: 4px;
+}
+
+.duplicate-btn:hover {
+  background: var(--bg-primary);
+  transform: scale(1.1);
+}
+
+.delete-btn:hover, .remove-btn:hover {
+  background: rgba(220, 38, 38, 0.1);
+  transform: scale(1.1);
 }
 
 .create-btn {
