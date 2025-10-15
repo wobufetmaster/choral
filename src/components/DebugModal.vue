@@ -11,7 +11,22 @@
           <p>No debug data available. Send a message to populate debug information.</p>
         </div>
 
+        <div v-else-if="debugData._error" class="debug-error">
+          <p><strong>⚠️ Debug data was too large to save:</strong></p>
+          <p>{{ debugData._error }}</p>
+          <div v-if="debugData.messageCount" class="debug-summary">
+            <p>Message count: {{ debugData.messageCount }}</p>
+            <p>Model: {{ debugData.model }}</p>
+            <p>Estimated tokens: {{ debugData.estimatedTokens }}</p>
+          </div>
+        </div>
+
         <template v-else>
+          <!-- Truncation warning -->
+          <div v-if="debugData._truncated" class="truncation-warning">
+            <p>⚠️ <strong>Debug data was truncated due to size.</strong> Showing last {{ debugData.messages?.length || 0 }} of {{ debugData._originalMessageCount }} messages.</p>
+          </div>
+
           <!-- Token Usage Summary -->
           <div class="debug-section">
             <div class="section-header" @click="toggleSection('tokens')">
@@ -467,6 +482,44 @@ export default {
   text-align: center;
   padding: 2rem;
   color: var(--text-secondary);
+}
+
+.debug-error {
+  padding: 2rem;
+  background: var(--bg-secondary);
+  border: 2px solid #f59e0b;
+  border-radius: 8px;
+  margin: 1rem;
+}
+
+.debug-error strong {
+  color: #f59e0b;
+  font-size: 1.1rem;
+}
+
+.debug-summary {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.debug-summary p {
+  margin: 0.5rem 0;
+  font-family: monospace;
+}
+
+.truncation-warning {
+  padding: 1rem;
+  background: #fef3c7;
+  color: #92400e;
+  border: 2px solid #f59e0b;
+  border-radius: 8px;
+  margin: 1rem;
+}
+
+.truncation-warning strong {
+  color: #b45309;
 }
 
 .debug-section {

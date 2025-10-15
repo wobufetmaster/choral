@@ -231,7 +231,7 @@
       <div class="messages" ref="messagesContainer" @scroll="handleScroll">
         <div
           v-for="(message, index) in messages"
-          :key="index"
+          :key="message._id || index"
           :class="['message', message.role]"
         >
           <img
@@ -363,6 +363,9 @@ import LorebookEditor from './LorebookEditor.vue';
 import ChatSidebar from './ChatSidebar.vue';
 import DebugModal from './DebugModal.vue';
 
+// Non-reactive debug data cache (outside Vue's reactivity system)
+const debugDataCache = new Map();
+
 export default {
   name: 'ChatView',
   components: {
@@ -431,6 +434,10 @@ export default {
         matchedEntries: {},
         lastRequest: null
       },
+      saveDebugDataThrottle: null, // Throttle saves to prevent loops
+      handleScrollThrottle: null, // Throttle scroll handler
+      scrollToBottomPending: false, // Flag to batch scroll calls
+      currentDebugData: null, // Current debug data for this chat session
       settings: {
         model: 'anthropic/claude-opus-4',
         temperature: 1.0,
@@ -509,17 +516,8 @@ export default {
       );
     },
     persistedDebugData() {
-      // Load debug data from localStorage
-      const chatKey = this.isGroupChat ? this.groupChatId : this.chatId;
-      if (!chatKey) return null;
-
-      try {
-        const stored = localStorage.getItem(`debug_${chatKey}`);
-        return stored ? JSON.parse(stored) : null;
-      } catch (err) {
-        console.error('Failed to load persisted debug data:', err);
-        return null;
-      }
+      // Return current debug data for this session
+      return this.currentDebugData;
     }
   },
   watch: {
@@ -788,6 +786,9 @@ export default {
 
         // Trigger auto-naming if chat has messages and hasn't been named yet
         await this.autoNameChat(chatId, chat);
+
+        // Load debug data for this chat
+        this.loadDebugDataFromStorage();
       } catch (error) {
         console.error('Failed to load chat:', error);
       }
@@ -968,7 +969,8 @@ export default {
       // Normal flow: add user message first
       const userMessage = {
         role: 'user',
-        content: this.userInput.trim()
+        content: this.userInput.trim(),
+        _id: Date.now() + Math.random() // Unique ID for Vue key
       };
 
       this.messages.push(userMessage);
@@ -1434,7 +1436,8 @@ export default {
           const newMessage = {
             role: 'assistant',
             swipes: [this.streamingContent],
-            swipeIndex: 0
+            swipeIndex: 0,
+            _id: Date.now() + Math.random() // Unique ID for Vue key
           };
 
           // Track character for group chats
@@ -1554,10 +1557,13 @@ export default {
           this.$forceUpdate();
         }
 
-        if (this.isGroupChat) {
-          await this.saveGroupChat(false); // Save without notification
-        } else {
-          await this.saveChat();
+        // Only save if the chat has more than just the greeting (i.e., user has actually sent messages)
+        if (this.messages.length > 1 || this.chatId) {
+          if (this.isGroupChat) {
+            await this.saveGroupChat(false); // Save without notification
+          } else {
+            await this.saveChat();
+          }
         }
       } else {
         // For other messages, normal swipe behavior
@@ -1599,10 +1605,13 @@ export default {
           this.$forceUpdate();
         }
 
-        if (this.isGroupChat) {
-          await this.saveGroupChat(false); // Save without notification
-        } else {
-          await this.saveChat();
+        // Only save if the chat has more than just the greeting (i.e., user has actually sent messages)
+        if (this.messages.length > 1 || this.chatId) {
+          if (this.isGroupChat) {
+            await this.saveGroupChat(false); // Save without notification
+          } else {
+            await this.saveChat();
+          }
         }
       } else {
         // For other messages, normal swipe behavior
@@ -1630,6 +1639,23 @@ export default {
     },
     async generateNewSwipe(index) {
       if (this.isStreaming) return;
+
+      // For group chats, set the speaker before building context
+      if (this.isGroupChat) {
+        const message = this.messages[index];
+        if (message.characterFilename) {
+          // Use the character that originally created this message
+          this.currentSpeaker = message.characterFilename;
+        } else if (message.swipeCharacters && message.swipeCharacters[0]) {
+          // Fallback to first swipe's character
+          this.currentSpeaker = message.swipeCharacters[0];
+        } else {
+          // Last resort: pick a random character
+          const randomIndex = Math.floor(Math.random() * this.groupChatCharacters.length);
+          this.currentSpeaker = this.groupChatCharacters[randomIndex].filename;
+        }
+        console.log('generateNewSwipe - currentSpeaker:', this.currentSpeaker);
+      }
 
       // Build context up to (but not including) this message
       const context = this.buildContext(index);
@@ -1869,20 +1895,29 @@ export default {
         this.$root.$notify('Failed to load preset', 'error');
       }
     },
-    async handlePersonaChange(personaName) {
+    async handlePersonaChange(personaFilename) {
       // Load and apply the selected persona
-      if (!personaName) return;
+      console.log('ChatView: handlePersonaChange called with filename:', personaFilename);
+      console.log('ChatView: Current persona:', this.persona);
+
+      if (!personaFilename) return;
 
       try {
         const response = await fetch('/api/personas');
         const personas = await response.json();
-        const selectedPersona = personas.find(p => p.name === personaName);
+        console.log('ChatView: Available personas from API:', personas.map(p => `${p.name} (${p._filename})`));
+
+        const selectedPersona = personas.find(p => p._filename === personaFilename || p.name === personaFilename);
+        console.log('ChatView: Found persona:', selectedPersona);
 
         if (selectedPersona) {
           this.onPersonaSaved(selectedPersona);
-        } else if (personaName === 'User') {
+        } else if (personaFilename === 'User') {
           // Default User persona
-          this.onPersonaSaved({ name: 'User', avatar: null });
+          this.onPersonaSaved({ name: 'User', avatar: null, _filename: 'User' });
+        } else {
+          console.warn('ChatView: Persona not found:', personaFilename);
+          this.$root.$notify(`Persona not found`, 'warning');
         }
       } catch (error) {
         console.error('Failed to load persona:', error);
@@ -1921,7 +1956,8 @@ export default {
         avatar: persona.avatar || null,
         description: persona.description || '',
         tagBindings: persona.tagBindings || [],
-        characterBindings: persona.characterBindings || []
+        characterBindings: persona.characterBindings || [],
+        _filename: persona._filename || persona.name
       };
 
       console.log('ChatView: Updated this.persona to:', this.persona);
@@ -1939,6 +1975,7 @@ export default {
       this.messages = [];
       this.chatDisplayTitle = null; // Reset display title for new chat
       this.conversationGroup = null; // Start fresh conversation thread (not a continuation)
+      this.currentDebugData = null; // Clear debug data for new chat
 
       if (this.isGroupChat) {
         // Don't create a new group chat file, just reset messages
@@ -2402,25 +2439,50 @@ export default {
       return preview + (strippedContent.length > 50 ? '...' : '');
     },
     scrollToBottom(force = false) {
-      const container = this.$refs.messagesContainer;
-      if (!container) return;
-
-      // If user has scrolled up and we're not forcing, don't auto-scroll
-      if (this.userHasScrolledUp && !force) {
+      // Batch scroll calls to prevent excessive updates
+      if (this.scrollToBottomPending && !force) {
         return;
       }
 
-      container.scrollTop = container.scrollHeight;
+      this.scrollToBottomPending = true;
+      this.$nextTick(() => {
+        this.scrollToBottomPending = false;
+
+        const container = this.$refs.messagesContainer;
+        if (!container) return;
+
+        // If user has scrolled up and we're not forcing, don't auto-scroll
+        if (this.userHasScrolledUp && !force) {
+          return;
+        }
+
+        container.scrollTop = container.scrollHeight;
+      });
     },
     handleScroll() {
+      // DISABLE scroll tracking during streaming to prevent infinite loops
+      if (this.isStreaming) {
+        return;
+      }
+
+      // Throttle to prevent excessive calls (max once per 100ms)
+      const now = Date.now();
+      if (this.handleScrollThrottle && now - this.handleScrollThrottle < 100) {
+        return;
+      }
+      this.handleScrollThrottle = now;
+
       const container = this.$refs.messagesContainer;
       if (!container) return;
 
       // Check if user is near the bottom (within 100px)
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      const newValue = !isNearBottom;
 
-      // Update flag based on scroll position
-      this.userHasScrolledUp = !isNearBottom;
+      // Only update if the value actually changed to prevent unnecessary reactivity
+      if (this.userHasScrolledUp !== newValue) {
+        this.userHasScrolledUp = newValue;
+      }
     },
     async loadLorebooks() {
       try {
@@ -2469,15 +2531,27 @@ export default {
 
       // matched entries will be populated by the server response
     },
-    saveDebugData(requestBody, debugInfoFromServer) {
-      // Build complete debug data object for persistence
+    loadDebugDataFromStorage() {
       const chatKey = this.isGroupChat ? this.groupChatId : this.chatId;
-      if (!chatKey) return;
+      if (!chatKey) {
+        return;
+      }
 
+      try {
+        const stored = localStorage.getItem(`debug_${chatKey}`);
+        if (stored) {
+          debugDataCache.set(chatKey, JSON.parse(stored));
+        }
+      } catch (err) {
+        console.error('Failed to load persisted debug data:', err);
+      }
+    },
+    saveDebugData(requestBody, debugInfoFromServer) {
       // Use processed messages from server if available, otherwise use original request messages
       const finalMessages = debugInfoFromServer?.processedMessages || requestBody.messages;
 
-      const debugData = {
+      // Simply store the debug data in memory for the current session
+      this.currentDebugData = {
         timestamp: Date.now(),
         // Request info
         model: requestBody.model,
@@ -2500,13 +2574,6 @@ export default {
         userMessageCount: this.debugInfo.userMessageCount,
         assistantMessageCount: this.debugInfo.assistantMessageCount
       };
-
-      try {
-        localStorage.setItem(`debug_${chatKey}`, JSON.stringify(debugData));
-        console.log('Saved debug data for', chatKey);
-      } catch (err) {
-        console.error('Failed to save debug data:', err);
-      }
     },
     editLorebook(lorebook) {
       // Set the lorebook to edit (LorebookEditor will handle cloning)
@@ -2641,6 +2708,9 @@ export default {
         if (this.messages.length === 0) {
           await this.initializeGroupChat();
         }
+
+        // Load debug data for this chat
+        this.loadDebugDataFromStorage();
       } catch (error) {
         console.error('Failed to load group chat:', error);
         // If group chat doesn't exist, initialize new one
@@ -2855,6 +2925,10 @@ export default {
       const speakingCharacter = speakerFilename
         ? this.groupChatCharacters.find(c => c.filename === speakerFilename)
         : null;
+
+      console.log('buildGroupChatContext - speakerFilename:', speakerFilename);
+      console.log('buildGroupChatContext - speakingCharacter:', speakingCharacter);
+      console.log('buildGroupChatContext - all characters:', this.groupChatCharacters.map(c => ({ filename: c.filename, name: c.name, hasData: !!c.data })));
 
       // Track if character info was injected via placeholders
       let hasCharacterInfo = false;

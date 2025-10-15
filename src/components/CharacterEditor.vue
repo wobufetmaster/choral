@@ -79,7 +79,7 @@
 
             <div class="form-group">
               <label>Example Dialogue</label>
-              <small>Example conversations to help guide the AI's responses. Use {{char}} and {{user}} placeholders.</small>
+              <small>Example conversations to help guide the AI's responses. Use <code v-pre>{{char}}</code> and <code v-pre>{{user}}</code> placeholders.</small>
               <textarea v-model="editedCard.data.mes_example" @input="autoExpand" rows="6" placeholder="<START>&#10;{{user}}: Hello!&#10;{{char}}: *waves enthusiastically* Hi there!&#10;&#10;<START>&#10;{{user}}: How are you?&#10;{{char}}: I'm doing great, thanks for asking!"></textarea>
             </div>
 
