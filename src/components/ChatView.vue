@@ -2926,10 +2926,6 @@ export default {
         ? this.groupChatCharacters.find(c => c.filename === speakerFilename)
         : null;
 
-      console.log('buildGroupChatContext - speakerFilename:', speakerFilename);
-      console.log('buildGroupChatContext - speakingCharacter:', speakingCharacter);
-      console.log('buildGroupChatContext - all characters:', this.groupChatCharacters.map(c => ({ filename: c.filename, name: c.name, hasData: !!c.data })));
-
       // Track if character info was injected via placeholders
       let hasCharacterInfo = false;
 
@@ -2951,14 +2947,33 @@ export default {
             if (hasCharPlaceholders) {
               // Build complete info for each character, then join them
               const allCharacterInfo = this.groupChatCharacters.map(c => {
-                const charData = c.data || {};
+                const charData = c.data?.data || c.data || {};
+
+                // Create macro context for THIS specific character
+                const charMacroContext = {
+                  charName: c.name,
+                  charNickname: charData.nickname || '',
+                  userName: this.persona?.name || 'User'
+                };
+
                 let info = `=== Character: ${c.name} ===\n`;
 
-                if (charData.description) info += `Description: ${charData.description}\n`;
-                if (charData.personality) info += `Personality: ${charData.personality}\n`;
-                if (charData.scenario) info += `Scenario: ${charData.scenario}\n`;
-                if (charData.system_prompt) info += `${charData.system_prompt}\n`;
-                if (charData.mes_example) info += `Example Dialogue:\n${charData.mes_example}\n`;
+                // Process macros in each field for this character
+                if (charData.description) {
+                  info += `Description: ${processMacrosForDisplay(charData.description, charMacroContext)}\n`;
+                }
+                if (charData.personality) {
+                  info += `Personality: ${processMacrosForDisplay(charData.personality, charMacroContext)}\n`;
+                }
+                if (charData.scenario) {
+                  info += `Scenario: ${processMacrosForDisplay(charData.scenario, charMacroContext)}\n`;
+                }
+                if (charData.system_prompt) {
+                  info += `${processMacrosForDisplay(charData.system_prompt, charMacroContext)}\n`;
+                }
+                if (charData.mes_example) {
+                  info += `Example Dialogue:\n${processMacrosForDisplay(charData.mes_example, charMacroContext)}\n`;
+                }
 
                 return info.trim();
               }).join('\n');
@@ -2977,11 +2992,24 @@ export default {
             // Replace with only the speaking character's info
             const charData = speakingCharacter.data?.data || speakingCharacter.data || {};
 
-            content = content.replace(/\{\{description\}\}/g, charData.description || '');
-            content = content.replace(/\{\{personality\}\}/g, charData.personality || '');
-            content = content.replace(/\{\{scenario\}\}/g, charData.scenario || '');
-            content = content.replace(/\{\{system_prompt\}\}/g, charData.system_prompt || '');
-            content = content.replace(/\{\{dialogue_examples\}\}/g, charData.mes_example || '');
+            // Create macro context for the speaking character
+            const charMacroContext = {
+              charName: speakingCharacter.name,
+              charNickname: charData.nickname || '',
+              userName: this.persona?.name || 'User'
+            };
+
+            // Process macros in each field before replacing placeholders
+            content = content.replace(/\{\{description\}\}/g,
+              charData.description ? processMacrosForDisplay(charData.description, charMacroContext) : '');
+            content = content.replace(/\{\{personality\}\}/g,
+              charData.personality ? processMacrosForDisplay(charData.personality, charMacroContext) : '');
+            content = content.replace(/\{\{scenario\}\}/g,
+              charData.scenario ? processMacrosForDisplay(charData.scenario, charMacroContext) : '');
+            content = content.replace(/\{\{system_prompt\}\}/g,
+              charData.system_prompt ? processMacrosForDisplay(charData.system_prompt, charMacroContext) : '');
+            content = content.replace(/\{\{dialogue_examples\}\}/g,
+              charData.mes_example ? processMacrosForDisplay(charData.mes_example, charMacroContext) : '');
           }
 
           // Check if any placeholders were replaced
@@ -3003,13 +3031,32 @@ export default {
         if (this.groupChatStrategy === 'join') {
           // Add all character info
           const characterInfos = this.groupChatCharacters.map(c => {
-            const charData = c.data || {};
+            const charData = c.data?.data || c.data || {};
+
+            // Create macro context for THIS specific character
+            const charMacroContext = {
+              charName: c.name,
+              charNickname: charData.nickname || '',
+              userName: this.persona?.name || 'User'
+            };
+
             let info = `${c.name}:\n`;
-            if (charData.description) info += `Description: ${charData.description}\n`;
-            if (charData.personality) info += `Personality: ${charData.personality}\n`;
-            if (charData.scenario) info += `Scenario: ${charData.scenario}\n`;
-            if (charData.system_prompt) info += `${charData.system_prompt}\n`;
-            if (charData.mes_example) info += `Example Dialogue:\n${charData.mes_example}\n`;
+            // Process macros in each field for this character
+            if (charData.description) {
+              info += `Description: ${processMacrosForDisplay(charData.description, charMacroContext)}\n`;
+            }
+            if (charData.personality) {
+              info += `Personality: ${processMacrosForDisplay(charData.personality, charMacroContext)}\n`;
+            }
+            if (charData.scenario) {
+              info += `Scenario: ${processMacrosForDisplay(charData.scenario, charMacroContext)}\n`;
+            }
+            if (charData.system_prompt) {
+              info += `${processMacrosForDisplay(charData.system_prompt, charMacroContext)}\n`;
+            }
+            if (charData.mes_example) {
+              info += `Example Dialogue:\n${processMacrosForDisplay(charData.mes_example, charMacroContext)}\n`;
+            }
             return info;
           }).join('\n\n');
 
@@ -3022,12 +3069,31 @@ export default {
         } else if (this.groupChatStrategy === 'swap' && speakingCharacter) {
           // Add only the speaking character's info
           const charData = speakingCharacter.data?.data || speakingCharacter.data || {};
+
+          // Create macro context for the speaking character
+          const charMacroContext = {
+            charName: speakingCharacter.name,
+            charNickname: charData.nickname || '',
+            userName: this.persona?.name || 'User'
+          };
+
           let characterInfo = `${speakingCharacter.name}:\n`;
-          if (charData.description) characterInfo += `Description: ${charData.description}\n`;
-          if (charData.personality) characterInfo += `Personality: ${charData.personality}\n`;
-          if (charData.scenario) characterInfo += `Scenario: ${charData.scenario}\n`;
-          if (charData.system_prompt) characterInfo += `${charData.system_prompt}\n`;
-          if (charData.mes_example) characterInfo += `Example Dialogue:\n${charData.mes_example}\n`;
+          // Process macros in each field for this character
+          if (charData.description) {
+            characterInfo += `Description: ${processMacrosForDisplay(charData.description, charMacroContext)}\n`;
+          }
+          if (charData.personality) {
+            characterInfo += `Personality: ${processMacrosForDisplay(charData.personality, charMacroContext)}\n`;
+          }
+          if (charData.scenario) {
+            characterInfo += `Scenario: ${processMacrosForDisplay(charData.scenario, charMacroContext)}\n`;
+          }
+          if (charData.system_prompt) {
+            characterInfo += `${processMacrosForDisplay(charData.system_prompt, charMacroContext)}\n`;
+          }
+          if (charData.mes_example) {
+            characterInfo += `Example Dialogue:\n${processMacrosForDisplay(charData.mes_example, charMacroContext)}\n`;
+          }
 
           if (characterInfo.trim() !== `${speakingCharacter.name}:\n`) {
             context.push({
