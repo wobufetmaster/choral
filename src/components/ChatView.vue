@@ -284,7 +284,7 @@
 
             <!-- Swipe navigation for assistant messages -->
             <div v-if="message.role === 'assistant' && getTotalSwipes(message) > 0" class="swipe-controls">
-              <button @click="swipeLeft(index)" :disabled="!canSwipeLeft(message)" class="swipe-button">←</button>
+              <button @click="swipeLeft(index)" :disabled="!canSwipeLeft(message) || isStreaming" class="swipe-button">←</button>
               <span class="swipe-counter">{{ getCurrentSwipeIndex(message) + 1 }}/{{ getTotalSwipes(message) }}</span>
               <button @click="swipeRight(index)" :disabled="isStreaming" class="swipe-button">→</button>
             </div>
