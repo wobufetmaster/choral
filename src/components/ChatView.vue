@@ -1479,6 +1479,32 @@ export default {
       const stripped = text.replace(/<[^>]*>/g, '');
       return Math.ceil(stripped.length / 4);
     },
+    applyTextStyling(text) {
+      // Apply special styling for quoted text and asterisk text
+      // Protect HTML tags and their attributes first to avoid breaking URLs and attributes
+
+      // Temporarily store HTML tags to protect them
+      const htmlTagPattern = /<[^>]+>/g;
+      const protectedTags = [];
+      let protectedText = text.replace(htmlTagPattern, (match) => {
+        protectedTags.push(match);
+        return `__HTML_TAG_${protectedTags.length - 1}__`;
+      });
+
+      // Style text in double quotes as dialogue (now safe from HTML attributes)
+      protectedText = protectedText.replace(/"([^"]+)"/g, '<span class="dialogue">"$1"</span>');
+
+      // Style text in asterisks as action/narration (avoid markdown bold **)
+      // Only match single asterisks, not double
+      protectedText = protectedText.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<span class="action">*$1*</span>');
+
+      // Restore HTML tags
+      protectedText = protectedText.replace(/__HTML_TAG_(\d+)__/g, (match, index) => {
+        return protectedTags[parseInt(index)];
+      });
+
+      return protectedText;
+    },
     sanitizeHtml(html, message = null) {
       // Process macros first - use the specific character for group chats
       let charName = this.character?.data?.name || 'Character';
@@ -1500,8 +1526,11 @@ export default {
       };
       const processed = processMacrosForDisplay(html, macroContext);
 
+      // Apply text styling (quotes and asterisks) before markdown
+      const styled = this.applyTextStyling(processed);
+
       // Render markdown (if markdown renderer is initialized)
-      const rendered = this.md ? this.md.render(processed) : processed;
+      const rendered = this.md ? this.md.render(styled) : styled;
 
       // Then sanitize
       return DOMPurify.sanitize(rendered, {
@@ -3471,6 +3500,45 @@ button.active {
   padding: 16px;
   background: transparent;
   border: none;
+}
+
+/* Special text styling - dialogue and actions */
+.message-content :deep(.dialogue) {
+  color: var(--accent-hover);
+  font-style: italic;
+  font-weight: 600;
+  text-shadow:
+    0 0 12px var(--accent-muted),
+    0 0 6px var(--accent-muted),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  filter: brightness(1.3) saturate(1.2);
+}
+
+.message-content :deep(.action) {
+  color: var(--text-primary);
+  font-style: italic;
+  font-weight: 500;
+  opacity: 0.75;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  filter: brightness(0.9);
+}
+
+/* Make dialogue stand out more in user messages (white background) */
+.message.user .message-content :deep(.dialogue) {
+  color: rgba(255, 255, 255, 1);
+  text-shadow:
+    0 0 15px rgba(255, 255, 255, 0.5),
+    0 0 8px rgba(255, 255, 255, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+  filter: brightness(1.15);
+}
+
+.message.user .message-content :deep(.action) {
+  color: rgba(255, 255, 255, 0.85);
+  opacity: 1;
+  font-weight: 500;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .message-actions {
