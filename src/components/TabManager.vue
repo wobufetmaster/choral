@@ -102,7 +102,19 @@ export default {
 
         if (savedTabs) {
           tabs.value = JSON.parse(savedTabs);
-          activeTabId.value = savedActiveTabId;
+
+          // Validate that the saved active tab ID exists in the loaded tabs
+          const activeTabExists = tabs.value.some(tab => tab.id === savedActiveTabId);
+
+          if (activeTabExists) {
+            activeTabId.value = savedActiveTabId;
+          } else if (tabs.value.length > 0) {
+            // If saved active tab doesn't exist, use the first tab
+            activeTabId.value = tabs.value[0].id;
+          } else {
+            // No valid tabs, create a new one
+            newTab();
+          }
         } else {
           // Default: open character list
           newTab();
@@ -224,9 +236,22 @@ export default {
         const { id, ...rest } = updates;
 
         // Update tab data (e.g., label, data.chatFilename)
-        if (rest.chatId) {
-          tabs.value[index].data = { ...tabs.value[index].data, chatFilename: rest.chatId };
+        // Handle both direct chatId (legacy) and nested data.chatId
+        if (rest.data?.chatId) {
+          // Store chatId as both chatId and chatFilename for compatibility
+          rest.data = {
+            ...rest.data,
+            chatFilename: rest.data.chatId
+          };
+        } else if (rest.chatId) {
+          // Legacy direct chatId format
+          tabs.value[index].data = {
+            ...tabs.value[index].data,
+            chatId: rest.chatId,
+            chatFilename: rest.chatId
+          };
         }
+
         if (rest.title) {
           tabs.value[index].label = rest.title;
         }

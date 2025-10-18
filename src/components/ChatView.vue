@@ -599,7 +599,8 @@ export default {
     await this.loadAvailablePersonas();
 
     // Load existing chat if ID provided
-    const chatId = this.tabData?.chatId || this.$route?.params?.id;
+    // Check both chatId and chatFilename (TabManager stores as chatFilename)
+    const chatId = this.tabData?.chatId || this.tabData?.chatFilename || this.$route?.params?.id;
     if (!this.isGroupChat) {
       if (chatId && chatId !== 'new') {
         await this.loadChat(chatId);
@@ -622,6 +623,15 @@ export default {
 
     // Auto-select lorebook based on character tags (will add to existing manual selections)
     await this.autoSelectLorebook();
+
+    // Scroll to bottom when tab is opened/reopened
+    // Use double nextTick to ensure all messages have fully rendered
+    this.$nextTick(() => {
+      this.$nextTick(() => {
+        // Add a small delay to ensure DOM is fully rendered
+        setTimeout(() => this.scrollToBottom(true), 100);
+      });
+    });
   },
   methods: {
     formatElapsedTime(ms) {
