@@ -1,3 +1,7 @@
+// Initialize console logging first, before any other logs
+const { initConsoleLogging } = require('./consoleLogger');
+initConsoleLogging();
+
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
@@ -270,9 +274,13 @@ function sanitizeFilename(filename) {
   const ext = path.extname(filename);
   let nameWithoutExt = path.basename(filename, ext);
 
-  // List of characters that are problematic on various filesystems
-  // Especially important for Android/Linux compatibility with macOS/Windows
-  const problematicChars = /["':<>?*|\/\\]/g;
+  // Normalize Unicode characters (NFD = decompose accented characters)
+  // This converts é to e + combining accent, ñ to n + combining tilde, etc.
+  nameWithoutExt = nameWithoutExt.normalize('NFD');
+
+  // Remove combining diacritical marks (accents, tildes, umlauts, etc.)
+  // \u0300-\u036f is the Unicode range for combining diacritical marks
+  nameWithoutExt = nameWithoutExt.replace(/[\u0300-\u036f]/g, '');
 
   // Replace problematic characters with safe alternatives or remove them
   nameWithoutExt = nameWithoutExt
@@ -283,6 +291,10 @@ function sanitizeFilename(filename) {
     .replace(/[?*|]/g, '') // Remove wildcards and pipes
     .replace(/[\/\\]/g, '-') // Replace slashes with dashes
     .trim();
+
+  // Remove any remaining non-ASCII characters (safety net for Android compatibility)
+  // Keep only: letters (a-z, A-Z), numbers (0-9), spaces, hyphens, underscores, dots
+  nameWithoutExt = nameWithoutExt.replace(/[^a-zA-Z0-9 _.-]/g, '');
 
   // Ensure the filename isn't empty after sanitization
   if (!nameWithoutExt) {
