@@ -42,7 +42,7 @@
           </div>
           <div class="selector-controls">
             <select :value="personaName" @change="$emit('persona-change', $event.target.value)" class="selector-dropdown">
-              <option v-for="p in availablePersonas" :key="p.name" :value="p.name">{{ p.nickname || p.name }}</option>
+              <option v-for="p in availablePersonas" :key="p._filename" :value="p._filename">{{ p.nickname || p.name }}</option>
             </select>
           </div>
         </div>

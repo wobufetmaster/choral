@@ -18,7 +18,7 @@
       :show-debug="showDebug"
       :is-group-chat="isGroupChat"
       :show-group-manager="showGroupManager"
-      :persona-name="persona.name"
+      :persona-name="persona._filename"
       :available-personas="availablePersonas"
       :available-presets="availablePresets"
       @new-chat="newChat"
@@ -39,6 +39,7 @@
         <strong>{{ avatarMenu.characterName }}</strong>
       </div>
       <button @click="viewCharacterCard" class="avatar-menu-btn">📄 View Card</button>
+      <button v-if="avatarMenu.message?.role === 'assistant' && avatarMenu.characterFilename" @click="editCharacter" class="avatar-menu-btn">✏️ Edit Character</button>
       <button v-if="isGroupChat" @click="setNextSpeaker" class="avatar-menu-btn">🎤 Set as Next Speaker</button>
       <button @click="closeAvatarMenu" class="avatar-menu-btn cancel">✕ Close</button>
     </div>
@@ -1885,6 +1886,38 @@ export default {
       }
       this.closeAvatarMenu();
     },
+    async editCharacter() {
+      // Don't allow editing narrator
+      if (this.avatarMenu.characterFilename === '__narrator__') {
+        this.$root.$notify('Cannot edit narrator', 'info');
+        this.closeAvatarMenu();
+        return;
+      }
+
+      if (this.avatarMenu.message?.role === 'assistant' && this.avatarMenu.characterFilename) {
+        try {
+          // Load character data
+          const response = await fetch(`/api/characters/${this.avatarMenu.characterFilename}`);
+          if (response.ok) {
+            const characterData = await response.json();
+            // Open character editor in a new tab
+            this.$emit('open-tab', 'character-editor', {
+              character: {
+                ...characterData,
+                filename: this.avatarMenu.characterFilename,
+                image: `/api/characters/${this.avatarMenu.characterFilename}/image`
+              }
+            }, `Edit: ${characterData.data.name}`, false);
+          } else {
+            this.$root.$notify('Failed to load character', 'error');
+          }
+        } catch (error) {
+          console.error('Error loading character for editing:', error);
+          this.$root.$notify('Error loading character', 'error');
+        }
+      }
+      this.closeAvatarMenu();
+    },
     setNextSpeaker() {
       // Don't allow setting narrator as next speaker
       if (this.avatarMenu.characterFilename === '__narrator__') {
@@ -1968,7 +2001,7 @@ export default {
       await this.handlePresetChange(this.currentPresetFilename);
     },
     async onPersonaChange() {
-      await this.handlePersonaChange(this.persona.name);
+      await this.handlePersonaChange(this.persona._filename);
     },
     applyPreset(preset) {
       // Apply preset settings to current chat
