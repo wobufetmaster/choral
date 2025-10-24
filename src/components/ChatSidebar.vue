@@ -68,6 +68,7 @@
         <button @click="$emit('new-chat-from-summary')" v-if="hasMessages" class="sidebar-btn">📖 New Chat from Summary</button>
         <button v-if="showConvertToGroup" @click="$emit('convert-to-group')" class="sidebar-btn">👥 Convert to Group</button>
         <button @click="$emit('toggle-history')" :class="{ 'active': showHistory }" class="sidebar-btn">📜 History</button>
+        <button @click="$emit('show-branch-tree')" class="sidebar-btn">🌿 Branch Timeline</button>
         <button @click="$emit('show-lorebooks')" class="sidebar-btn">📚 Lorebook</button>
         <button @click="$emit('toggle-debug')" :class="{ 'active': showDebug }" class="sidebar-btn">🐛 Debug</button>
         <button v-if="isGroupChat" @click="$emit('toggle-group-manager')" :class="{ 'active': showGroupManager }" class="sidebar-btn sidebar-btn-special">👥 Group Manager</button>
@@ -143,6 +144,7 @@ export default {
     'new-chat-from-summary',
     'convert-to-group',
     'toggle-history',
+    'show-branch-tree',
     'persona-change',
     'preset-change',
     'show-lorebooks',

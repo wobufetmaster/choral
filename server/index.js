@@ -854,12 +854,47 @@ app.get('/api/chats/character/:characterFilename', async (req, res) => {
   }
 });
 
+// Helper function to migrate old chat format to new branch format
+function migrateChatToBranches(chat) {
+  // Check if chat is already in branch format
+  if (chat.branches && chat.mainBranch) {
+    return chat; // Already migrated
+  }
+
+  // Create new branch-based structure
+  const mainBranchId = 'branch-main';
+  const migratedChat = {
+    ...chat,
+    mainBranch: mainBranchId,
+    currentBranch: mainBranchId,
+    branches: {
+      [mainBranchId]: {
+        id: mainBranchId,
+        name: 'Main',
+        createdAt: chat.timestamp || new Date().toISOString(),
+        parentBranchId: null,
+        branchPointMessageIndex: null,
+        messages: chat.messages || []
+      }
+    }
+  };
+
+  // Remove old messages array from root
+  delete migratedChat.messages;
+
+  return migratedChat;
+}
+
 // Get specific chat
 app.get('/api/chats/:filename', async (req, res) => {
   try {
     const filePath = path.join(CHATS_DIR, req.params.filename);
     const content = await fs.readFile(filePath, 'utf-8');
-    const chat = JSON.parse(content);
+    let chat = JSON.parse(content);
+
+    // Auto-migrate if needed
+    chat = migrateChatToBranches(chat);
+
     res.json(chat);
   } catch (error) {
     res.status(404).json({ error: 'Chat not found' });
@@ -869,9 +904,14 @@ app.get('/api/chats/:filename', async (req, res) => {
 // Create/update chat
 app.post('/api/chats', async (req, res) => {
   try {
-    const chat = req.body;
+    let chat = req.body;
     const filename = chat.filename || `chat_${Date.now()}.json`;
     const filePath = path.join(CHATS_DIR, filename);
+
+    // If chat doesn't have branch structure, ensure it's properly formatted
+    if (!chat.branches || !chat.mainBranch) {
+      chat = migrateChatToBranches(chat);
+    }
 
     await fs.writeFile(filePath, JSON.stringify(chat, null, 2));
     res.json({ success: true, filename });
@@ -916,10 +956,14 @@ app.post('/api/chats/:filename/auto-name', async (req, res) => {
   try {
     const filePath = path.join(CHATS_DIR, req.params.filename);
     const content = await fs.readFile(filePath, 'utf-8');
-    const chat = JSON.parse(content);
+    let chat = JSON.parse(content);
 
-    // Check if chat has messages
-    if (!chat.messages || chat.messages.length === 0) {
+    // Migrate if needed
+    chat = migrateChatToBranches(chat);
+
+    // Get messages from main branch
+    const mainBranch = chat.branches[chat.mainBranch];
+    if (!mainBranch || !mainBranch.messages || mainBranch.messages.length === 0) {
       return res.status(400).json({ error: 'Chat has no messages to analyze' });
     }
 
@@ -949,7 +993,7 @@ app.post('/api/chats/:filename/auto-name', async (req, res) => {
     const model = bookkeepingSettings.model || 'openai/gpt-4o-mini';
 
     // Extract messages for context (limit to first 10 messages or 2000 chars)
-    const messagesToAnalyze = chat.messages.slice(0, 10);
+    const messagesToAnalyze = mainBranch.messages.slice(0, 10);
     let conversationText = messagesToAnalyze
       .map(msg => {
         const role = msg.role === 'user' ? 'User' : 'Assistant';
@@ -1015,7 +1059,7 @@ Generate a short title (3-6 words) that captures the essence of this conversatio
     console.log('\n========== AUTO-NAMING REQUEST ==========');
     console.log('Chat:', req.params.filename);
     console.log('Model:', model);
-    console.log('Message count:', chat.messages.length);
+    console.log('Message count:', mainBranch.messages.length);
     console.log('=========================================\n');
 
     // Call OpenRouter with structured output
@@ -1053,6 +1097,195 @@ Generate a short title (3-6 words) that captures the essence of this conversatio
     res.json({ success: true, title: generatedTitle });
   } catch (error) {
     console.error('Failed to auto-generate chat title:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== BRANCH MANAGEMENT ENDPOINTS ==========
+
+// Create a new branch
+app.post('/api/chats/:filename/branches', async (req, res) => {
+  try {
+    const { parentBranchId, messageIndex, branchName } = req.body;
+    const filePath = path.join(CHATS_DIR, req.params.filename);
+
+    // Load and migrate chat
+    const content = await fs.readFile(filePath, 'utf-8');
+    let chat = JSON.parse(content);
+    chat = migrateChatToBranches(chat);
+
+    // Validate parent branch exists
+    if (!chat.branches[parentBranchId]) {
+      return res.status(404).json({ error: 'Parent branch not found' });
+    }
+
+    const parentBranch = chat.branches[parentBranchId];
+
+    // Validate message index
+    if (messageIndex < 0 || messageIndex >= parentBranch.messages.length) {
+      return res.status(400).json({ error: 'Invalid message index' });
+    }
+
+    // Create new branch ID
+    const newBranchId = `branch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Copy messages up to and including the branch point
+    const branchMessages = parentBranch.messages.slice(0, messageIndex + 1);
+
+    // Create new branch
+    const newBranch = {
+      id: newBranchId,
+      name: branchName || `Branch ${Object.keys(chat.branches).length}`,
+      createdAt: new Date().toISOString(),
+      parentBranchId: parentBranchId,
+      branchPointMessageIndex: messageIndex,
+      messages: branchMessages
+    };
+
+    // Add branch to chat
+    chat.branches[newBranchId] = newBranch;
+    chat.currentBranch = newBranchId;
+
+    // Save chat
+    await fs.writeFile(filePath, JSON.stringify(chat, null, 2));
+
+    res.json({ success: true, branch: newBranch });
+  } catch (error) {
+    console.error('Failed to create branch:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Rename a branch
+app.put('/api/chats/:filename/branches/:branchId', async (req, res) => {
+  try {
+    const { branchId } = req.params;
+    const { name } = req.body;
+    const filePath = path.join(CHATS_DIR, req.params.filename);
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Branch name is required' });
+    }
+
+    // Load and migrate chat
+    const content = await fs.readFile(filePath, 'utf-8');
+    let chat = JSON.parse(content);
+    chat = migrateChatToBranches(chat);
+
+    // Validate branch exists
+    if (!chat.branches[branchId]) {
+      return res.status(404).json({ error: 'Branch not found' });
+    }
+
+    // Update branch name
+    chat.branches[branchId].name = name.trim();
+
+    // Save chat
+    await fs.writeFile(filePath, JSON.stringify(chat, null, 2));
+
+    res.json({ success: true, branch: chat.branches[branchId] });
+  } catch (error) {
+    console.error('Failed to rename branch:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a branch
+app.delete('/api/chats/:filename/branches/:branchId', async (req, res) => {
+  try {
+    const { branchId } = req.params;
+    const { deleteChildren } = req.query;
+    const filePath = path.join(CHATS_DIR, req.params.filename);
+
+    // Load and migrate chat
+    const content = await fs.readFile(filePath, 'utf-8');
+    let chat = JSON.parse(content);
+    chat = migrateChatToBranches(chat);
+
+    // Validate branch exists
+    if (!chat.branches[branchId]) {
+      return res.status(404).json({ error: 'Branch not found' });
+    }
+
+    // Prevent deleting main branch
+    if (branchId === chat.mainBranch) {
+      return res.status(400).json({ error: 'Cannot delete main branch' });
+    }
+
+    // Find child branches
+    const childBranches = Object.keys(chat.branches).filter(
+      id => chat.branches[id].parentBranchId === branchId
+    );
+
+    if (childBranches.length > 0 && deleteChildren !== 'true') {
+      return res.status(400).json({
+        error: 'Branch has children',
+        childBranches: childBranches.map(id => ({
+          id,
+          name: chat.branches[id].name
+        }))
+      });
+    }
+
+    // Delete branch and optionally children
+    const branchesToDelete = [branchId];
+    if (deleteChildren === 'true') {
+      // Recursively find all descendants
+      const findDescendants = (parentId) => {
+        const children = Object.keys(chat.branches).filter(
+          id => chat.branches[id].parentBranchId === parentId
+        );
+        children.forEach(childId => {
+          branchesToDelete.push(childId);
+          findDescendants(childId);
+        });
+      };
+      findDescendants(branchId);
+    }
+
+    // Delete branches
+    branchesToDelete.forEach(id => delete chat.branches[id]);
+
+    // If current branch was deleted, switch to main
+    if (branchesToDelete.includes(chat.currentBranch)) {
+      chat.currentBranch = chat.mainBranch;
+    }
+
+    // Save chat
+    await fs.writeFile(filePath, JSON.stringify(chat, null, 2));
+
+    res.json({ success: true, deletedBranches: branchesToDelete });
+  } catch (error) {
+    console.error('Failed to delete branch:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Switch current branch
+app.put('/api/chats/:filename/current-branch', async (req, res) => {
+  try {
+    const { branchId } = req.body;
+    const filePath = path.join(CHATS_DIR, req.params.filename);
+
+    // Load and migrate chat
+    const content = await fs.readFile(filePath, 'utf-8');
+    let chat = JSON.parse(content);
+    chat = migrateChatToBranches(chat);
+
+    // Validate branch exists
+    if (!chat.branches[branchId]) {
+      return res.status(404).json({ error: 'Branch not found' });
+    }
+
+    // Switch branch
+    chat.currentBranch = branchId;
+
+    // Save chat
+    await fs.writeFile(filePath, JSON.stringify(chat, null, 2));
+
+    res.json({ success: true, currentBranch: branchId });
+  } catch (error) {
+    console.error('Failed to switch branch:', error);
     res.status(500).json({ error: error.message });
   }
 });

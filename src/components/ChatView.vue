@@ -25,6 +25,7 @@
       @new-chat-from-summary="startNewChatFromSummary"
       @convert-to-group="convertToGroupChat"
       @toggle-history="showChatHistory = !showChatHistory"
+      @show-branch-tree="showBranchTree = true"
       @persona-change="handlePersonaChange"
       @preset-change="handlePresetChange"
       @show-lorebooks="showLorebooks = true"
@@ -228,6 +229,27 @@
       @close="showDebug = false"
     />
 
+    <!-- Branch Name Input Modal -->
+    <BranchNameInput
+      :isOpen="branchModal.show"
+      :branchCount="Object.keys(branches).length"
+      @confirm="createBranch"
+      @cancel="branchModal.show = false"
+    />
+
+    <!-- Branch Tree Modal -->
+    <BranchTreeModal
+      :show="showBranchTree"
+      :branches="branches"
+      :mainBranch="mainBranch"
+      :currentBranch="currentBranch"
+      :chatId="chatId"
+      @close="showBranchTree = false"
+      @switch-branch="switchToBranch"
+      @rename-branch="renameBranch"
+      @delete-branch="deleteBranchFromTree"
+    />
+
     <div class="chat-container">
       <div class="messages" ref="messagesContainer" @scroll="handleScroll">
         <div
@@ -260,6 +282,7 @@
             <div class="message-actions">
               <button @click="editMessage(index)" title="Edit">✏️</button>
               <button @click="copyMessage(getCurrentContent(message))" title="Copy">📋</button>
+              <button @click="openBranchModal(index)" title="Create Branch" class="branch-button">🌿</button>
               <button @click="deleteMessage(index)" title="Delete">🗑️</button>
               <button
                 v-if="index < messages.length - 1"
@@ -363,6 +386,8 @@ import GroupChatManager from './GroupChatManager.vue';
 import LorebookEditor from './LorebookEditor.vue';
 import ChatSidebar from './ChatSidebar.vue';
 import DebugModal from './DebugModal.vue';
+import BranchNameInput from './BranchNameInput.vue';
+import BranchTreeModal from './BranchTreeModal.vue';
 
 // Non-reactive debug data cache (outside Vue's reactivity system)
 const debugDataCache = new Map();
@@ -373,7 +398,9 @@ export default {
     GroupChatManager,
     LorebookEditor,
     ChatSidebar,
-    DebugModal
+    DebugModal,
+    BranchNameInput,
+    BranchTreeModal
   },
   props: {
     tabData: {
@@ -402,6 +429,7 @@ export default {
       sidebarOpen: true,
       showSettings: false,
       showChatHistory: false,
+      showBranchTree: false,
       showLorebooks: false,
       showDebug: false,
       showGroupManager: false,
@@ -419,6 +447,13 @@ export default {
         characterName: '',
         characterFilename: ''
       },
+      branchModal: {
+        show: false,
+        messageIndex: null
+      },
+      branches: {},
+      mainBranch: null,
+      currentBranch: null,
       showCharacterCard: false,
       viewingCharacter: null,
       chatHistory: [],
@@ -789,7 +824,21 @@ export default {
       try {
         const response = await fetch(`/api/chats/${chatId}`);
         const chat = await response.json();
-        this.messages = this.normalizeMessages(chat.messages || []);
+
+        // Handle branch-based structure
+        if (chat.branches && chat.mainBranch) {
+          this.branches = chat.branches;
+          this.mainBranch = chat.mainBranch;
+          this.currentBranch = chat.currentBranch || chat.mainBranch;
+
+          // Load messages from current branch
+          const branch = this.branches[this.currentBranch];
+          this.messages = this.normalizeMessages(branch?.messages || []);
+        } else {
+          // Old format (will be migrated on server)
+          this.messages = this.normalizeMessages(chat.messages || []);
+        }
+
         this.chatId = chatId;
 
         // Capture the custom title if it exists
@@ -901,13 +950,27 @@ export default {
     },
     async saveChat(showNotification = false) {
       try {
+        // Update current branch messages
+        if (this.currentBranch && this.branches[this.currentBranch]) {
+          this.branches[this.currentBranch].messages = this.messages;
+        }
+
         const chat = {
           filename: this.chatId || `chat_${Date.now()}.json`,
           character: this.character?.data.name || 'Unknown',
           characterFilename: this.tabData?.characterId || this.$route?.query?.character,
-          messages: this.messages,
           timestamp: Date.now()
         };
+
+        // Include branch structure if it exists
+        if (this.branches && Object.keys(this.branches).length > 0) {
+          chat.branches = this.branches;
+          chat.mainBranch = this.mainBranch;
+          chat.currentBranch = this.currentBranch;
+        } else {
+          // Old format for compatibility
+          chat.messages = this.messages;
+        }
 
         const response = await fetch('/api/chats', {
           method: 'POST',
@@ -1828,9 +1891,148 @@ export default {
         this.$root.$notify(`Deleted ${messagesToDelete} message${messagesToDelete > 1 ? 's' : ''}`, 'success');
       }
     },
-    branch(index) {
-      // TODO: Implement branching system
-      this.$root.$notify('Branching system coming soon!', 'info');
+    openBranchModal(index) {
+      this.branchModal.messageIndex = index;
+      this.branchModal.show = true;
+    },
+    async createBranch(branchName) {
+      try {
+        const messageIndex = this.branchModal.messageIndex;
+        this.branchModal.show = false;
+
+        // Ensure chat is saved and has a chatId
+        if (!this.chatId) {
+          await this.saveChat();
+        }
+
+        // Initialize branch structure if needed
+        if (!this.branches || Object.keys(this.branches).length === 0) {
+          const mainBranchId = 'branch-main';
+          this.branches = {
+            [mainBranchId]: {
+              id: mainBranchId,
+              name: 'Main',
+              createdAt: new Date().toISOString(),
+              parentBranchId: null,
+              branchPointMessageIndex: null,
+              messages: [...this.messages]
+            }
+          };
+          this.mainBranch = mainBranchId;
+          this.currentBranch = mainBranchId;
+          // Save the chat with branch structure
+          await this.saveChat();
+        }
+
+        const response = await fetch(`/api/chats/${this.chatId}/branches`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            parentBranchId: this.currentBranch,
+            messageIndex: messageIndex,
+            branchName: branchName
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create branch');
+        }
+
+        const data = await response.json();
+        const newBranch = data.branch;
+
+        // Update local state
+        this.branches[newBranch.id] = newBranch;
+        this.currentBranch = newBranch.id;
+        this.messages = [...newBranch.messages];
+
+        this.$root.$notify(`Branch "${branchName}" created`, 'success');
+      } catch (error) {
+        console.error('Failed to create branch:', error);
+        this.$root.$notify(`Failed to create branch: ${error.message}`, 'error');
+      }
+    },
+    async switchToBranch(branchId) {
+      try {
+        // Update current branch on server
+        const response = await fetch(`/api/chats/${this.chatId}/current-branch`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ branchId })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to switch branch');
+        }
+
+        // Update local state
+        this.currentBranch = branchId;
+        const branch = this.branches[branchId];
+        this.messages = this.normalizeMessages([...branch.messages]);
+
+        this.showBranchTree = false;
+        this.$root.$notify(`Switched to branch "${branch.name}"`, 'success');
+
+        // Scroll to bottom after switching
+        this.$nextTick(() => this.scrollToBottom());
+      } catch (error) {
+        console.error('Failed to switch branch:', error);
+        this.$root.$notify('Failed to switch branch', 'error');
+      }
+    },
+    async renameBranch(branchId, newName) {
+      try {
+        const response = await fetch(`/api/chats/${this.chatId}/branches/${branchId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to rename branch');
+        }
+
+        // Update local state
+        this.branches[branchId].name = newName;
+
+        this.$root.$notify(`Branch renamed to "${newName}"`, 'success');
+      } catch (error) {
+        console.error('Failed to rename branch:', error);
+        this.$root.$notify('Failed to rename branch', 'error');
+      }
+    },
+    async deleteBranchFromTree(branchId, deleteChildren) {
+      try {
+        const response = await fetch(`/api/chats/${this.chatId}/branches/${branchId}?deleteChildren=${deleteChildren}`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete branch');
+        }
+
+        const data = await response.json();
+
+        // Remove deleted branches from local state
+        data.deletedBranches.forEach(id => {
+          delete this.branches[id];
+        });
+
+        // If we deleted the current branch, switch to main
+        if (data.deletedBranches.includes(this.currentBranch)) {
+          this.currentBranch = this.mainBranch;
+          const mainBranch = this.branches[this.mainBranch];
+          this.messages = this.normalizeMessages([...mainBranch.messages]);
+          this.$nextTick(() => this.scrollToBottom());
+        }
+
+        this.$root.$notify(`Branch deleted`, 'success');
+      } catch (error) {
+        console.error('Failed to delete branch:', error);
+        this.$root.$notify(`Failed to delete branch: ${error.message}`, 'error');
+      }
     },
     showAvatarMenu(event, message, index) {
       const rect = event.target.getBoundingClientRect();
