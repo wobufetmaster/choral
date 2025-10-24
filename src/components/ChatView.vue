@@ -1901,8 +1901,12 @@ export default {
         this.branchModal.show = false;
 
         // Ensure chat is saved and has a chatId
-        if (!this.chatId) {
-          await this.saveChat();
+        if (!this.chatId && !this.groupChatId) {
+          if (this.isGroupChat) {
+            await this.saveGroupChat(false);
+          } else {
+            await this.saveChat();
+          }
         }
 
         // Initialize branch structure if needed
@@ -1921,14 +1925,50 @@ export default {
           this.mainBranch = mainBranchId;
           this.currentBranch = mainBranchId;
           // Save the chat with branch structure
-          await this.saveChat();
+          if (this.isGroupChat) {
+            await this.saveGroupChat(false);
+          } else {
+            await this.saveChat();
+          }
         }
 
-        const response = await fetch(`/api/chats/${this.chatId}/branches`, {
+        // Determine the correct parent branch for this message index
+        // If we're in a child branch and the message is before the branch point,
+        // we should branch from the ancestor that actually contains that message
+        let parentBranchId = this.currentBranch;
+        const currentBranchObj = this.branches[this.currentBranch];
+
+        if (currentBranchObj.parentBranchId !== null) {
+          const currentBranchPoint = currentBranchObj.branchPointMessageIndex ?? 0;
+
+          // If message index is at or before the current branch's split point,
+          // it belongs to an ancestor branch
+          if (messageIndex <= currentBranchPoint) {
+            // Walk up the tree to find which ancestor contains this message
+            let ancestorId = currentBranchObj.parentBranchId;
+            while (ancestorId) {
+              const ancestor = this.branches[ancestorId];
+              const ancestorBranchPoint = ancestor.branchPointMessageIndex ?? 0;
+
+              // If this is the main branch or the message is after this ancestor's branch point,
+              // this is the correct parent
+              if (ancestor.parentBranchId === null || messageIndex > ancestorBranchPoint) {
+                parentBranchId = ancestorId;
+                break;
+              }
+
+              // Keep walking up
+              ancestorId = ancestor.parentBranchId;
+            }
+          }
+        }
+
+        const chatFileId = this.isGroupChat ? this.groupChatId : this.chatId;
+        const response = await fetch(`/api/chats/${chatFileId}/branches`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            parentBranchId: this.currentBranch,
+            parentBranchId: parentBranchId,
             messageIndex: messageIndex,
             branchName: branchName
           })
@@ -1946,6 +1986,13 @@ export default {
         this.branches[newBranch.id] = newBranch;
         this.currentBranch = newBranch.id;
         this.messages = [...newBranch.messages];
+
+        // Save the chat to persist the new branch
+        if (this.isGroupChat) {
+          await this.saveGroupChat(false);
+        } else {
+          await this.saveChat();
+        }
 
         this.$root.$notify(`Branch "${branchName}" created`, 'success');
       } catch (error) {
@@ -2976,7 +3023,20 @@ export default {
         this.groupChatName = groupChat.name || '';
         this.groupChatTags = groupChat.tags || [];
         this.conversationGroup = groupChat.conversationGroup || null; // Load conversation group
-        this.messages = this.normalizeMessages(groupChat.messages || []);
+
+        // Load branch structure if it exists
+        if (groupChat.branches && groupChat.mainBranch) {
+          this.branches = groupChat.branches;
+          this.mainBranch = groupChat.mainBranch;
+          this.currentBranch = groupChat.currentBranch || groupChat.mainBranch;
+
+          // Load messages from current branch
+          const branch = this.branches[this.currentBranch];
+          this.messages = this.normalizeMessages(branch?.messages || []);
+        } else {
+          // Old format without branches
+          this.messages = this.normalizeMessages(groupChat.messages || []);
+        }
 
         // If no messages, initialize with swipeable greetings
         if (this.messages.length === 0) {
@@ -3035,6 +3095,11 @@ export default {
 
     async saveGroupChat(showNotification = true) {
       try {
+        // Update current branch messages
+        if (this.currentBranch && this.branches[this.currentBranch]) {
+          this.branches[this.currentBranch].messages = this.messages;
+        }
+
         // Generate conversationGroup UUID if it doesn't exist
         if (!this.conversationGroup) {
           this.conversationGroup = this.generateUUID();
@@ -3049,10 +3114,19 @@ export default {
           explicitMode: this.groupChatExplicitMode,
           name: this.groupChatName,
           tags: this.groupChatTags,
-          messages: this.messages,
           timestamp: Date.now(),
           title: this.chatDisplayTitle // Include title for chat history
         };
+
+        // Include branch structure if it exists
+        if (this.branches && Object.keys(this.branches).length > 0) {
+          groupChat.branches = this.branches;
+          groupChat.mainBranch = this.mainBranch;
+          groupChat.currentBranch = this.currentBranch;
+        } else {
+          // Old format for compatibility
+          groupChat.messages = this.messages;
+        }
 
         const response = await fetch('/api/group-chats', {
           method: 'POST',

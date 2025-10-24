@@ -1107,7 +1107,11 @@ Generate a short title (3-6 words) that captures the essence of this conversatio
 app.post('/api/chats/:filename/branches', async (req, res) => {
   try {
     const { parentBranchId, messageIndex, branchName } = req.body;
-    const filePath = path.join(CHATS_DIR, req.params.filename);
+
+    // Determine if this is a group chat or regular chat
+    const isGroupChat = req.params.filename.startsWith('group_chat_');
+    const chatDir = isGroupChat ? GROUP_CHATS_DIR : CHATS_DIR;
+    const filePath = path.join(chatDir, req.params.filename);
 
     // Load and migrate chat
     const content = await fs.readFile(filePath, 'utf-8');
@@ -1161,7 +1165,11 @@ app.put('/api/chats/:filename/branches/:branchId', async (req, res) => {
   try {
     const { branchId } = req.params;
     const { name } = req.body;
-    const filePath = path.join(CHATS_DIR, req.params.filename);
+
+    // Determine if this is a group chat or regular chat
+    const isGroupChat = req.params.filename.startsWith('group_chat_');
+    const chatDir = isGroupChat ? GROUP_CHATS_DIR : CHATS_DIR;
+    const filePath = path.join(chatDir, req.params.filename);
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Branch name is required' });
@@ -1195,7 +1203,11 @@ app.delete('/api/chats/:filename/branches/:branchId', async (req, res) => {
   try {
     const { branchId } = req.params;
     const { deleteChildren } = req.query;
-    const filePath = path.join(CHATS_DIR, req.params.filename);
+
+    // Determine if this is a group chat or regular chat
+    const isGroupChat = req.params.filename.startsWith('group_chat_');
+    const chatDir = isGroupChat ? GROUP_CHATS_DIR : CHATS_DIR;
+    const filePath = path.join(chatDir, req.params.filename);
 
     // Load and migrate chat
     const content = await fs.readFile(filePath, 'utf-8');
@@ -1265,7 +1277,11 @@ app.delete('/api/chats/:filename/branches/:branchId', async (req, res) => {
 app.put('/api/chats/:filename/current-branch', async (req, res) => {
   try {
     const { branchId } = req.body;
-    const filePath = path.join(CHATS_DIR, req.params.filename);
+
+    // Determine if this is a group chat or regular chat
+    const isGroupChat = req.params.filename.startsWith('group_chat_');
+    const chatDir = isGroupChat ? GROUP_CHATS_DIR : CHATS_DIR;
+    const filePath = path.join(chatDir, req.params.filename);
 
     // Load and migrate chat
     const content = await fs.readFile(filePath, 'utf-8');
