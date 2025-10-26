@@ -183,6 +183,21 @@ export default {
     getMacrosForCategory(categoryKey) {
       return MACRO_DEFINITIONS.filter(m => m.category === categoryKey);
     },
+    checkMissingEssentialMacros() {
+      // Combine all enabled prompt content
+      const allPromptContent = (this.selectedPreset.prompts || [])
+        .filter(p => p.enabled)
+        .map(p => p.content || '')
+        .join('\n');
+
+      // Get all essential macros (character card data)
+      const essentialMacros = MACRO_DEFINITIONS.filter(m => m.isCharacterData);
+
+      // Find which ones are missing
+      return essentialMacros.filter(macro => {
+        return !allPromptContent.includes(macro.pattern);
+      });
+    },
     async loadConfig() {
       try {
         const response = await fetch('/api/config');
@@ -282,6 +297,19 @@ export default {
       this.selectedPreset.prompts.splice(index, 1);
     },
     async savePreset() {
+      // Validate for missing essential macros
+      const missingMacros = this.checkMissingEssentialMacros();
+
+      if (missingMacros.length > 0) {
+        const macroList = missingMacros.map(m => m.pattern).join(', ');
+        const confirmed = confirm(
+          `Warning: This preset is missing essential character macros:\n\n${macroList}\n\n` +
+          `Character cards won't be properly loaded without these macros.\n\n` +
+          `Save anyway?`
+        );
+        if (!confirmed) return;
+      }
+
       try {
         // Ensure prompts array exists
         if (!this.selectedPreset.prompts) {
