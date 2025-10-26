@@ -20,6 +20,13 @@
             <div class="preset-name">
               <span>{{ preset.name }}</span>
               <span v-if="preset.filename === activePresetFilename" class="active-badge">Active</span>
+              <span
+                v-if="hasMissingEssentialMacros(preset)"
+                class="warning-badge"
+                title="Missing essential character macros"
+              >
+                ⚠️
+              </span>
             </div>
             <div class="preset-actions">
               <button
@@ -197,6 +204,16 @@ export default {
       return essentialMacros.filter(macro => {
         return !allPromptContent.includes(macro.pattern);
       });
+    },
+    hasMissingEssentialMacros(preset) {
+      const allPromptContent = (preset.prompts || [])
+        .filter(p => p.enabled)
+        .map(p => p.content || '')
+        .join('\n');
+
+      const essentialMacros = MACRO_DEFINITIONS.filter(m => m.isCharacterData);
+
+      return essentialMacros.some(macro => !allPromptContent.includes(macro.pattern));
     },
     async loadConfig() {
       try {
@@ -489,6 +506,12 @@ export default {
   border-radius: 3px;
   text-transform: uppercase;
   font-weight: 600;
+}
+
+.warning-badge {
+  font-size: 14px;
+  margin-left: 4px;
+  cursor: help;
 }
 
 .preset-actions {
