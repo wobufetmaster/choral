@@ -122,8 +122,170 @@ function processMessagesWithMacros(messages, context) {
   }));
 }
 
+/**
+ * Macro metadata for documentation and validation
+ * MUST stay in sync with src/utils/macros.js
+ */
+const MACRO_DEFINITIONS = [
+  // Character Card Data (Essential - pulled from character cards)
+  {
+    pattern: '{{description}}',
+    category: 'character_card',
+    description: 'Physical appearance and basic character info from card',
+    isCharacterData: true,
+    example: 'Character: {{description}}'
+  },
+  {
+    pattern: '{{personality}}',
+    category: 'character_card',
+    description: 'Personality traits and behaviors from card',
+    isCharacterData: true,
+    example: 'Personality: {{personality}}'
+  },
+  {
+    pattern: '{{scenario}}',
+    category: 'character_card',
+    description: 'Current situation/context for the roleplay from card',
+    isCharacterData: true,
+    example: 'Scenario: {{scenario}}'
+  },
+  {
+    pattern: '{{dialogue_examples}}',
+    category: 'character_card',
+    description: 'Example conversations showing character voice from card',
+    isCharacterData: true,
+    example: '{{dialogue_examples}}'
+  },
+
+  // Names & Identifiers
+  {
+    pattern: '{{char}}',
+    category: 'names',
+    description: 'Character name or nickname',
+    isCharacterData: false,
+    example: '{{char}} smiled warmly.'
+  },
+  {
+    pattern: '{{user}}',
+    category: 'names',
+    description: 'User name or persona name',
+    isCharacterData: false,
+    example: '{{user}} waved hello.'
+  },
+
+  // Date & Time
+  {
+    pattern: '{{date}}',
+    category: 'datetime',
+    description: 'Current date (e.g., "October 26, 2025")',
+    isCharacterData: false,
+    example: 'Today is {{date}}'
+  },
+  {
+    pattern: '{{isotime}}',
+    category: 'datetime',
+    description: 'Current time in HH:MM format (e.g., "14:30")',
+    isCharacterData: false,
+    example: 'Current time: {{isotime}}'
+  },
+
+  // Randomization
+  {
+    pattern: '{{random:...}}',
+    category: 'randomization',
+    description: 'Pick random option from comma-separated list each time',
+    isCharacterData: false,
+    example: '{{random:happy,sad,excited}}'
+  },
+  {
+    pattern: '{{pick:...}}',
+    category: 'randomization',
+    description: 'Consistent random choice (cached per session)',
+    isCharacterData: false,
+    example: '{{pick:coffee,tea,water}}'
+  },
+  {
+    pattern: '{{roll:N}}',
+    category: 'randomization',
+    description: 'Random number from 1 to N (also supports {{roll:dN}})',
+    isCharacterData: false,
+    example: 'You rolled a {{roll:20}}'
+  },
+
+  // Utilities
+  {
+    pattern: '{{reverse:...}}',
+    category: 'utilities',
+    description: 'Reverse the text inside',
+    isCharacterData: false,
+    example: '{{reverse:hello}} outputs "olleh"'
+  },
+  {
+    pattern: '{{characters_list}}',
+    category: 'utilities',
+    description: 'List of all available characters with filenames',
+    isCharacterData: false,
+    example: 'Available: {{characters_list}}'
+  },
+  {
+    pattern: '{{comment:...}}',
+    category: 'utilities',
+    description: 'Visible comment shown in UI as italics',
+    isCharacterData: false,
+    example: '{{comment:This is a note for readers}}'
+  },
+  {
+    pattern: '{{//...}}',
+    category: 'utilities',
+    description: 'Hidden comment (removed from display and AI context)',
+    isCharacterData: false,
+    example: '{{// This is only visible in the editor}}'
+  },
+  {
+    pattern: '{{hidden_key:...}}',
+    category: 'utilities',
+    description: 'Hidden lorebook scan key (not shown to AI or user)',
+    isCharacterData: false,
+    example: '{{hidden_key:secret_trigger}}'
+  }
+];
+
+/**
+ * Macro category metadata for organization
+ * MUST stay in sync with src/utils/macros.js
+ */
+const MACRO_CATEGORIES = {
+  character_card: {
+    name: 'Character Card Data',
+    order: 1,
+    description: 'Essential macros that pull data from character cards'
+  },
+  names: {
+    name: 'Names & Identifiers',
+    order: 2,
+    description: 'Character and user name substitution'
+  },
+  datetime: {
+    name: 'Date & Time',
+    order: 3,
+    description: 'Current date and time values'
+  },
+  randomization: {
+    name: 'Randomization',
+    order: 4,
+    description: 'Random selections and dice rolls'
+  },
+  utilities: {
+    name: 'Utilities',
+    order: 5,
+    description: 'Text manipulation and special functions'
+  }
+};
+
 module.exports = {
   processMacros,
   clearPickCache,
-  processMessagesWithMacros
+  processMessagesWithMacros,
+  MACRO_DEFINITIONS,
+  MACRO_CATEGORIES
 };

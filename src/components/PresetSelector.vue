@@ -20,6 +20,13 @@
             <div class="preset-name">
               <span>{{ preset.name }}</span>
               <span v-if="preset.filename === activePresetFilename" class="active-badge">Active</span>
+              <span
+                v-if="hasMissingEssentialMacros(preset)"
+                class="warning-badge"
+                title="Missing essential character macros"
+              >
+                ⚠️
+              </span>
             </div>
             <div class="preset-actions">
               <button
@@ -54,6 +61,7 @@
           <div class="editor-header">
             <h3>Edit Preset</h3>
             <div class="header-actions">
+              <button @click="showMacroReference = true" class="help-btn" title="View available macros">📖 Macros</button>
               <button @click="$refs.fileInput.click()" class="import-btn">📥 Import</button>
               <button @click="savePreset" class="save-btn">💾 Save</button>
               <button @click="setAsActive" class="set-active-btn">⭐ Set as Active</button>
@@ -117,10 +125,38 @@
           <button @click="addPrompt" class="add-prompt-btn">+ Add Prompt</button>
         </div>
       </div>
+
+    <!-- Macro Reference Modal -->
+    <div v-if="showMacroReference" class="modal-overlay" @click="showMacroReference = false">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Available Macros</h3>
+          <button @click="showMacroReference = false" class="modal-close-btn">×</button>
+        </div>
+        <div class="macro-reference">
+          <div v-for="category in sortedCategories" :key="category.key" class="macro-category">
+            <h4>{{ category.name }}</h4>
+            <p class="category-description">{{ category.description }}</p>
+            <div class="macro-list">
+              <div v-for="macro in getMacrosForCategory(category.key)" :key="macro.pattern" class="macro-item">
+                <div class="macro-header">
+                  <code class="macro-pattern">{{ macro.pattern }}</code>
+                  <span v-if="macro.isCharacterData" class="essential-badge">Essential</span>
+                </div>
+                <div class="macro-description">{{ macro.description }}</div>
+                <div class="macro-example"><em>Example:</em> <code>{{ macro.example }}</code></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import { MACRO_DEFINITIONS, MACRO_CATEGORIES } from '../utils/macros.js';
+
 export default {
   name: 'PresetSelector',
   props: {
@@ -135,7 +171,15 @@ export default {
     return {
       presets: [],
       selectedPreset: null,
-      activePresetFilename: null
+      activePresetFilename: null,
+      showMacroReference: false  // NEW: controls modal visibility
+    }
+  },
+  computed: {
+    sortedCategories() {
+      return Object.entries(MACRO_CATEGORIES)
+        .map(([key, value]) => ({ key, ...value }))
+        .sort((a, b) => a.order - b.order);
     }
   },
   async mounted() {
@@ -143,6 +187,34 @@ export default {
     await this.loadPresets();
   },
   methods: {
+    getMacrosForCategory(categoryKey) {
+      return MACRO_DEFINITIONS.filter(m => m.category === categoryKey);
+    },
+    checkMissingEssentialMacros() {
+      // Combine all enabled prompt content
+      const allPromptContent = (this.selectedPreset.prompts || [])
+        .filter(p => p.enabled)
+        .map(p => p.content || '')
+        .join('\n');
+
+      // Get all essential macros (character card data)
+      const essentialMacros = MACRO_DEFINITIONS.filter(m => m.isCharacterData);
+
+      // Find which ones are missing
+      return essentialMacros.filter(macro => {
+        return !allPromptContent.includes(macro.pattern);
+      });
+    },
+    hasMissingEssentialMacros(preset) {
+      const allPromptContent = (preset.prompts || [])
+        .filter(p => p.enabled)
+        .map(p => p.content || '')
+        .join('\n');
+
+      const essentialMacros = MACRO_DEFINITIONS.filter(m => m.isCharacterData);
+
+      return essentialMacros.some(macro => !allPromptContent.includes(macro.pattern));
+    },
     async loadConfig() {
       try {
         const response = await fetch('/api/config');
@@ -242,6 +314,19 @@ export default {
       this.selectedPreset.prompts.splice(index, 1);
     },
     async savePreset() {
+      // Validate for missing essential macros
+      const missingMacros = this.checkMissingEssentialMacros();
+
+      if (missingMacros.length > 0) {
+        const macroList = missingMacros.map(m => m.pattern).join(', ');
+        const confirmed = confirm(
+          `Warning: This preset is missing essential character macros:\n\n${macroList}\n\n` +
+          `Character cards won't be properly loaded without these macros.\n\n` +
+          `Save anyway?`
+        );
+        if (!confirmed) return;
+      }
+
       try {
         // Ensure prompts array exists
         if (!this.selectedPreset.prompts) {
@@ -423,6 +508,12 @@ export default {
   font-weight: 600;
 }
 
+.warning-badge {
+  font-size: 14px;
+  margin-left: 4px;
+  cursor: help;
+}
+
 .preset-actions {
   display: flex;
   gap: 4px;
@@ -583,5 +674,185 @@ export default {
   .preset-body {
     grid-template-columns: 1fr;
   }
+}
+
+/* Help button */
+.help-btn {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.help-btn:hover {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+  transform: translateY(-1px);
+}
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  max-width: 800px;
+  max-height: 80vh;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--text-primary);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 32px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--text-primary);
+}
+
+/* Macro reference content */
+.macro-reference {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.macro-category {
+  margin-bottom: 32px;
+}
+
+.macro-category:last-child {
+  margin-bottom: 0;
+}
+
+.macro-category h4 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: var(--accent-color);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.category-description {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.macro-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.macro-item {
+  background: var(--bg-secondary);
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.macro-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.macro-pattern {
+  background: var(--bg-tertiary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: var(--accent-color);
+  border: 1px solid var(--border-color);
+}
+
+.essential-badge {
+  background: var(--accent-color);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.macro-description {
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.macro-example {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 6px 0 0 0;
+  border-top: 1px solid var(--border-color);
+  margin-top: 6px;
+}
+
+.macro-example em {
+  font-style: italic;
+  margin-right: 6px;
+}
+
+.macro-example code {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
 }
 </style>
