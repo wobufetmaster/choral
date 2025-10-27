@@ -866,7 +866,16 @@ export default {
         // 1. Chat has messages
         // 2. Chat hasn't been auto-named before
         // 3. Title is still the default (character name or filename-based)
-        if (!chat || !chat.messages || chat.messages.length === 0) {
+
+        // Check for messages in both branch-based and flat structure
+        let hasMessages = false;
+        if (chat.branches && chat.currentBranch && chat.branches[chat.currentBranch]) {
+          hasMessages = chat.branches[chat.currentBranch].messages?.length > 0;
+        } else if (chat.messages) {
+          hasMessages = chat.messages.length > 0;
+        }
+
+        if (!chat || !hasMessages) {
           return;
         }
 
@@ -2651,7 +2660,19 @@ export default {
       return result;
     },
     async loadChatFromHistory(chat) {
-      this.messages = this.normalizeMessages(chat.messages || []);
+      // Handle both branch-based structure and old flat structure
+      if (chat.branches && chat.mainBranch) {
+        this.branches = chat.branches;
+        this.mainBranch = chat.mainBranch;
+        this.currentBranch = chat.currentBranch || chat.mainBranch;
+
+        // Load messages from current branch
+        const branch = this.branches[this.currentBranch];
+        this.messages = this.normalizeMessages(branch?.messages || []);
+      } else {
+        // Old format
+        this.messages = this.normalizeMessages(chat.messages || []);
+      }
 
       // Set display title from chat data
       this.chatDisplayTitle = chat.title || null;
@@ -2761,12 +2782,26 @@ export default {
       // Priority 2: For group chats, show character names
       if (chat.isGroupChat) {
         const names = chat.characters?.map(c => c.name).join(', ') || 'Group';
-        const messageCount = chat.messages?.length || 0;
+        // Get message count from branches if available
+        let messageCount = 0;
+        if (chat.branches && chat.currentBranch && chat.branches[chat.currentBranch]) {
+          messageCount = chat.branches[chat.currentBranch].messages?.length || 0;
+        } else {
+          messageCount = chat.messages?.length || 0;
+        }
         return `${names} (${messageCount} messages)`;
       }
 
       // Priority 3: Show preview of last message
-      const lastMessage = chat.messages?.[chat.messages.length - 1];
+      // Handle both branch-based structure and old flat structure
+      let messages = null;
+      if (chat.branches && chat.currentBranch && chat.branches[chat.currentBranch]) {
+        messages = chat.branches[chat.currentBranch].messages;
+      } else {
+        messages = chat.messages;
+      }
+
+      const lastMessage = messages?.[messages.length - 1];
       if (!lastMessage) return 'Empty chat';
 
       // Handle both old format (content) and new format (swipes)
