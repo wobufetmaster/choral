@@ -151,14 +151,27 @@
         </div>
       </div>
     </div>
+
+    <!-- Macro Warning Dialog -->
+    <MacroWarningDialog
+      v-if="showMacroWarningDialog"
+      :missing-macros="pendingMissingMacros"
+      @cancel="handleCancelSave"
+      @save-anyway="handleSaveAnyway"
+      @add-and-save="handleAddAndSave"
+    />
   </div>
 </template>
 
 <script>
 import { MACRO_DEFINITIONS, MACRO_CATEGORIES } from '../utils/macros.js';
+import MacroWarningDialog from './MacroWarningDialog.vue';
 
 export default {
   name: 'PresetSelector',
+  components: {
+    MacroWarningDialog
+  },
   props: {
     currentSettings: Object,
     tabData: {
@@ -172,7 +185,9 @@ export default {
       presets: [],
       selectedPreset: null,
       activePresetFilename: null,
-      showMacroReference: false  // NEW: controls modal visibility
+      showMacroReference: false,
+      showMacroWarningDialog: false,
+      pendingMissingMacros: []
     }
   },
   computed: {
@@ -189,6 +204,63 @@ export default {
   methods: {
     getMacrosForCategory(categoryKey) {
       return MACRO_DEFINITIONS.filter(m => m.category === categoryKey);
+    },
+    addMissingMacroPrompts(missingMacros) {
+      const MACRO_TEMPLATES = {
+        '{{description}}': {
+          name: 'Character Description',
+          content: 'Character: {{description}}',
+          injection_order: 100
+        },
+        '{{personality}}': {
+          name: 'Character Personality',
+          content: 'Personality: {{personality}}',
+          injection_order: 200
+        },
+        '{{scenario}}': {
+          name: 'Scenario',
+          content: 'Scenario: {{scenario}}',
+          injection_order: 300
+        },
+        '{{dialogue_examples}}': {
+          name: 'Example Dialogue',
+          content: 'Here are some examples of dialogue: {{dialogue_examples}}',
+          injection_order: 400
+        }
+      };
+
+      // Find insertion point - after last character-related prompt
+      let insertIndex = this.selectedPreset.prompts.length;
+
+      for (let i = this.selectedPreset.prompts.length - 1; i >= 0; i--) {
+        const content = this.selectedPreset.prompts[i].content || '';
+        const hasCharMacro = ['{{description}}', '{{personality}}', '{{scenario}}', '{{dialogue_examples}}']
+          .some(macro => content.includes(macro));
+
+        if (hasCharMacro) {
+          insertIndex = i + 1;
+          break;
+        }
+      }
+
+      // Create new prompts for missing macros
+      const newPrompts = missingMacros.map(macro => {
+        const template = MACRO_TEMPLATES[macro.pattern];
+        return {
+          identifier: `auto_${macro.pattern.replace(/[{}]/g, '')}_${Date.now()}`,
+          name: `Auto: ${template.name}`,
+          role: 'system',
+          content: template.content,
+          enabled: true,
+          injection_order: template.injection_order
+        };
+      });
+
+      // Sort by injection_order
+      newPrompts.sort((a, b) => a.injection_order - b.injection_order);
+
+      // Insert all at once
+      this.selectedPreset.prompts.splice(insertIndex, 0, ...newPrompts);
     },
     checkMissingEssentialMacros() {
       // Combine all enabled prompt content
@@ -318,15 +390,16 @@ export default {
       const missingMacros = this.checkMissingEssentialMacros();
 
       if (missingMacros.length > 0) {
-        const macroList = missingMacros.map(m => m.pattern).join(', ');
-        const confirmed = confirm(
-          `Warning: This preset is missing essential character macros:\n\n${macroList}\n\n` +
-          `Character cards won't be properly loaded without these macros.\n\n` +
-          `Save anyway?`
-        );
-        if (!confirmed) return;
+        // Show warning dialog with auto-fix option
+        this.pendingMissingMacros = missingMacros;
+        this.showMacroWarningDialog = true;
+        return; // Wait for user choice
       }
 
+      // No missing macros, proceed with save
+      await this.proceedWithSave();
+    },
+    async proceedWithSave() {
       try {
         // Ensure prompts array exists
         if (!this.selectedPreset.prompts) {
@@ -356,6 +429,20 @@ export default {
         console.error('Failed to save preset:', error);
         this.$root.$notify(`Failed to save preset: ${error.message}`, 'error');
       }
+    },
+    handleAddAndSave() {
+      this.addMissingMacroPrompts(this.pendingMissingMacros);
+      this.showMacroWarningDialog = false;
+      this.proceedWithSave();
+    },
+    handleSaveAnyway() {
+      this.showMacroWarningDialog = false;
+      this.proceedWithSave();
+    },
+    handleCancelSave() {
+      this.showMacroWarningDialog = false;
+      // Save is aborted, clear pending macros
+      this.pendingMissingMacros = [];
     },
     async deletePreset(filename) {
       if (!confirm('Delete this preset?')) return;
