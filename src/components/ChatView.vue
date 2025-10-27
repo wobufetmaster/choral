@@ -1327,6 +1327,24 @@ export default {
             const data = line.slice(6);
 
             if (data === '[DONE]') {
+              // Check if response is empty
+              const hasContent = this.streamingContent && this.streamingContent.trim().length > 0;
+
+              if (!hasContent) {
+                // Empty response - don't add swipe, just clean up and notify
+                this.streamingContent = '';
+                this.isStreaming = false;
+                this.isGeneratingSwipe = false;
+                this.generatingSwipeIndex = null;
+                this.currentSpeaker = null;
+                this.currentToolCall = null;
+                this.toolCallStartTime = null;
+                this.stopToolCallTimer();
+                this.nextSpeaker = null;
+                this.$root.$notify('Received empty response - swipe not added', 'warning');
+                return;
+              }
+
               // Add new assistant message with swipe
               if (this.isGeneratingSwipe && this.generatingSwipeIndex !== null) {
                 // Add to existing message's swipes
@@ -1495,8 +1513,8 @@ export default {
         this.abortController = null;
       }
 
-      // Save partial response if any content was generated
-      if (this.streamingContent) {
+      // Save partial response only if there's actual content (not just whitespace)
+      if (this.streamingContent && this.streamingContent.trim().length > 0) {
         if (this.isGeneratingSwipe && this.generatingSwipeIndex !== null) {
           // Add partial swipe
           const message = this.messages[this.generatingSwipeIndex];
