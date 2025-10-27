@@ -304,7 +304,14 @@
                 <button @click="cancelEdit" class="edit-cancel" title="Cancel">✕</button>
               </div>
             </div>
-            <div v-else class="message-content" v-html="sanitizeHtml(isGeneratingSwipe && generatingSwipeIndex === index ? streamingContent : getCurrentContent(message), message)" :title="`~${estimateTokens(getCurrentContent(message))} tokens`"></div>
+            <!-- Only show content when: not generating swipe for this message, or there's streaming content -->
+            <div v-else-if="!isGeneratingSwipe || generatingSwipeIndex !== index || streamingContent" class="message-content" v-html="sanitizeHtml(isGeneratingSwipe && generatingSwipeIndex === index ? streamingContent : getCurrentContent(message), message)" :title="`~${estimateTokens(getCurrentContent(message))} tokens`"></div>
+
+            <!-- Tool call indicator for swipe generation -->
+            <div v-else-if="isGeneratingSwipe && generatingSwipeIndex === index && currentToolCall" class="message-content tool-call-indicator">
+              <span class="tool-call-icon">🔧</span>
+              <span class="tool-call-text">Calling {{ currentToolCall }}... ({{ formatElapsedTime(toolCallElapsedTime) }})</span>
+            </div>
 
             <!-- Swipe navigation for assistant messages -->
             <div v-if="message.role === 'assistant' && getTotalSwipes(message) > 0" class="swipe-controls">
