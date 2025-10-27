@@ -135,7 +135,7 @@
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search characters..."
+            placeholder="Search characters by name or tag..."
             class="search-input"
           />
 
@@ -147,7 +147,7 @@
                 v-for="tag in allTags"
                 :key="tag.name"
                 @click="toggleTagFilter(tag.name)"
-                :class="['tag-badge', { 'tag-active': selectedTags.includes(tag.name) }]"
+                :class="['tag-badge', { 'tag-active': selectedTags.some(t => normalizeTag(t) === normalizeTag(tag.name)) }]"
                 :style="{ backgroundColor: tag.color, color: getTextColor(tag.color) }"
               >
                 {{ tag.name }}
@@ -207,7 +207,8 @@ export default {
       localExplicitMode: this.explicitMode,
       searchQuery: '',
       selectedTags: [],
-      showCharacterPicker: false
+      showCharacterPicker: false,
+      tagColors: {} // Store tag colors loaded from API
     };
   },
   computed: {
@@ -224,7 +225,7 @@ export default {
         const query = this.searchQuery.toLowerCase();
         filtered = filtered.filter(char => {
           const nameMatch = char.name.toLowerCase().includes(query);
-          const tagMatch = char.data?.tags?.some(tag =>
+          const tagMatch = char.tags?.some(tag =>
             tag.toLowerCase().includes(query)
           );
           return nameMatch || tagMatch;
@@ -234,9 +235,9 @@ export default {
       // Filter by selected tags
       if (this.selectedTags.length > 0) {
         filtered = filtered.filter(char => {
-          const charTags = char.data?.tags || [];
+          const charTags = char.tags || [];
           return this.selectedTags.every(selectedTag =>
-            charTags.some(tag => tag.toLowerCase() === selectedTag.toLowerCase())
+            charTags.some(tag => this.normalizeTag(tag) === this.normalizeTag(selectedTag))
           );
         });
       }
@@ -244,10 +245,10 @@ export default {
       return filtered;
     },
     allTags() {
-      // Collect all unique tags from available characters
+      // Collect all unique tags from ALL characters (same as CharacterList)
       const tagMap = new Map();
-      this.availableCharacters.forEach(char => {
-        const tags = char.data?.tags || [];
+      this.allCharacters.forEach(char => {
+        const tags = char.tags || [];
         tags.forEach(tag => {
           if (!tagMap.has(tag.toLowerCase())) {
             tagMap.set(tag.toLowerCase(), {
@@ -262,6 +263,9 @@ export default {
       );
     }
   },
+  async mounted() {
+    await this.loadTagColors();
+  },
   watch: {
     strategy(newVal) {
       this.localStrategy = newVal;
@@ -271,8 +275,24 @@ export default {
     }
   },
   methods: {
+    async loadTagColors() {
+      try {
+        const response = await fetch('/api/tags');
+        if (response.ok) {
+          this.tagColors = await response.json();
+        }
+      } catch (error) {
+        console.error('Failed to load tag colors:', error);
+      }
+    },
+    normalizeTag(tag) {
+      return tag.toLowerCase().trim();
+    },
     toggleTagFilter(tagName) {
-      const index = this.selectedTags.indexOf(tagName);
+      // Case-insensitive tag filter toggle (same as CharacterList)
+      const index = this.selectedTags.findIndex(t =>
+        this.normalizeTag(t) === this.normalizeTag(tagName)
+      );
       if (index > -1) {
         this.selectedTags.splice(index, 1);
       } else {
@@ -280,13 +300,9 @@ export default {
       }
     },
     getTagColor(tag) {
-      // Try to get color from local storage (same as CharacterList)
-      const tagColors = JSON.parse(localStorage.getItem('tagColors') || '{}');
-      if (tagColors[tag]) {
-        return tagColors[tag];
-      }
-      // Default gray color
-      return '#6b7280';
+      // Normalize tag before lookup (same as CharacterList)
+      const normalized = this.normalizeTag(tag);
+      return this.tagColors[normalized] || '#6b7280'; // Default gray color
     },
     getTextColor(backgroundColor) {
       // Calculate luminance to determine if text should be black or white

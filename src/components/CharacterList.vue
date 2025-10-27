@@ -277,7 +277,7 @@
           <div class="group-chat-filters">
             <input
               v-model="groupChatSearchQuery"
-              placeholder="Search characters..."
+              placeholder="Search characters by name or tag..."
               type="text"
               class="group-chat-search"
             />
