@@ -47,7 +47,9 @@ function mergeConsecutiveMessages(messages) {
 
     if (msg.role === current.role) {
       // Same role, merge content
-      current.content += '\n\n' + msg.content;
+      const currText = extractTextFromContent(current.content);
+      const msgText = extractTextFromContent(msg.content);
+      current.content = [{ type: 'text', text: currText + '\n\n' + msgText }];
     } else {
       // Different role, push current and start new
       merged.push(current);
@@ -103,7 +105,7 @@ function strictMode(messages) {
   // Collect system messages
   const systemContent = messages
     .filter(m => m.role === 'system')
-    .map(m => m.content)
+    .map(m => extractTextFromContent(m.content))
     .join('\n\n');
 
   // Get non-system messages
@@ -113,7 +115,7 @@ function strictMode(messages) {
   if (nonSystem.length > 0 && nonSystem[0].role !== 'user') {
     nonSystem.unshift({
       role: 'user',
-      content: '[Start of conversation]'
+      content: [{ type: 'text', text: '[Start of conversation]' }]
     });
   }
 
@@ -121,9 +123,10 @@ function strictMode(messages) {
   if (systemContent && nonSystem.length > 0) {
     const firstUserIndex = nonSystem.findIndex(m => m.role === 'user');
     if (firstUserIndex !== -1) {
+      const existingText = extractTextFromContent(nonSystem[firstUserIndex].content);
       nonSystem[firstUserIndex] = {
         ...nonSystem[firstUserIndex],
-        content: systemContent + '\n\n' + nonSystem[firstUserIndex].content
+        content: [{ type: 'text', text: systemContent + '\n\n' + existingText }]
       };
     }
   }
@@ -173,7 +176,9 @@ function semiStrictMode(messages) {
     } else {
       if (result.length > 0 && result[result.length - 1].role === msg.role) {
         // Merge with previous
-        result[result.length - 1].content += '\n\n' + msg.content;
+        const prevText = extractTextFromContent(result[result.length - 1].content);
+        const currText = extractTextFromContent(msg.content);
+        result[result.length - 1].content = [{ type: 'text', text: prevText + '\n\n' + currText }];
       } else {
         result.push(msg);
       }
@@ -193,12 +198,12 @@ function singleUserMode(messages) {
 
   const allContent = messages.map(msg => {
     const roleLabel = msg.role.charAt(0).toUpperCase() + msg.role.slice(1);
-    return `[${roleLabel}]\n${msg.content}`;
+    return `[${roleLabel}]\n${extractTextFromContent(msg.content)}`;
   }).join('\n\n');
 
   return [{
     role: 'user',
-    content: allContent
+    content: [{ type: 'text', text: allContent }]
   }];
 }
 
@@ -216,7 +221,7 @@ function anthropicPrefillMode(messages, prefill = '') {
   if (prefill && result.length > 0 && result[result.length - 1].role === 'user') {
     result.push({
       role: 'assistant',
-      content: prefill
+      content: [{ type: 'text', text: prefill }]
     });
   }
 
