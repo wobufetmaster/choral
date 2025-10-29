@@ -2012,15 +2012,30 @@ export default {
     },
     async copyMessage(content) {
       try {
+        let htmlContent = content;
+
+        // Handle array content (multimodal messages)
+        if (Array.isArray(content)) {
+          htmlContent = content
+            .map(part => {
+              if (part.type === 'text') return part.text;
+              if (part.type === 'image_url') {
+                return `<img src="${part.image_url.url}" alt="Attached image" style="max-width: 100%; border-radius: 8px;">`;
+              }
+              return '';
+            })
+            .join('\n');
+        }
+
         // Copy both HTML and plain text
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = content;
+        tempDiv.innerHTML = htmlContent;
         const textContent = tempDiv.textContent || tempDiv.innerText || '';
 
         // Use the modern Clipboard API with both formats
         await navigator.clipboard.write([
           new ClipboardItem({
-            'text/html': new Blob([content], { type: 'text/html' }),
+            'text/html': new Blob([htmlContent], { type: 'text/html' }),
             'text/plain': new Blob([textContent], { type: 'text/plain' })
           })
         ]);
@@ -2029,8 +2044,23 @@ export default {
       } catch (err) {
         // Fallback to plain text if HTML copy fails
         try {
+          let htmlContent = content;
+
+          // Handle array content (multimodal messages)
+          if (Array.isArray(content)) {
+            htmlContent = content
+              .map(part => {
+                if (part.type === 'text') return part.text;
+                if (part.type === 'image_url') {
+                  return `<img src="${part.image_url.url}" alt="Attached image" style="max-width: 100%; border-radius: 8px;">`;
+                }
+                return '';
+              })
+              .join('\n');
+          }
+
           const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = content;
+          tempDiv.innerHTML = htmlContent;
           const textContent = tempDiv.textContent || tempDiv.innerText || '';
           await navigator.clipboard.writeText(textContent);
           this.$root.$notify('Message copied (plain text)', 'success');
@@ -3053,7 +3083,16 @@ export default {
       this.debugInfo.assistantMessageCount = messages.filter(m => m.role === 'assistant').length;
 
       // Estimate total tokens
-      const allText = messages.map(m => m.content).join(' ');
+      const allText = messages.map(m => {
+        if (typeof m.content === 'string') return m.content;
+        if (Array.isArray(m.content)) {
+          return m.content
+            .filter(part => part.type === 'text')
+            .map(part => part.text)
+            .join(' ');
+        }
+        return '';
+      }).join(' ');
       this.debugInfo.estimatedTokens = this.estimateTokens(allText);
 
       // matched entries will be populated by the server response
