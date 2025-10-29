@@ -116,10 +116,36 @@ function clearPickCache() {
  * @returns {Array} - Messages with macros processed
  */
 function processMessagesWithMacros(messages, context) {
-  return messages.map(msg => ({
-    ...msg,
-    content: processMacros(msg.content, context)
-  }));
+  return messages.map((message) => {
+    // Handle string content (legacy)
+    if (typeof message.content === 'string') {
+      return {
+        ...message,
+        content: processMacros(message.content, context),
+      };
+    }
+
+    // Handle array content (multimodal)
+    if (Array.isArray(message.content)) {
+      return {
+        ...message,
+        content: message.content.map((part) => {
+          // Only process text parts
+          if (part.type === 'text') {
+            return {
+              ...part,
+              text: processMacros(part.text, context),
+            };
+          }
+          // Pass through image_url parts unchanged
+          return part;
+        }),
+      };
+    }
+
+    // Pass through unchanged if neither
+    return message;
+  });
 }
 
 /**
