@@ -37,10 +37,11 @@ function getApiKey() {
  * @param {Array} params.tools - Optional tool definitions for tool calling
  * @param {Function} params.onChunk - Callback for each chunk of streamed data
  * @param {Function} params.onToolCall - Callback when a tool call is detected
+ * @param {Function} params.onImages - Callback when AI-generated images are received
  * @param {Function} params.onComplete - Callback when streaming is complete
  * @param {Function} params.onError - Callback for errors
  */
-function streamChatCompletion({ messages, model, options = {}, tools, onChunk, onToolCall, onToolCallStart, onComplete, onError }) {
+function streamChatCompletion({ messages, model, options = {}, tools, onChunk, onToolCall, onToolCallStart, onImages, onComplete, onError }) {
   const apiKey = getApiKey();
 
   if (!apiKey) {
@@ -145,6 +146,12 @@ function streamChatCompletion({ messages, model, options = {}, tools, onChunk, o
             // Handle text content
             if (delta?.content) {
               onChunk(delta.content);
+            }
+
+            // Handle images in the response (AI-generated images)
+            if (parsed.choices?.[0]?.message?.images && onImages) {
+              const images = parsed.choices[0].message.images;
+              onImages(images);
             }
 
             // Handle tool calls

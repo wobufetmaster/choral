@@ -2807,6 +2807,11 @@ app.post('/api/chat/stream', async (req, res) => {
       console.log('Tool call starting:', toolName);
       res.write(`data: ${JSON.stringify({ type: 'tool_call_start', toolName })}\n\n`);
     },
+    onImages: (images) => {
+      // Handle AI-generated images from OpenRouter response
+      console.log('AI-generated images received:', images.length);
+      res.write(`data: ${JSON.stringify({ type: 'images', images })}\n\n`);
+    },
     onToolCall: async (toolCall) => {
       try {
         console.log('Tool call detected:', JSON.stringify(toolCall, null, 2));

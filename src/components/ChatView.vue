@@ -501,6 +501,7 @@ export default {
       showDebug: false,
       showGroupManager: false,
       showImageModal: false,
+      pendingImages: null, // Temporary storage for AI-generated images
       currentPresetName: null,
       currentPresetFilename: null,
       availablePresets: [],
@@ -1530,8 +1531,16 @@ export default {
                   newMessage.swipeCharacters = [this.currentSpeaker];
                 }
 
+                // Add AI-generated images if present
+                if (this.pendingImages && this.pendingImages.length > 0) {
+                  newMessage.images = this.pendingImages;
+                }
+
                 this.messages.push(newMessage);
               }
+
+              // Clear pending images
+              this.pendingImages = null;
 
               this.streamingContent = '';
               this.isStreaming = false;
@@ -1646,6 +1655,13 @@ export default {
                 console.error('Tool error:', parsed.error);
                 this.streamingContent += `\n\n✗ Error executing tool: ${parsed.error}\n\n`;
                 this.$root.$notify('Tool execution failed', 'error');
+                this.$nextTick(() => this.scrollToBottom());
+              } else if (parsed.type === 'images') {
+                // Handle AI-generated images
+                console.log('AI-generated images received:', parsed.images);
+                // Find the last assistant message (could be streaming or the one we're about to create)
+                // We'll store the images temporarily and add them when [DONE] is received
+                this.pendingImages = parsed.images;
                 this.$nextTick(() => this.scrollToBottom());
               } else if (parsed.content) {
                 this.streamingContent += parsed.content;
