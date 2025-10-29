@@ -1126,6 +1126,77 @@ export default {
         this.$root.$notify('Failed to get response', 'error');
       }
     },
+    async handleImageMessage({ text, images }) {
+      // Close modal
+      this.showImageModal = false;
+
+      // Build message content array
+      const content = [];
+
+      // Add text if provided
+      if (text.trim()) {
+        content.push({ type: 'text', text: text.trim() });
+      }
+
+      // Add images
+      for (const img of images) {
+        content.push({
+          type: 'image_url',
+          image_url: {
+            url: img.dataUrl, // Already in base64 format
+          },
+        });
+      }
+
+      // Create message object
+      const userMessage = {
+        role: 'user',
+        content: content, // Array format for multimodal
+        _id: Date.now() + Math.random() // Unique ID for Vue key
+      };
+
+      // Add to messages
+      this.messages.push(userMessage);
+
+      // Reset scroll lock when user sends a message (they want to see it)
+      this.userHasScrolledUp = false;
+      this.$nextTick(() => this.scrollToBottom(true));
+
+      // For group chats in explicit mode, just add the message without generating response
+      if (this.isGroupChat && this.groupChatExplicitMode) {
+        // Save the group chat with the new user message
+        await this.saveGroupChat();
+        this.$root.$notify('Message added. Select a character to respond.', 'info');
+        return;
+      }
+
+      // For group chats in auto mode, pick a random character to respond
+      if (this.isGroupChat && this.groupChatCharacters.length > 0) {
+        const randomIndex = Math.floor(Math.random() * this.groupChatCharacters.length);
+        this.currentSpeaker = this.groupChatCharacters[randomIndex].filename;
+        console.log('Random character selected:', this.currentSpeaker);
+      }
+
+      // Build context for API
+      const context = this.buildContext();
+
+      // Start streaming
+      this.isStreaming = true;
+      this.streamingContent = '';
+      this.userHasScrolledUp = false; // Reset scroll lock when AI starts responding
+
+      try {
+        await this.streamResponse(context);
+      } catch (error) {
+        // Ignore AbortError - user cancelled the request
+        if (error.name === 'AbortError') {
+          return;
+        }
+        console.error('Error streaming response:', error);
+        this.isStreaming = false;
+        this.$root.$notify('Failed to get response', 'error');
+      }
+    },
     buildContext(upToMessageIndex = null) {
       // Use group chat context builder if in group chat mode
       if (this.isGroupChat) {
