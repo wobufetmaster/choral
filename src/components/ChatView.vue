@@ -305,7 +305,55 @@
               </div>
             </div>
             <!-- Only show content when: not generating swipe for this message, or there's streaming content -->
-            <div v-else-if="!isGeneratingSwipe || generatingSwipeIndex !== index || streamingContent" class="message-content" v-html="sanitizeHtml(isGeneratingSwipe && generatingSwipeIndex === index ? streamingContent : getCurrentContent(message), message)" :title="`~${estimateTokens(getCurrentContent(message))} tokens`"></div>
+            <div v-else-if="!isGeneratingSwipe || generatingSwipeIndex !== index || streamingContent" class="message-content">
+              <!-- Handle string content (legacy text-only messages) -->
+              <div
+                v-if="typeof getCurrentContent(message) === 'string'"
+                class="message-text"
+                v-html="sanitizeHtml(isGeneratingSwipe && generatingSwipeIndex === index ? streamingContent : getCurrentContent(message), message)"
+                :title="`~${estimateTokens(getCurrentContent(message))} tokens`"
+              ></div>
+
+              <!-- Handle array content (multimodal messages) -->
+              <template v-else-if="Array.isArray(getCurrentContent(message))">
+                <div
+                  v-for="(part, partIndex) in getCurrentContent(message)"
+                  :key="partIndex"
+                  class="content-part"
+                >
+                  <!-- Text part -->
+                  <div
+                    v-if="part.type === 'text'"
+                    class="message-text"
+                    v-html="sanitizeHtml(part.text, message)"
+                  ></div>
+
+                  <!-- Image part -->
+                  <div v-else-if="part.type === 'image_url'" class="message-image">
+                    <img
+                      :src="part.image_url.url"
+                      alt="Attached image"
+                      class="inline-image"
+                    />
+                  </div>
+                </div>
+              </template>
+
+              <!-- Handle AI-generated images (separate images field) -->
+              <div v-if="message.images && message.images.length > 0" class="ai-generated-images">
+                <div
+                  v-for="(img, imgIndex) in message.images"
+                  :key="imgIndex"
+                  class="message-image"
+                >
+                  <img
+                    :src="img.image_url.url"
+                    alt="AI-generated image"
+                    class="inline-image"
+                  />
+                </div>
+              </div>
+            </div>
 
             <!-- Tool call indicator for swipe generation -->
             <div v-else-if="isGeneratingSwipe && generatingSwipeIndex === index && currentToolCall" class="message-content tool-call-indicator">
@@ -4690,6 +4738,34 @@ button.active {
   color: var(--text-secondary);
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+/* Image support styles */
+.content-part {
+  margin-bottom: 0.5rem;
+}
+
+.message-text {
+  /* Inherits all existing .message-content text styling */
+}
+
+.message-image {
+  margin-top: 0.5rem;
+}
+
+.inline-image {
+  max-width: 100%;
+  max-height: 600px;
+  border-radius: 8px;
+  display: block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.ai-generated-images {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 @media (max-width: 768px) {
