@@ -132,16 +132,36 @@ export default {
       }
 
       try {
-        const dataUrl = await this.readFileAsDataURL(file);
+        let dataUrl = await this.readFileAsDataURL(file);
+
+        // Calculate actual base64 size from data URL
+        // The base64 string length IS the number of bytes that will be sent
+        const base64String = dataUrl.split(',')[1];
+        let actualSize = base64String.length; // This is the actual byte size that gets transmitted
+
+        // Check if image exceeds 5MB (most providers' limit)
+        const MAX_SIZE_MB = 5;
+        const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
+        console.log(`Original image base64: ${(actualSize / (1024 * 1024)).toFixed(2)}MB, file size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+
+        if (actualSize > MAX_SIZE_BYTES) {
+          this.$root.$notify(`Image is ${(actualSize / (1024 * 1024)).toFixed(1)}MB. Compressing to fit 5MB limit...`, 'info');
+          const compressed = await this.compressImage(dataUrl, MAX_SIZE_BYTES);
+          dataUrl = compressed.dataUrl;
+          actualSize = compressed.size;
+          console.log(`Compressed to: ${(actualSize / (1024 * 1024)).toFixed(2)}MB`);
+        }
+
         this.attachedImages.push({
           dataUrl,
           filename: file.name,
-          size: file.size,
+          size: actualSize,
           type: file.type,
         });
       } catch (error) {
-        console.error('Failed to read image:', error);
-        this.$root.$notify('Failed to read image file', 'error');
+        console.error('Failed to read/compress image:', error);
+        this.$root.$notify(`Failed to process image: ${error.message}`, 'error');
       }
     },
 
@@ -151,6 +171,54 @@ export default {
         reader.onload = () => resolve(reader.result);
         reader.onerror = reject;
         reader.readAsDataURL(file);
+      });
+    },
+
+    async compressImage(dataUrl, maxSizeBytes) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          let result = null;
+
+          // Try progressively smaller dimensions until we're under the limit
+          // Note: PNG compression doesn't support quality parameter, so we only scale
+          for (let scale = 1.0; scale >= 0.2; scale -= 0.05) {
+            const scaledWidth = Math.floor(width * scale);
+            const scaledHeight = Math.floor(height * scale);
+
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+
+            const compressed = canvas.toDataURL('image/png');
+
+            // Calculate actual base64 size (the base64 string length IS the transmitted size)
+            const base64String = compressed.split(',')[1];
+            const size = base64String.length;
+
+            console.log(`Trying scale ${scale.toFixed(2)}: ${(size / (1024 * 1024)).toFixed(2)}MB`);
+
+            if (size <= maxSizeBytes) {
+              result = { dataUrl: compressed, size };
+              console.log(`Success! Final size: ${(size / (1024 * 1024)).toFixed(2)}MB at ${(scale * 100).toFixed(0)}% scale`);
+              break;
+            }
+          }
+
+          if (result) {
+            resolve(result);
+          } else {
+            reject(new Error('Unable to compress image below 5MB'));
+          }
+        };
+        img.onerror = () => reject(new Error('Failed to load image for compression'));
+        img.src = dataUrl;
       });
     },
 

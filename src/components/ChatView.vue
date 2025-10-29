@@ -411,7 +411,7 @@
         <button v-if="isStreaming" @click="stopStreaming" class="stop-btn">
           Stop
         </button>
-        <button v-else @click="sendMessage" :disabled="!userInput.trim()">
+        <button v-else @click="sendMessage">
           Send
         </button>
       </div>
@@ -1571,6 +1571,20 @@ export default {
 
             try {
               const parsed = JSON.parse(data);
+
+              // Check for error from server
+              if (parsed.error) {
+                console.error('API Error:', parsed.error);
+                this.isStreaming = false;
+                this.isGeneratingSwipe = false;
+                this.generatingSwipeIndex = null;
+                this.currentSpeaker = null;
+                this.currentToolCall = null;
+                this.stopToolCallTimer();
+                this.$root.$notify(`API Error: ${parsed.error}`, 'error');
+                return;
+              }
+
               if (parsed.type === 'debug') {
                 // Handle debug information from server
                 console.log('Received debug info:', parsed.debug);

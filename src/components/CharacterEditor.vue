@@ -374,16 +374,56 @@ function triggerImageUpload() {
   imageInput.value.click()
 }
 
-function handleImageUpload(event) {
+async function handleImageUpload(event) {
   const file = event.target.files[0]
   if (file) {
-    imageFile.value = file
+    // Check if it's a JPEG and convert to PNG
+    if (file.type === 'image/jpeg' || file.type === 'image/jpg') {
+      try {
+        const dataUrl = await convertToPNG(file)
+        imagePreview.value = dataUrl
+
+        // Convert data URL back to File object for upload
+        const response = await fetch(dataUrl)
+        const blob = await response.blob()
+        imageFile.value = new File([blob], file.name.replace(/\.(jpg|jpeg)$/i, '.png'), { type: 'image/png' })
+      } catch (error) {
+        console.error('Failed to convert JPEG to PNG:', error)
+        if (instance?.appContext?.config?.globalProperties?.$root?.$notify) {
+          instance.appContext.config.globalProperties.$root.$notify('Failed to convert image to PNG', 'error')
+        }
+      }
+    } else {
+      imageFile.value = file
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        imagePreview.value = e.target.result
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+}
+
+function convertToPNG(file) {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
-      imagePreview.value = e.target.result
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        const pngDataUrl = canvas.toDataURL('image/png')
+        resolve(pngDataUrl)
+      }
+      img.onerror = reject
+      img.src = e.target.result
     }
+    reader.onerror = reject
     reader.readAsDataURL(file)
-  }
+  })
 }
 
 function addGreeting() {

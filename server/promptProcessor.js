@@ -196,14 +196,40 @@ function semiStrictMode(messages) {
 function singleUserMode(messages) {
   if (!messages || messages.length === 0) return [];
 
-  const allContent = messages.map(msg => {
+  const content = [];
+  const textParts = [];
+  const imageParts = [];
+
+  // Process each message
+  for (const msg of messages) {
     const roleLabel = msg.role.charAt(0).toUpperCase() + msg.role.slice(1);
-    return `[${roleLabel}]\n${extractTextFromContent(msg.content)}`;
-  }).join('\n\n');
+    const textContent = extractTextFromContent(msg.content);
+
+    if (textContent) {
+      textParts.push(`[${roleLabel}]\n${textContent}`);
+    }
+
+    // Collect image_url parts
+    if (Array.isArray(msg.content)) {
+      for (const part of msg.content) {
+        if (part.type === 'image_url') {
+          imageParts.push(part);
+        }
+      }
+    }
+  }
+
+  // Add combined text as first part
+  if (textParts.length > 0) {
+    content.push({ type: 'text', text: textParts.join('\n\n') });
+  }
+
+  // Add all images after the text
+  content.push(...imageParts);
 
   return [{
     role: 'user',
-    content: [{ type: 'text', text: allContent }]
+    content: content
   }];
 }
 
