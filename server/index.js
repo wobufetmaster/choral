@@ -146,6 +146,25 @@ function normalizeTag(tag) {
   return tag.toLowerCase().trim();
 }
 
+// Normalize message content to array format for OpenRouter multimodal API
+function normalizeMessageContent(message) {
+  // If content is already an array, pass through
+  if (Array.isArray(message.content)) {
+    return { ...message, content: message.content };
+  }
+
+  // If string, convert to array format
+  if (typeof message.content === 'string') {
+    return {
+      ...message,
+      content: [{ type: 'text', text: message.content }],
+    };
+  }
+
+  // Otherwise, pass through unchanged
+  return message;
+}
+
 // Ensure data directories exist
 async function ensureDirectories() {
   await fs.mkdir(CHARACTERS_DIR, { recursive: true });
@@ -2744,13 +2763,16 @@ app.post('/api/chat/stream', async (req, res) => {
   const processingMode = promptProcessing || 'merge_system';
   processedMessages = processPrompt(processedMessages, processingMode, options);
 
+  // Normalize all messages to array format for multimodal support
+  const normalizedMessages = processedMessages.map(normalizeMessageContent);
+
   // Add processed messages to debug info
-  debugInfo.processedMessages = processedMessages;
+  debugInfo.processedMessages = normalizedMessages;
 
   // Log the request
   logRequest({
     model,
-    messages: processedMessages,
+    messages: normalizedMessages,
     options,
     context,
     promptProcessing: processingMode,
@@ -2771,7 +2793,7 @@ app.post('/api/chat/stream', async (req, res) => {
   let fullResponse = '';
 
   streamChatCompletion({
-    messages: processedMessages,
+    messages: normalizedMessages,
     model,
     options,
     tools: processedTools, // Pass processed tools with expanded macros
@@ -2908,10 +2930,13 @@ app.post('/api/chat', async (req, res) => {
     const processingMode = promptProcessing || 'merge_system';
     processedMessages = processPrompt(processedMessages, processingMode, options);
 
+    // Normalize all messages to array format for multimodal support
+    const normalizedMessages = processedMessages.map(normalizeMessageContent);
+
     // Log the request
     logRequest({
       model,
-      messages: processedMessages,
+      messages: normalizedMessages,
       options,
       context,
       promptProcessing: processingMode,
@@ -2919,7 +2944,7 @@ app.post('/api/chat', async (req, res) => {
       streaming: false
     });
 
-    const response = await chatCompletion({ messages: processedMessages, model, options, tools: processedTools });
+    const response = await chatCompletion({ messages: normalizedMessages, model, options, tools: processedTools });
 
     // Check if response contains tool calls
     if (typeof response === 'object' && response.tool_calls) {
