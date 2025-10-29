@@ -917,6 +917,11 @@ export default {
         // Capture the custom title if it exists
         this.chatDisplayTitle = chat.title || null;
 
+        // Load persona if saved in chat
+        if (chat.personaFilename) {
+          await this.handlePersonaChange(chat.personaFilename);
+        }
+
         // Trigger auto-naming if chat has messages and hasn't been named yet
         await this.autoNameChat(chatId, chat);
 
@@ -1041,7 +1046,8 @@ export default {
           filename: this.chatId || `chat_${Date.now()}.json`,
           character: this.character?.data.name || 'Unknown',
           characterFilename: this.tabData?.characterId || this.$route?.query?.character,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          personaFilename: this.persona?._filename || null
         };
 
         // Include branch structure if it exists
@@ -2889,6 +2895,11 @@ export default {
 
       // Set display title from chat data
       this.chatDisplayTitle = chat.title || null;
+
+      // Load persona if saved in chat
+      if (chat.personaFilename) {
+        await this.handlePersonaChange(chat.personaFilename);
+      }
 
       if (chat.isGroupChat) {
         this.groupChatId = chat.filename;
