@@ -1,9 +1,9 @@
 <template>
-  <div class="modal-overlay" @click="$emit('close')">
+  <div class="modal-overlay" @click="closeModal">
     <div class="modal-content image-attachment-modal" @click.stop>
       <div class="modal-header">
         <h3>Compose Message with Images</h3>
-        <button @click="$emit('close')" class="close-button">×</button>
+        <button @click="closeModal" class="close-button">×</button>
       </div>
 
       <div class="modal-body">
@@ -57,7 +57,7 @@
       </div>
 
       <div class="modal-footer">
-        <button @click="$emit('close')" class="cancel-btn">Cancel</button>
+        <button @click="closeModal" class="cancel-btn">Cancel</button>
         <button
           @click="sendMessage"
           :disabled="!canSend"
@@ -73,11 +73,17 @@
 <script>
 export default {
   name: 'ImageAttachmentModal',
-  emits: ['close', 'send'],
+  props: {
+    initialImages: {
+      type: Array,
+      default: () => []
+    }
+  },
+  emits: ['close', 'send', 'update-pending'],
   data() {
     return {
       messageText: '',
-      attachedImages: [], // { dataUrl, filename, size, type }
+      attachedImages: [...this.initialImages], // { dataUrl, filename, size, type }
     };
   },
   computed: {
@@ -156,6 +162,12 @@ export default {
       if (bytes < 1024) return bytes + ' B';
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
       return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    },
+
+    closeModal() {
+      // Save any pending images before closing
+      this.$emit('update-pending', this.attachedImages);
+      this.$emit('close');
     },
 
     sendMessage() {

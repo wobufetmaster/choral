@@ -406,6 +406,7 @@
         ></textarea>
         <button @click="showImageModal = true" class="attach-btn" :disabled="isStreaming">
           📎
+          <span v-if="pendingUserImages.length > 0" class="badge">{{ pendingUserImages.length }}</span>
         </button>
         <button v-if="isStreaming" @click="stopStreaming" class="stop-btn">
           Stop
@@ -436,7 +437,9 @@
     <!-- Image Attachment Modal -->
     <ImageAttachmentModal
       v-if="showImageModal"
+      :initialImages="pendingUserImages"
       @close="showImageModal = false"
+      @update-pending="pendingUserImages = $event"
       @send="handleImageMessage"
     />
 
@@ -502,6 +505,7 @@ export default {
       showGroupManager: false,
       showImageModal: false,
       pendingImages: null, // Temporary storage for AI-generated images
+      pendingUserImages: [], // User images queued for next message
       currentPresetName: null,
       currentPresetFilename: null,
       availablePresets: [],
@@ -1185,6 +1189,9 @@ export default {
 
       // Close modal
       this.showImageModal = false;
+
+      // Clear pending images since we're sending them now
+      this.pendingUserImages = [];
 
       // Build message content array
       const content = [];
@@ -4212,6 +4219,25 @@ button.active {
 .input-area .stop-btn:hover {
   background: #c82333;
   opacity: 1;
+}
+
+.attach-btn {
+  position: relative;
+}
+
+.attach-btn .badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: var(--accent-color);
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  line-height: 1;
+  min-width: 18px;
+  text-align: center;
 }
 
 .settings-panel {
