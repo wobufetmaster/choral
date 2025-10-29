@@ -2759,12 +2759,13 @@ app.post('/api/chat/stream', async (req, res) => {
     }
   }
 
+  // Normalize all messages to array format for multimodal support FIRST
+  // This must happen before prompt processing so the processor can handle array content
+  processedMessages = processedMessages.map(normalizeMessageContent);
+
   // Apply prompt post-processing
   const processingMode = promptProcessing || 'merge_system';
-  processedMessages = processPrompt(processedMessages, processingMode, options);
-
-  // Normalize all messages to array format for multimodal support
-  const normalizedMessages = processedMessages.map(normalizeMessageContent);
+  const normalizedMessages = processPrompt(processedMessages, processingMode, options);
 
   // Add processed messages to debug info
   debugInfo.processedMessages = normalizedMessages;
@@ -2931,12 +2932,13 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
+    // Normalize all messages to array format for multimodal support FIRST
+    // This must happen before prompt processing so the processor can handle array content
+    processedMessages = processedMessages.map(normalizeMessageContent);
+
     // Apply prompt post-processing
     const processingMode = promptProcessing || 'merge_system';
-    processedMessages = processPrompt(processedMessages, processingMode, options);
-
-    // Normalize all messages to array format for multimodal support
-    const normalizedMessages = processedMessages.map(normalizeMessageContent);
+    const normalizedMessages = processPrompt(processedMessages, processingMode, options);
 
     // Log the request
     logRequest({

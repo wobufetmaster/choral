@@ -16,6 +16,22 @@ const MODES = {
 };
 
 /**
+ * Extract text content from message content (handles both string and array formats)
+ * @param {string|Array} content - Message content
+ * @returns {string} - Extracted text
+ */
+function extractTextFromContent(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter(part => part.type === 'text')
+      .map(part => part.text)
+      .join('\n\n');
+  }
+  return '';
+}
+
+/**
  * Merge consecutive messages with the same role
  * @param {Array} messages
  * @returns {Array}
@@ -56,7 +72,7 @@ function mergeSystemMessages(messages) {
 
   for (const msg of messages) {
     if (msg.role === 'system') {
-      systemMessages.push(msg.content);
+      systemMessages.push(extractTextFromContent(msg.content));
     } else {
       otherMessages.push(msg);
     }
@@ -67,7 +83,7 @@ function mergeSystemMessages(messages) {
   if (systemMessages.length > 0) {
     result.push({
       role: 'system',
-      content: systemMessages.join('\n\n')
+      content: [{ type: 'text', text: systemMessages.join('\n\n') }]
     });
   }
 
