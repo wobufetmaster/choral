@@ -1127,6 +1127,13 @@ export default {
       }
     },
     async handleImageMessage({ text, images }) {
+      // Validate we have content to send
+      if (!text.trim() && (!images || images.length === 0)) {
+        this.showImageModal = false;
+        this.$root.$notify('Cannot send empty message', 'error');
+        return;
+      }
+
       // Close modal
       this.showImageModal = false;
 
@@ -1161,6 +1168,13 @@ export default {
       // Reset scroll lock when user sends a message (they want to see it)
       this.userHasScrolledUp = false;
       this.$nextTick(() => this.scrollToBottom(true));
+
+      // Save immediately to prevent loss if stream fails
+      if (this.isGroupChat) {
+        await this.saveGroupChat(false); // false = don't show notification
+      } else {
+        await this.saveChat(false);
+      }
 
       // For group chats in explicit mode, just add the message without generating response
       if (this.isGroupChat && this.groupChatExplicitMode) {
