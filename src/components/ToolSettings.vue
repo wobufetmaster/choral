@@ -5,107 +5,127 @@
     </div>
 
     <div class="tool-settings-content">
-        <!-- Global Toggle -->
-        <div class="settings-section">
-          <label class="toggle-setting">
-            <input type="checkbox" v-model="settings.enableToolCalling" />
-            <span>Enable Tool Calling</span>
-          </label>
-          <p class="setting-description">
-            When enabled, characters can use tools like creating character cards, generating images, etc.
+      <!-- Global Toggle -->
+      <div class="settings-section">
+        <label class="toggle-setting">
+          <input type="checkbox" v-model="settings.enableToolCalling" />
+          <span>Enable Tool Calling</span>
+        </label>
+        <p class="setting-description">
+          When enabled, characters can use tools like creating character cards, generating images, etc.
+        </p>
+      </div>
+
+      <!-- Character Tool Permissions -->
+      <div class="settings-section" v-if="settings.enableToolCalling">
+        <h4>Character Tool Permissions</h4>
+        <p class="setting-description">
+          Click a character card to configure which tools they can access.
+        </p>
+
+        <CharacterGridPicker
+          :characters="characters"
+          @select="openToolModal"
+          grid-class="tool-settings-grid"
+          card-class="tool-settings-card"
+          image-class="tool-settings-image"
+        >
+          <template #card-footer="{ character }">
+            <div :class="['tool-status-badge', getToolStatusClass(character.filename)]">
+              {{ getToolStatusText(character.filename) }}
+            </div>
+          </template>
+        </CharacterGridPicker>
+      </div>
+
+      <!-- Available Tools Info -->
+      <div class="settings-section">
+        <h4>Available Tools</h4>
+        <div class="tools-info">
+          <div v-for="tool in availableTools" :key="tool.id" class="tool-info-item">
+            <strong>{{ tool.name }}</strong>
+            <p>{{ tool.description }}</p>
+          </div>
+          <p v-if="availableTools.length === 0" class="no-tools">
+            No tools are currently available.
           </p>
         </div>
-
-        <!-- Character Tool Permissions -->
-        <div class="settings-section" v-if="settings.enableToolCalling">
-          <h4>Character Tool Permissions</h4>
-          <p class="setting-description">
-            Configure which tools each character can access.
-          </p>
-
-          <!-- Search and Filter -->
-          <div class="search-filter">
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search characters by name or tag..."
-              class="search-input"
-            />
-            <div v-if="allTags.length > 0" class="tag-filter">
-              <span class="filter-label">Filter by tag:</span>
-              <div class="filter-tags">
-                <button
-                  v-for="tag in allTags"
-                  :key="tag"
-                  :class="['filter-tag', { active: selectedTags.includes(tag) }]"
-                  @click="toggleTagFilter(tag)"
-                >
-                  {{ tag }}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="character-tools-list">
-            <div
-              v-for="character in filteredCharacters"
-              :key="character.filename"
-              class="character-tool-item"
-            >
-              <div class="character-info">
-                <img
-                  v-if="character.avatar"
-                  :src="character.avatar"
-                  :alt="character.name"
-                  class="character-avatar-small"
-                />
-                <span class="character-name">{{ character.name }}</span>
-              </div>
-
-              <div class="tool-checkboxes">
-                <label
-                  v-for="tool in availableTools"
-                  :key="tool.id"
-                  class="tool-checkbox"
-                  :title="tool.description"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="isToolEnabled(character.filename, tool.id)"
-                    @change="toggleTool(character.filename, tool.id)"
-                  />
-                  <span>{{ tool.name }}</span>
-                </label>
-                <span v-if="availableTools.length === 0" class="no-tools">No tools available</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Available Tools Info -->
-        <div class="settings-section">
-          <h4>Available Tools</h4>
-          <div class="tools-info">
-            <div v-for="tool in availableTools" :key="tool.id" class="tool-info-item">
-              <strong>{{ tool.name }}</strong>
-              <p>{{ tool.description }}</p>
-            </div>
-            <p v-if="availableTools.length === 0" class="no-tools">
-              No tools are currently available.
-            </p>
-          </div>
-        </div>
+      </div>
     </div>
 
     <div class="page-footer">
       <button @click="saveSettings" class="btn-primary">💾 Save Settings</button>
     </div>
+
+    <!-- Tool Configuration Modal -->
+    <div
+      v-if="showToolModal"
+      class="tool-modal-backdrop"
+      @click.self="closeToolModal"
+    >
+      <div class="tool-modal">
+        <div class="tool-modal-header">
+          <div class="modal-character-info">
+            <img
+              :src="`/api/characters/${selectedCharacter.filename}/image`"
+              :alt="selectedCharacter.name"
+              class="modal-character-avatar"
+            />
+            <div>
+              <h3>{{ selectedCharacter.name }}</h3>
+              <p class="tool-count-text">{{ getToolCountText() }}</p>
+            </div>
+          </div>
+          <button @click="closeToolModal" class="close-button">×</button>
+        </div>
+
+        <div class="tool-modal-body">
+          <!-- Tool Search (if needed) -->
+          <input
+            v-if="availableTools.length >= 5"
+            v-model="toolSearchQuery"
+            type="text"
+            placeholder="Search tools..."
+            class="tool-search-input"
+          />
+
+          <!-- Tool Cards Grid -->
+          <div class="tool-cards-grid">
+            <div
+              v-for="tool in filteredTools"
+              :key="tool.id"
+              :class="['tool-card', { 'tool-card-enabled': isToolEnabledInModal(tool.id) }]"
+              @click="toggleToolInModal(tool.id)"
+              tabindex="0"
+              role="button"
+              :aria-label="`Toggle ${tool.name}`"
+              @keydown.enter="toggleToolInModal(tool.id)"
+            >
+              <div class="tool-card-icon">{{ tool.icon || '⚙️' }}</div>
+              <div class="tool-card-name">{{ tool.name }}</div>
+              <div class="tool-card-description">{{ tool.description }}</div>
+              <div v-if="isToolEnabledInModal(tool.id)" class="tool-card-checkmark">✓</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tool-modal-footer">
+          <button @click="closeToolModal" class="btn-secondary">Cancel</button>
+          <button @click="saveToolModal" class="btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import CharacterGridPicker from './CharacterGridPicker.vue';
+
 export default {
   name: 'ToolSettings',
+  components: {
+    CharacterGridPicker
+  },
   data() {
     return {
       settings: {
@@ -114,40 +134,21 @@ export default {
       },
       characters: [],
       availableTools: [],
-      searchQuery: '',
-      selectedTags: []
+      showToolModal: false,
+      selectedCharacter: null,
+      modalToolSelections: [],
+      toolSearchQuery: ''
     };
   },
   computed: {
-    filteredCharacters() {
-      let filtered = this.characters;
+    filteredTools() {
+      if (!this.toolSearchQuery) return this.availableTools;
 
-      // Filter by search query
-      if (this.searchQuery) {
-        const query = this.searchQuery.toLowerCase();
-        filtered = filtered.filter(char =>
-          char.name.toLowerCase().includes(query) ||
-          char.tags?.some(tag => tag.toLowerCase().includes(query))
-        );
-      }
-
-      // Filter by selected tags
-      if (this.selectedTags.length > 0) {
-        filtered = filtered.filter(char =>
-          this.selectedTags.every(selectedTag =>
-            char.tags?.includes(selectedTag)
-          )
-        );
-      }
-
-      return filtered;
-    },
-    allTags() {
-      const tags = new Set();
-      this.characters.forEach(char => {
-        char.tags?.forEach(tag => tags.add(tag));
-      });
-      return Array.from(tags).sort();
+      const query = this.toolSearchQuery.toLowerCase();
+      return this.availableTools.filter(tool =>
+        tool.name.toLowerCase().includes(query) ||
+        tool.description.toLowerCase().includes(query)
+      );
     }
   },
   async mounted() {
@@ -188,39 +189,86 @@ export default {
         console.error('Failed to load available tools:', error);
       }
     },
-    isToolEnabled(characterFilename, toolId) {
+    getToolStatusText(characterFilename) {
       const charConfig = this.settings.characterTools.find(
         ct => ct.characterFilename === characterFilename
       );
-      return charConfig?.tools?.includes(toolId) || false;
+      const enabledCount = charConfig?.tools?.length || 0;
+      const totalCount = this.availableTools.length;
+
+      if (enabledCount === 0) return '○ No tools';
+      if (enabledCount === totalCount) return '✓ All tools';
+      return `⚙ ${enabledCount}/${totalCount} tools`;
     },
-    toggleTool(characterFilename, toolId) {
+    getToolStatusClass(characterFilename) {
+      const charConfig = this.settings.characterTools.find(
+        ct => ct.characterFilename === characterFilename
+      );
+      const enabledCount = charConfig?.tools?.length || 0;
+      const totalCount = this.availableTools.length;
+
+      if (enabledCount === 0) return 'status-none';
+      if (enabledCount === totalCount) return 'status-all';
+      return 'status-partial';
+    },
+    openToolModal(character) {
+      this.selectedCharacter = character;
+      const charConfig = this.settings.characterTools.find(
+        ct => ct.characterFilename === character.filename
+      );
+      this.modalToolSelections = charConfig?.tools ? [...charConfig.tools] : [];
+      this.toolSearchQuery = '';
+      this.showToolModal = true;
+    },
+    closeToolModal() {
+      this.showToolModal = false;
+      this.selectedCharacter = null;
+      this.modalToolSelections = [];
+      this.toolSearchQuery = '';
+    },
+    isToolEnabledInModal(toolId) {
+      return this.modalToolSelections.includes(toolId);
+    },
+    toggleToolInModal(toolId) {
+      const index = this.modalToolSelections.indexOf(toolId);
+      if (index === -1) {
+        this.modalToolSelections.push(toolId);
+      } else {
+        this.modalToolSelections.splice(index, 1);
+      }
+    },
+    saveToolModal() {
+      if (!this.selectedCharacter) return;
+
       // Find or create character config
       let charConfig = this.settings.characterTools.find(
-        ct => ct.characterFilename === characterFilename
+        ct => ct.characterFilename === this.selectedCharacter.filename
       );
 
       if (!charConfig) {
         charConfig = {
-          characterFilename: characterFilename,
+          characterFilename: this.selectedCharacter.filename,
           tools: []
         };
         this.settings.characterTools.push(charConfig);
       }
 
-      // Toggle tool
-      const toolIndex = charConfig.tools.indexOf(toolId);
-      if (toolIndex === -1) {
-        charConfig.tools.push(toolId);
-      } else {
-        charConfig.tools.splice(toolIndex, 1);
-      }
+      // Update tools
+      charConfig.tools = [...this.modalToolSelections];
 
       // Clean up empty configs
       if (charConfig.tools.length === 0) {
         const configIndex = this.settings.characterTools.indexOf(charConfig);
         this.settings.characterTools.splice(configIndex, 1);
       }
+
+      this.closeToolModal();
+    },
+    getToolCountText() {
+      if (!this.selectedCharacter) return '';
+      const enabledCount = this.modalToolSelections.length;
+      const totalCount = this.availableTools.length;
+      return `Configuring ${enabledCount}/${totalCount} tools`;
     },
     async saveSettings() {
       try {
@@ -238,14 +286,6 @@ export default {
       } catch (error) {
         console.error('Failed to save tool settings:', error);
         this.$root.$notify('Failed to save tool settings', 'error');
-      }
-    },
-    toggleTagFilter(tag) {
-      const index = this.selectedTags.indexOf(tag);
-      if (index > -1) {
-        this.selectedTags.splice(index, 1);
-      } else {
-        this.selectedTags.push(tag);
       }
     }
   }
@@ -322,64 +362,253 @@ export default {
   cursor: pointer;
 }
 
-.character-tools-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* Custom styling for CharacterGridPicker in this component */
+.tool-settings-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
 }
 
-.character-tool-item {
+.tool-settings-image {
+  height: 200px;
+}
+
+.tool-status-badge {
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 0.85em;
+  font-weight: 500;
+  border-top: 1px solid var(--border-color, #333);
+}
+
+.tool-status-badge.status-all {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.tool-status-badge.status-partial {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+}
+
+.tool-status-badge.status-none {
+  background: rgba(158, 158, 158, 0.2);
+  color: #9e9e9e;
+}
+
+/* Tool Modal */
+.tool-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.tool-modal {
   background: var(--bg-secondary, #1a1a1a);
-  border-radius: 8px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 12px;
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tool-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.modal-character-info {
+  display: flex;
+  align-items: center;
   gap: 15px;
 }
 
-.character-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 200px;
-}
-
-.character-avatar-small {
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
+.modal-character-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
   object-fit: cover;
 }
 
-.character-name {
-  font-weight: 500;
+.modal-character-info h3 {
+  margin: 0;
   color: var(--text-color, #e0e0e0);
+  font-size: 1.2em;
 }
 
-.tool-checkboxes {
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
+.tool-count-text {
+  margin: 5px 0 0 0;
+  color: var(--text-muted, #888);
+  font-size: 0.85em;
 }
 
-.tool-checkbox {
+.close-button {
+  background: none;
+  border: none;
+  font-size: 2em;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  padding: 0;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.close-button:hover {
+  background: var(--hover-color, #333);
+  color: var(--text-color, #e0e0e0);
+}
+
+.tool-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.tool-search-input {
+  width: 100%;
+  padding: 10px;
+  background: var(--bg-primary, #0a0a0a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  color: var(--text-color, #e0e0e0);
+  font-size: 1em;
+  margin-bottom: 20px;
+}
+
+.tool-search-input::placeholder {
+  color: var(--text-muted, #666);
+}
+
+.tool-search-input:focus {
+  outline: none;
+  border-color: var(--accent-color, #4a9eff);
+}
+
+/* Tool Cards Grid */
+.tool-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 15px;
+}
+
+.tool-card {
+  background: var(--bg-primary, #0a0a0a);
+  border: 2px solid var(--border-color, #333);
+  border-radius: 8px;
+  padding: 20px;
   cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tool-card:hover {
+  border-color: var(--accent-color, #4a9eff);
+  transform: translateY(-2px);
+}
+
+.tool-card:focus {
+  outline: 2px solid var(--accent-color, #4a9eff);
+  outline-offset: 2px;
+}
+
+.tool-card-enabled {
+  background: rgba(74, 158, 255, 0.1);
+  border-color: var(--accent-color, #4a9eff);
+}
+
+.tool-card-icon {
+  font-size: 2em;
+  margin-bottom: 10px;
+}
+
+.tool-card-name {
+  font-weight: 600;
+  color: var(--text-color, #e0e0e0);
+  margin-bottom: 8px;
+  font-size: 1em;
+}
+
+.tool-card-description {
+  color: var(--text-muted, #888);
+  font-size: 0.85em;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.tool-card-checkmark {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--accent-color, #4a9eff);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.9em;
-  color: var(--text-color, #e0e0e0);
+  font-weight: bold;
 }
 
-.tool-checkbox span {
-  color: var(--text-color, #e0e0e0);
+.tool-modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 20px;
+  border-top: 1px solid var(--border-color, #333);
 }
 
-.tool-checkbox input[type="checkbox"] {
+.btn-primary, .btn-secondary {
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: none;
   cursor: pointer;
+  font-size: 1em;
+  transition: all 0.2s;
 }
 
+.btn-primary {
+  background: var(--accent-color, #4a9eff);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--accent-color-hover, #3a8eef);
+}
+
+.btn-secondary {
+  background: var(--bg-tertiary, #2a2a2a);
+  color: var(--text-color, #e0e0e0);
+  border: 1px solid var(--border-color, #333);
+}
+
+.btn-secondary:hover {
+  background: var(--hover-color, #333);
+}
+
+/* Tools Info Section */
 .tools-info {
   display: flex;
   flex-direction: column;
@@ -409,71 +638,6 @@ export default {
   font-style: italic;
 }
 
-.search-filter {
-  margin-bottom: 20px;
-}
-
-.search-input {
-  width: 100%;
-  padding: 10px;
-  background: var(--bg-secondary, #1a1a1a);
-  border: 1px solid var(--border-color, #333);
-  border-radius: 4px;
-  color: var(--text-color, #e0e0e0);
-  font-size: 1em;
-  margin-bottom: 15px;
-}
-
-.search-input::placeholder {
-  color: var(--text-muted, #666);
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--accent-color, #4a9eff);
-}
-
-.tag-filter {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.filter-label {
-  color: var(--text-muted, #888);
-  font-size: 0.9em;
-  white-space: nowrap;
-}
-
-.filter-tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.filter-tag {
-  padding: 4px 12px;
-  font-size: 12px;
-  background: var(--bg-tertiary, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
-  border-radius: 16px;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: var(--text-color, #e0e0e0);
-}
-
-.filter-tag:hover {
-  background: var(--hover-color, #333);
-  border-color: var(--accent-color, #4a9eff);
-}
-
-.filter-tag.active {
-  background: var(--accent-color, #4a9eff);
-  color: white;
-  border-color: var(--accent-color, #4a9eff);
-}
-
 .page-footer {
   display: flex;
   gap: 10px;
@@ -483,17 +647,23 @@ export default {
   border-top: 1px solid var(--border-color, #333);
 }
 
-.btn-primary {
-  padding: 10px 20px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 1em;
-  background: var(--accent-color, #4a9eff);
-  color: white;
-}
+/* Responsive Design */
+@media (max-width: 768px) {
+  .character-cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+  }
 
-.btn-primary:hover {
-  background: var(--accent-color-hover, #3a8eef);
+  .character-card-avatar {
+    height: 150px;
+  }
+
+  .tool-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tool-modal {
+    max-height: 95vh;
+  }
 }
 </style>
