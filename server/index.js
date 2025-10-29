@@ -1,6 +1,6 @@
 // Initialize console logging first, before any other logs
-const { initConsoleLogging } = require('./consoleLogger');
-initConsoleLogging();
+// const { initConsoleLogging } = require('./consoleLogger');
+// initConsoleLogging();
 
 const express = require('express');
 const cors = require('cors');
