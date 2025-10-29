@@ -29,12 +29,23 @@ function logRequest(data) {
     streaming: data.streaming || false,
     options: data.options,
     context: data.context,
-    messages: data.messages?.map((msg, i) => ({
-      index: i,
-      role: msg.role,
-      contentLength: msg.content?.length || 0,
-      content: msg.content
-    }))
+    messages: data.messages?.map((msg, i) => {
+      let contentLength = 0;
+      if (Array.isArray(msg.content)) {
+        contentLength = msg.content.reduce((sum, part) => {
+          return sum + (part.type === 'text' ? part.text.length : 0);
+        }, 0);
+      } else if (typeof msg.content === 'string') {
+        contentLength = msg.content.length;
+      }
+
+      return {
+        index: i,
+        role: msg.role,
+        contentLength,
+        content: msg.content
+      };
+    })
   };
 
   const logText = JSON.stringify(logEntry, null, 2) + ',\n';
@@ -57,7 +68,23 @@ function logRequest(data) {
   console.log('\nFull Messages:');
   data.messages?.forEach((msg, i) => {
     console.log(`\n[${i}] ${msg.role}:`);
-    console.log(msg.content.substring(0, 500) + (msg.content.length > 500 ? '...' : ''));
+
+    // Handle array content (multimodal)
+    if (Array.isArray(msg.content)) {
+      msg.content.forEach((part, partIdx) => {
+        if (part.type === 'text') {
+          const preview = part.text.substring(0, 500) + (part.text.length > 500 ? '...' : '');
+          console.log(`  [text] ${preview}`);
+        } else if (part.type === 'image_url') {
+          const url = part.image_url.url;
+          const truncated = url.substring(0, 50) + '...[base64 image]';
+          console.log(`  [image] ${truncated}`);
+        }
+      });
+    } else {
+      // Legacy string content
+      console.log(msg.content.substring(0, 500) + (msg.content.length > 500 ? '...' : ''));
+    }
   });
   console.log('='.repeat(80) + '\n');
 }
