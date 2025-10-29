@@ -14,11 +14,43 @@ try {
 }
 
 /**
+ * Truncate base64 images in messages for logging
+ * @param {Array} messages - Array of message objects
+ * @returns {Array} Messages with truncated image URLs
+ */
+function truncateImages(messages) {
+  return messages.map((msg) => {
+    // If content is not an array, return unchanged
+    if (!Array.isArray(msg.content)) return msg;
+
+    // Map through content parts and truncate image_url parts
+    return {
+      ...msg,
+      content: msg.content.map((part) => {
+        if (part.type === 'image_url') {
+          const url = part.image_url.url;
+          const truncated = url.length > 50 ? url.slice(0, 50) + '...[truncated]' : url;
+          return {
+            ...part,
+            image_url: { url: truncated },
+          };
+        }
+        // Pass through text parts unchanged
+        return part;
+      }),
+    };
+  });
+}
+
+/**
  * Log an API request to the LLM
  * @param {Object} data - Data to log
  */
 function logRequest(data) {
   const timestamp = new Date().toISOString();
+
+  // Truncate images for logging (keep original data for API call)
+  const truncatedMessages = data.messages ? truncateImages(data.messages) : [];
 
   // Build structured JSON log for VSCode collapsibility
   const logEntry = {
@@ -29,7 +61,7 @@ function logRequest(data) {
     streaming: data.streaming || false,
     options: data.options,
     context: data.context,
-    messages: data.messages?.map((msg, i) => {
+    messages: truncatedMessages.map((msg, i) => {
       let contentLength = 0;
       if (Array.isArray(msg.content)) {
         contentLength = msg.content.reduce((sum, part) => {
@@ -60,13 +92,13 @@ function logRequest(data) {
   console.log('\n' + '='.repeat(80));
   console.log('API REQUEST:', timestamp);
   console.log('Model:', data.model);
-  console.log('Messages:', data.messages?.length, 'messages');
+  console.log('Messages:', truncatedMessages.length, 'messages');
   console.log('Options:', JSON.stringify(data.options, null, 2));
   if (data.context) {
     console.log('Macro Context:', JSON.stringify(data.context, null, 2));
   }
   console.log('\nFull Messages:');
-  data.messages?.forEach((msg, i) => {
+  truncatedMessages.forEach((msg, i) => {
     console.log(`\n[${i}] ${msg.role}:`);
 
     // Handle array content (multimodal)
