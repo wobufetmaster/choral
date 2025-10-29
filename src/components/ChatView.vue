@@ -356,6 +356,9 @@
           placeholder="Type your message..."
           :disabled="isStreaming"
         ></textarea>
+        <button @click="showImageModal = true" class="attach-btn" :disabled="isStreaming">
+          📎
+        </button>
         <button v-if="isStreaming" @click="stopStreaming" class="stop-btn">
           Stop
         </button>
@@ -382,6 +385,13 @@
       <button @click="showSettings = false">Close</button>
     </div>
 
+    <!-- Image Attachment Modal -->
+    <ImageAttachmentModal
+      v-if="showImageModal"
+      @close="showImageModal = false"
+      @send="handleImageMessage"
+    />
+
   </div>
 </template>
 
@@ -395,6 +405,7 @@ import ChatSidebar from './ChatSidebar.vue';
 import DebugModal from './DebugModal.vue';
 import BranchNameInput from './BranchNameInput.vue';
 import BranchTreeModal from './BranchTreeModal.vue';
+import ImageAttachmentModal from './ImageAttachmentModal.vue';
 
 // Non-reactive debug data cache (outside Vue's reactivity system)
 const debugDataCache = new Map();
@@ -407,7 +418,8 @@ export default {
     ChatSidebar,
     DebugModal,
     BranchNameInput,
-    BranchTreeModal
+    BranchTreeModal,
+    ImageAttachmentModal
   },
   props: {
     tabData: {
@@ -440,6 +452,7 @@ export default {
       showLorebooks: false,
       showDebug: false,
       showGroupManager: false,
+      showImageModal: false,
       currentPresetName: null,
       currentPresetFilename: null,
       availablePresets: [],
