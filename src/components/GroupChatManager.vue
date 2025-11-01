@@ -133,7 +133,7 @@
         <div class="picker-modal-body">
           <CharacterGridPicker
             :characters="allCharacters"
-            :exclude-filenames="characters.map(c => c.filename)"
+            :exclude-filenames="characters.filter(c => c && c.filename).map(c => c.filename)"
             @select="handleCharacterSelect"
           />
         </div>

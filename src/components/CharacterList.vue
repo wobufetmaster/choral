@@ -429,30 +429,41 @@ export default {
   },
   computed: {
     filteredCharacters() {
-      let filtered = this.characters;
+      try {
+        let filtered = this.characters;
 
-      // Filter by selected tags (must have ALL selected tags - case insensitive)
-      if (this.selectedTags.length > 0) {
-        filtered = filtered.filter(char =>
-          this.selectedTags.every(selectedTag =>
-            char.tags?.some(charTag =>
-              this.normalizeTag(charTag) === this.normalizeTag(selectedTag)
-            )
-          )
-        );
+        // Filter by selected tags (must have ALL selected tags - case insensitive)
+        if (this.selectedTags.length > 0) {
+          filtered = filtered.filter(char => {
+            if (!char || !char.tags) return false;
+            return this.selectedTags.every(selectedTag =>
+              char.tags?.some(charTag =>
+                charTag && this.normalizeTag(charTag) === this.normalizeTag(selectedTag)
+              )
+            );
+          });
+        }
+
+        // Filter by search query
+        if (this.searchQuery) {
+          const query = this.searchQuery.toLowerCase();
+          filtered = filtered.filter(char => {
+            if (!char || !char.name) return false;
+            const nameMatch = char.name.toLowerCase().includes(query);
+            const tagMatch = char.tags?.some(tag => {
+              if (!tag || typeof tag !== 'string') return false;
+              return tag.toLowerCase().includes(query);
+            });
+            return nameMatch || tagMatch;
+          });
+        }
+
+        // Sort characters
+        return this.sortCharacters(filtered);
+      } catch (error) {
+        console.error('[CharacterList] Error in filteredCharacters:', error);
+        return [];
       }
-
-      // Filter by search query
-      if (this.searchQuery) {
-        const query = this.searchQuery.toLowerCase();
-        filtered = filtered.filter(char =>
-          char.name.toLowerCase().includes(query) ||
-          char.tags?.some(tag => tag.toLowerCase().includes(query))
-        );
-      }
-
-      // Sort characters
-      return this.sortCharacters(filtered);
     },
     filteredGroupChats() {
       let filtered = this.groupChats;
@@ -487,10 +498,22 @@ export default {
     allTags() {
       // Get all unique tags across all characters
       const tags = new Set();
-      this.characters.forEach(char => {
-        char.tags?.forEach(tag => tags.add(tag));
-      });
-      return Array.from(tags).sort();
+      try {
+        if (!this.characters || !Array.isArray(this.characters)) {
+          return [];
+        }
+        this.characters.forEach(char => {
+          if (!char || !char.tags) return;
+          char.tags.forEach(tag => {
+            if (!tag || typeof tag !== 'string') return;
+            tags.add(tag);
+          });
+        });
+        return Array.from(tags).sort();
+      } catch (error) {
+        console.error('[CharacterList] Error computing allTags:', error);
+        return [];
+      }
     },
     availableTags() {
       // Get tags from other characters that aren't already applied
@@ -508,22 +531,25 @@ export default {
 
       // Filter by selected tags
       if (this.groupChatSelectedTags.length > 0) {
-        filtered = filtered.filter(char =>
-          this.groupChatSelectedTags.every(selectedTag =>
+        filtered = filtered.filter(char => {
+          if (!char || !char.tags) return false;
+          return this.groupChatSelectedTags.every(selectedTag =>
             char.tags?.some(charTag =>
-              this.normalizeTag(charTag) === this.normalizeTag(selectedTag)
+              charTag && this.normalizeTag(charTag) === this.normalizeTag(selectedTag)
             )
-          )
-        );
+          );
+        });
       }
 
       // Filter by search query
       if (this.groupChatSearchQuery) {
         const query = this.groupChatSearchQuery.toLowerCase();
-        filtered = filtered.filter(char =>
-          char.name.toLowerCase().includes(query) ||
-          char.tags?.some(tag => tag.toLowerCase().includes(query))
-        );
+        filtered = filtered.filter(char => {
+          if (!char || !char.name) return false;
+          const nameMatch = char.name.toLowerCase().includes(query);
+          const tagMatch = char.tags?.some(tag => tag && tag.toLowerCase().includes(query));
+          return nameMatch || tagMatch;
+        });
       }
 
       return filtered;
@@ -729,6 +755,9 @@ export default {
       }
     },
     normalizeTag(tag) {
+      if (!tag || typeof tag !== 'string') {
+        return '';
+      }
       return tag.toLowerCase().trim();
     },
     getTagColor(tag) {

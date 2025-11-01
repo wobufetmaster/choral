@@ -216,6 +216,55 @@ async function ensureDirectories() {
 
 // ===== Character Routes =====
 
+// Helper function to validate and sanitize character data
+function validateCharacterData(char, filename) {
+  if (!char) {
+    console.warn(`[Character Validation] Null character for file: ${filename}`);
+    return null;
+  }
+
+  // Ensure required fields exist and are valid
+  const validated = {
+    filename: filename || 'unknown.png',
+    name: null,
+    tags: [],
+    data: char.data || {},
+    createdAt: char.createdAt || Date.now(),
+    modifiedAt: char.modifiedAt || Date.now()
+  };
+
+  // Validate and sanitize name
+  if (char.name && typeof char.name === 'string') {
+    validated.name = char.name.trim();
+  } else if (char.data?.name && typeof char.data.name === 'string') {
+    validated.name = char.data.name.trim();
+  } else {
+    console.warn(`[Character Validation] Invalid name for ${filename}, using filename`);
+    validated.name = filename.replace('.png', '');
+  }
+
+  // Validate and sanitize tags
+  if (Array.isArray(char.tags)) {
+    validated.tags = char.tags
+      .filter(tag => tag && typeof tag === 'string')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
+  } else if (char.data?.tags && Array.isArray(char.data.tags)) {
+    validated.tags = char.data.tags
+      .filter(tag => tag && typeof tag === 'string')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
+  }
+
+  // Ensure data object exists
+  if (!validated.data || typeof validated.data !== 'object') {
+    console.warn(`[Character Validation] Invalid data object for ${filename}`);
+    validated.data = { name: validated.name };
+  }
+
+  return validated;
+}
+
 // Get all characters
 app.get('/api/characters', async (req, res) => {
   try {
@@ -245,7 +294,7 @@ app.get('/api/characters', async (req, res) => {
           // Use mtime as a better indicator of when the file was originally created
           const createdAt = (birthtimeMs === ctimeMs) ? mtimeMs : birthtimeMs;
 
-          return {
+          const rawCharacter = {
             filename: file,
             name: card.data?.name || 'Unknown',
             tags: card.data?.tags || [],
@@ -253,6 +302,9 @@ app.get('/api/characters', async (req, res) => {
             createdAt: createdAt, // Use mtime if birthtime not supported
             modifiedAt: mtimeMs // Also include modification time
           };
+
+          // Validate and sanitize the character data
+          return validateCharacterData(rawCharacter, file);
         } catch (err) {
           console.error(`Error reading ${file}:`, err);
           return null;
@@ -260,7 +312,12 @@ app.get('/api/characters', async (req, res) => {
       })
     );
 
-    res.json(characters.filter(c => c !== null));
+    // Filter out null entries and ensure all returned characters are valid
+    const validCharacters = characters.filter(c => c !== null);
+
+    console.log(`[Characters API] Loaded ${validCharacters.length} valid characters out of ${pngFiles.length} files`);
+
+    res.json(validCharacters);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2691,7 +2748,7 @@ app.post('/api/tools/update-character', async (req, res) => {
 
 // Stream chat completion
 app.post('/api/chat/stream', async (req, res) => {
-  const { messages, model, options, context, promptProcessing, lorebookFilenames, debug, tools } = req.body;
+  const { messages, model, options, context, promptProcessing, lorebookFilenames, debug, tools, stoppingStrings } = req.body;
 
   // Process macros in messages if context provided
   let processedMessages = context
@@ -2798,10 +2855,15 @@ app.post('/api/chat/stream', async (req, res) => {
     model,
     options,
     tools: processedTools, // Pass processed tools with expanded macros
+    stoppingStrings: stoppingStrings || [],
     onChunk: (content) => {
       fullResponse += content;
       logStreamChunk(content);
       res.write(`data: ${JSON.stringify({ content })}\n\n`);
+    },
+    onStop: (finalText) => {
+      console.log('Generation stopped due to stopping string. Final text length:', finalText.length);
+      res.write(`data: ${JSON.stringify({ type: 'stopped', reason: 'stopping_string' })}\n\n`);
     },
     onToolCallStart: (toolName) => {
       // Notify client as soon as we detect tool call is starting to stream

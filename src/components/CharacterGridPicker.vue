@@ -27,21 +27,22 @@
     <!-- Character Grid -->
     <div :class="['character-grid', gridClass]">
       <div
-        v-for="char in filteredCharacters"
-        :key="char.filename"
+        v-for="(char, index) in filteredCharacters"
+        :key="char.filename || `char-${index}`"
         @click="selectCharacter(char)"
         :class="['character-card', cardClass]"
         tabindex="0"
         role="button"
-        :aria-label="`Select ${char.name}`"
+        :aria-label="`Select ${char.name || 'Unknown'}`"
         @keydown.enter="selectCharacter(char)"
       >
         <img
+          v-if="char.filename"
           :src="`/api/characters/${char.filename}/image`"
-          :alt="char.name"
+          :alt="char.name || 'Unknown'"
           :class="['character-image', imageClass]"
         />
-        <div :class="['character-name', nameClass]">{{ char.name }}</div>
+        <div :class="['character-name', nameClass]">{{ char.name || 'Unknown' }}</div>
         <slot name="card-footer" :character="char"></slot>
       </div>
       <div v-if="filteredCharacters.length === 0" class="no-characters">
@@ -92,10 +93,13 @@ export default {
   computed: {
     availableCharacters() {
       // Filter out excluded characters
+      if (!this.characters || this.characters.length === 0) {
+        return [];
+      }
       if (this.excludeFilenames.length === 0) {
         return this.characters;
       }
-      return this.characters.filter(c => !this.excludeFilenames.includes(c.filename));
+      return this.characters.filter(c => c && c.filename && !this.excludeFilenames.includes(c.filename));
     },
     filteredCharacters() {
       let filtered = this.availableCharacters;
@@ -104,10 +108,12 @@ export default {
       if (this.searchQuery.trim()) {
         const query = this.searchQuery.toLowerCase();
         filtered = filtered.filter(char => {
+          if (!char || !char.name) return false;
           const nameMatch = char.name.toLowerCase().includes(query);
-          const tagMatch = char.tags?.some(tag =>
-            tag.toLowerCase().includes(query)
-          );
+          const tagMatch = char.tags?.some(tag => {
+            if (!tag || typeof tag !== 'string') return false;
+            return tag.toLowerCase().includes(query);
+          });
           return nameMatch || tagMatch;
         });
       }
@@ -127,20 +133,30 @@ export default {
     allTags() {
       // Collect all unique tags from ALL characters
       const tagMap = new Map();
-      this.characters.forEach(char => {
-        const tags = char.tags || [];
-        tags.forEach(tag => {
-          if (!tagMap.has(tag.toLowerCase())) {
-            tagMap.set(tag.toLowerCase(), {
-              name: tag,
-              color: this.getTagColor(tag)
-            });
-          }
+      if (!this.characters || !Array.isArray(this.characters)) {
+        return [];
+      }
+      try {
+        this.characters.forEach(char => {
+          if (!char || !char.tags) return;
+          const tags = char.tags || [];
+          tags.forEach(tag => {
+            if (!tag) return;
+            if (!tagMap.has(tag.toLowerCase())) {
+              tagMap.set(tag.toLowerCase(), {
+                name: tag,
+                color: this.getTagColor(tag)
+              });
+            }
+          });
         });
-      });
-      return Array.from(tagMap.values()).sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
+        return Array.from(tagMap.values()).sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+      } catch (error) {
+        console.error('[CharacterGridPicker] Error computing allTags:', error);
+        return [];
+      }
     }
   },
   async mounted() {
@@ -158,6 +174,9 @@ export default {
       }
     },
     normalizeTag(tag) {
+      if (!tag || typeof tag !== 'string') {
+        return '';
+      }
       return tag.toLowerCase().trim();
     },
     toggleTagFilter(tagName) {
@@ -175,10 +194,19 @@ export default {
       return this.tagColors[normalized] || '#6b7280';
     },
     getTextColor(backgroundColor) {
+      if (!backgroundColor || typeof backgroundColor !== 'string') {
+        return '#ffffff';
+      }
       const hex = backgroundColor.replace('#', '');
+      if (hex.length !== 6) {
+        return '#ffffff';
+      }
       const r = parseInt(hex.substr(0, 2), 16);
       const g = parseInt(hex.substr(2, 2), 16);
       const b = parseInt(hex.substr(4, 2), 16);
+      if (isNaN(r) || isNaN(g) || isNaN(b)) {
+        return '#ffffff';
+      }
       const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
       return luminance > 0.5 ? '#000000' : '#ffffff';
     },
