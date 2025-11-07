@@ -8,6 +8,30 @@
         "update_character_card",
         "add_greetings"
       ]
+    },
+    {
+      "characterFilename": "Setting Card Builder.png",
+      "tools": [
+        "create_character_card",
+        "update_character_card",
+        "add_greetings"
+      ]
+    },
+    {
+      "characterFilename": "Character Card Builder V2.png",
+      "tools": [
+        "create_character_card",
+        "update_character_card",
+        "add_greetings"
+      ]
+    },
+    {
+      "characterFilename": "Setting Card Builder V2.png",
+      "tools": [
+        "update_character_card",
+        "create_character_card",
+        "add_greetings"
+      ]
     }
   ]
 }

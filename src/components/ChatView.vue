@@ -484,7 +484,7 @@ export default {
       md: null, // Markdown renderer (initialized in mounted)
       character: null,
       characterName: 'Chat',
-      persona: { name: 'User', avatar: null },
+      persona: { name: 'User', avatar: null, _filename: 'default.json' },
       messages: [],
       userInput: '',
       isStreaming: false,
@@ -1416,6 +1416,7 @@ export default {
         context: macroContext,
         promptProcessing: this.settings.prompt_processing || 'merge_system',
         lorebookFilenames: this.selectedLorebookFilenames,
+        stoppingStrings: this.settings.stopping_strings || ['[User]'],
         debug: true // Always collect debug data for persistence
       };
 
@@ -2486,12 +2487,13 @@ export default {
 
         if (selectedPersona) {
           this.onPersonaSaved(selectedPersona);
-        } else if (personaFilename === 'User') {
-          // Default User persona
-          this.onPersonaSaved({ name: 'User', avatar: null, _filename: 'User' });
+        } else if (personaFilename === 'User' || personaFilename === 'default.json') {
+          // Default User persona fallback
+          this.onPersonaSaved({ name: 'User', avatar: null, _filename: 'default.json' });
         } else {
           console.warn('ChatView: Persona not found:', personaFilename);
-          this.$root.$notify(`Persona not found`, 'warning');
+          console.warn('ChatView: Available personas:', personas.map(p => p._filename));
+          this.$root.$notify(`Persona not found: ${personaFilename}`, 'warning');
         }
       } catch (error) {
         console.error('Failed to load persona:', error);
@@ -2531,7 +2533,7 @@ export default {
         description: persona.description || '',
         tagBindings: persona.tagBindings || [],
         characterBindings: persona.characterBindings || [],
-        _filename: persona._filename || persona.name
+        _filename: persona._filename || (persona.name === 'User' ? 'default.json' : `${persona.name}.json`)
       };
 
       console.log('ChatView: Updated this.persona to:', this.persona);

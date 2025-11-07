@@ -35,13 +35,15 @@ function getApiKey() {
  * @param {string} params.model - Model name
  * @param {Object} params.options - Additional options (temperature, max_tokens, etc.)
  * @param {Array} params.tools - Optional tool definitions for tool calling
+ * @param {Array} params.stoppingStrings - Optional array of strings that stop generation
  * @param {Function} params.onChunk - Callback for each chunk of streamed data
  * @param {Function} params.onToolCall - Callback when a tool call is detected
  * @param {Function} params.onImages - Callback when AI-generated images are received
  * @param {Function} params.onComplete - Callback when streaming is complete
  * @param {Function} params.onError - Callback for errors
+ * @param {Function} params.onStop - Callback when a stopping string is detected
  */
-function streamChatCompletion({ messages, model, options = {}, tools, onChunk, onToolCall, onToolCallStart, onImages, onComplete, onError }) {
+function streamChatCompletion({ messages, model, options = {}, tools, stoppingStrings, onChunk, onToolCall, onToolCallStart, onImages, onComplete, onError, onStop }) {
   const apiKey = getApiKey();
 
   if (!apiKey) {
@@ -98,8 +100,11 @@ function streamChatCompletion({ messages, model, options = {}, tools, onChunk, o
     let pendingToolCall = null; // Promise for async tool execution
     let toolCallStartNotified = false; // Track if we've notified client about tool call start
     let completed = false; // Track if onComplete has been called
+    let accumulatedText = ''; // For stopping string detection
+    let stopped = false; // Track if we've stopped due to stopping string
 
     res.on('data', (chunk) => {
+      if (stopped) return; // Don't process more data if we've stopped
       buffer += chunk.toString();
       const lines = buffer.split('\n');
 
@@ -145,7 +150,48 @@ function streamChatCompletion({ messages, model, options = {}, tools, onChunk, o
 
             // Handle text content
             if (delta?.content) {
-              onChunk(delta.content);
+              accumulatedText += delta.content;
+
+              // Check for stopping strings
+              let contentToSend = delta.content;
+              let shouldStop = false;
+
+              if (stoppingStrings && stoppingStrings.length > 0) {
+                for (const stopString of stoppingStrings) {
+                  const stopIndex = accumulatedText.indexOf(stopString);
+                  if (stopIndex !== -1) {
+                    // Found a stopping string - truncate content
+                    const previousLength = accumulatedText.length - delta.content.length;
+                    if (stopIndex >= previousLength) {
+                      // Stopping string is in current chunk
+                      const relativeIndex = stopIndex - previousLength;
+                      contentToSend = delta.content.substring(0, relativeIndex);
+                    }
+                    shouldStop = true;
+                    break;
+                  }
+                }
+              }
+
+              // Send content if there's any to send
+              if (contentToSend) {
+                onChunk(contentToSend);
+              }
+
+              // Stop if we found a stopping string
+              if (shouldStop) {
+                stopped = true;
+                if (onStop) {
+                  onStop(accumulatedText.substring(0, accumulatedText.indexOf(stoppingStrings.find(s => accumulatedText.includes(s)))));
+                }
+                if (!completed) {
+                  completed = true;
+                  onComplete();
+                }
+                // Abort the request
+                req.destroy();
+                return;
+              }
             }
 
             // Handle images in the response (AI-generated images)

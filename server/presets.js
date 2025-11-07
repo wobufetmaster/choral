@@ -16,6 +16,7 @@ const DEFAULT_PRESET = {
   max_tokens: 4096,
   max_context: 24000,
   prompt_processing: 'merge_system',
+  stopping_strings: ['[User]'],
   prompts: [
     {
       identifier: 'main',
@@ -78,6 +79,7 @@ function convertPixiJBToPreset(pixijbConfig) {
     max_tokens: pixijbConfig.openai_max_tokens ?? 4096,
     max_context: pixijbConfig.openai_max_context ?? 24000,
     prompt_processing: 'merge_system',
+    stopping_strings: pixijbConfig.stopping_strings || ['[User]'],
     prompts: []
   };
 

@@ -9,6 +9,7 @@
   "repetition_penalty": 1,
   "max_tokens": 4096,
   "max_context": 24000,
+  "stopping_strings": ["[User]"],
   "prompts": [
     {
       "identifier": "main",

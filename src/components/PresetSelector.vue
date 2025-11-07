@@ -109,6 +109,16 @@
             </div>
           </div>
 
+          <h4>Stopping Strings</h4>
+          <p class="section-description">Generation will automatically stop when these strings are detected.</p>
+          <div class="stopping-strings-list">
+            <div v-for="(str, index) in selectedPreset.stopping_strings" :key="index" class="stopping-string-item">
+              <input v-model="selectedPreset.stopping_strings[index]" placeholder="e.g. [User]" />
+              <button @click="removeStoppingString(index)" class="remove-btn">×</button>
+            </div>
+          </div>
+          <button @click="addStoppingString" class="add-btn">+ Add Stopping String</button>
+
           <h4>System Prompts</h4>
           <div class="prompts-list">
             <div v-for="(prompt, index) in selectedPreset.prompts" :key="index" class="prompt-item">
@@ -304,6 +314,10 @@ export default {
           // Select the active preset by default
           const activePreset = this.presets.find(p => p.filename === this.activePresetFilename);
           this.selectedPreset = activePreset ? { ...activePreset } : { ...this.presets[0] };
+          // Ensure stopping_strings exists
+          if (!this.selectedPreset.stopping_strings) {
+            this.selectedPreset.stopping_strings = ['[User]'];
+          }
         }
       } catch (error) {
         console.error('Failed to load presets:', error);
@@ -311,6 +325,10 @@ export default {
     },
     selectPreset(preset) {
       this.selectedPreset = { ...preset };
+      // Ensure stopping_strings exists
+      if (!this.selectedPreset.stopping_strings) {
+        this.selectedPreset.stopping_strings = ['[User]'];
+      }
     },
     createNewPreset() {
       this.selectedPreset = {
@@ -321,6 +339,7 @@ export default {
         top_k: 0,
         max_tokens: 4096,
         prompt_processing: 'merge_system',
+        stopping_strings: ['[User]'],
         prompts: []
       };
     },
@@ -384,6 +403,18 @@ export default {
     },
     removePrompt(index) {
       this.selectedPreset.prompts.splice(index, 1);
+    },
+    addStoppingString() {
+      if (!this.selectedPreset) {
+        return;
+      }
+      if (!this.selectedPreset.stopping_strings) {
+        this.selectedPreset.stopping_strings = [];
+      }
+      this.selectedPreset.stopping_strings.push('');
+    },
+    removeStoppingString(index) {
+      this.selectedPreset.stopping_strings.splice(index, 1);
     },
     async savePreset() {
       // Validate for missing essential macros
@@ -655,6 +686,34 @@ export default {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+.stopping-strings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stopping-string-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.stopping-string-item input {
+  flex: 1;
+}
+
+.section-description {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.add-btn {
+  align-self: flex-start;
+  margin-bottom: 20px;
 }
 
 .prompts-list {
