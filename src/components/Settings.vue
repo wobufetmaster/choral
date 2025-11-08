@@ -100,6 +100,23 @@
           />
           <small>Enter a URL to an image file</small>
         </div>
+
+        <div class="form-group">
+          <button @click="togglePreview" class="preview-toggle-btn">
+            {{ showPreview ? 'Hide Preview' : 'Preview Background' }}
+          </button>
+        </div>
+
+        <BackgroundPreview
+          v-if="showPreview"
+          :backgroundConfig="{
+            type: backgroundType,
+            pattern: backgroundPattern,
+            opacity: backgroundOpacity,
+            url: customBackgroundUrl
+          }"
+          :currentTheme="currentTheme"
+        />
       </div>
 
       <div class="setting-group">
@@ -119,9 +136,13 @@
 <script>
 import { ref, onMounted, watch } from 'vue';
 import { themes, backgroundPatterns, getStoredTheme, getStoredBackground, saveTheme as saveThemeUtil, saveBackground, applyTheme } from '../utils/themes.js';
+import BackgroundPreview from './BackgroundPreview.vue';
 
 export default {
   name: 'Settings',
+  components: {
+    BackgroundPreview
+  },
   props: {
     tabData: {
       type: Object,
@@ -140,6 +161,7 @@ export default {
     const backgroundOpacity = ref(0.15);
     const customBackgroundUrl = ref('');
     const isLoading = ref(true);
+    const showPreview = ref(false);
 
     const themeOptions = Object.entries(themes).map(([key, theme]) => ({
       key,
@@ -260,6 +282,10 @@ export default {
       }));
     };
 
+    const togglePreview = () => {
+      showPreview.value = !showPreview.value;
+    };
+
     // Watch for background changes
     watch([backgroundType, backgroundPattern, backgroundOpacity, customBackgroundUrl], () => {
       updateBackground();
@@ -287,11 +313,13 @@ export default {
       backgroundOpacity,
       customBackgroundUrl,
       patternOptions,
+      showPreview,
       saveApiKey,
       saveActivePreset,
       saveDefaultPersona,
       updateTheme,
       updateBackground,
+      togglePreview,
     };
   },
 };
@@ -413,5 +441,22 @@ export default {
   background: var(--accent-color, #4a9eff);
   cursor: pointer;
   border: 2px solid var(--bg-primary, #0d0d0d);
+}
+
+.preview-toggle-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-tertiary, #2a2a2a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 6px;
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preview-toggle-btn:hover {
+  background: var(--hover-color, #404040);
+  border-color: var(--accent-color, #4a9eff);
 }
 </style>
