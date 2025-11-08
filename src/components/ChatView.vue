@@ -2618,8 +2618,9 @@ export default {
 
         // Build context for macro processing
         const context = {
-          char: this.isGroupChat ? 'Character' : (this.characterName || 'Character'),
-          user: this.persona.name || 'User'
+          charName: this.isGroupChat ? 'Character' : (this.character?.data?.name || 'Character'),
+          charNickname: this.isGroupChat ? '' : (this.character?.data?.nickname || ''),
+          userName: this.persona?.name || 'User'
         };
 
         // Get character filenames for group chats
