@@ -42,7 +42,7 @@ export const themes = {
     },
     background: {
       type: 'pattern',
-      value: 'noise',
+      value: 'hexagons',
       opacity: 0.15
     }
   },
@@ -80,7 +80,7 @@ export const themes = {
     },
     background: {
       type: 'pattern',
-      value: 'noise',
+      value: 'hexagons',
       opacity: 0.1
     }
   },
@@ -118,7 +118,7 @@ export const themes = {
     },
     background: {
       type: 'pattern',
-      value: 'noise',
+      value: 'hexagons',
       opacity: 0.12
     }
   },
@@ -156,7 +156,7 @@ export const themes = {
     },
     background: {
       type: 'pattern',
-      value: 'noise',
+      value: 'hexagons',
       opacity: 0.13
     }
   },

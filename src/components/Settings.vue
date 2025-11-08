@@ -157,7 +157,7 @@ export default {
     const personas = ref([]);
     const currentTheme = ref('cozy-dark');
     const backgroundType = ref('pattern');
-    const backgroundPattern = ref('noise');
+    const backgroundPattern = ref('hexagons');
     const backgroundOpacity = ref(0.15);
     const customBackgroundUrl = ref('');
     const isLoading = ref(true);
@@ -211,7 +211,7 @@ export default {
       const storedBg = getStoredBackground();
       if (storedBg) {
         backgroundType.value = storedBg.type || 'pattern';
-        backgroundPattern.value = storedBg.pattern || 'noise';
+        backgroundPattern.value = storedBg.pattern || 'hexagons';
         backgroundOpacity.value = storedBg.opacity || 0.15;
         customBackgroundUrl.value = storedBg.url || '';
       } else {
@@ -219,7 +219,7 @@ export default {
         const theme = themes[currentTheme.value];
         if (theme?.background) {
           backgroundType.value = theme.background.type || 'none';
-          backgroundPattern.value = theme.background.value || 'noise';
+          backgroundPattern.value = theme.background.value || 'hexagons';
           backgroundOpacity.value = theme.background.opacity || 0.15;
         }
       }
