@@ -52,20 +52,27 @@ export default {
         };
       }
 
-      // Handle pattern background
-      if (props.backgroundConfig.type === 'pattern' && props.backgroundConfig.pattern) {
-        const pattern = backgroundPatterns[props.backgroundConfig.pattern];
-        if (pattern && pattern.css) {
-          const patternStyles = parseCss(pattern.css);
-          return {
-            ...styles,
-            ...patternStyles,
-            opacity: props.backgroundConfig.opacity || 0.15
-          };
-        }
+      // For pattern backgrounds, we don't apply styles directly
+      // The pattern will be applied to the ::before pseudo-element
+      return styles;
+    });
+
+    // Separate computed property for pattern layer styles
+    const patternLayerStyle = computed(() => {
+      if (!props.backgroundConfig || props.backgroundConfig.type !== 'pattern') {
+        return null;
       }
 
-      return styles;
+      const pattern = backgroundPatterns[props.backgroundConfig.pattern];
+      if (!pattern || !pattern.css) {
+        return null;
+      }
+
+      const patternStyles = parseCss(pattern.css);
+      return {
+        ...patternStyles,
+        opacity: props.backgroundConfig.opacity || 0.15
+      };
     });
 
     const parseCss = (cssString) => {
@@ -88,7 +95,8 @@ export default {
     };
 
     return {
-      combinedStyle
+      combinedStyle,
+      patternLayerStyle
     };
   }
 };
@@ -106,6 +114,25 @@ export default {
   position: relative;
   min-height: 300px;
   padding: 20px;
+}
+
+/* Pattern layer - separate from content to allow independent opacity */
+.preview-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+
+  /* Dynamic pattern styles applied via v-bind */
+  background: v-bind('patternLayerStyle?.background');
+  background-size: v-bind('patternLayerStyle?.backgroundSize');
+  background-position: v-bind('patternLayerStyle?.backgroundPosition');
+  background-repeat: v-bind('patternLayerStyle?.backgroundRepeat');
+  opacity: v-bind('patternLayerStyle?.opacity');
 }
 
 .preview-content {
