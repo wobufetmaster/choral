@@ -214,6 +214,61 @@ export const backgroundPatterns = {
       background-size: 80px 140px;
       background-position: 0 0, 0 0, 40px 70px, 40px 70px;
     `
+  },
+  waves: {
+    name: 'Waves',
+    css: `
+      background-image:
+        linear-gradient(135deg, rgba(255,255,255,0.06) 25%, transparent 25%),
+        linear-gradient(225deg, rgba(255,255,255,0.06) 25%, transparent 25%),
+        linear-gradient(45deg, rgba(255,255,255,0.06) 25%, transparent 25%),
+        linear-gradient(315deg, rgba(255,255,255,0.06) 25%, transparent 25%);
+      background-position: 20px 0, 20px 0, 0 0, 0 0;
+      background-size: 40px 40px;
+      background-repeat: repeat;
+    `
+  },
+  diagonalStripes: {
+    name: 'Diagonal Stripes',
+    css: `
+      background-image:
+        linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.05) 75%),
+        linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.05) 75%);
+      background-size: 60px 60px;
+      background-position: 0 0, 30px 30px;
+    `
+  },
+  triangles: {
+    name: 'Triangles',
+    css: `
+      background-image:
+        linear-gradient(135deg, rgba(255,255,255,0.04) 25%, transparent 25%),
+        linear-gradient(225deg, rgba(255,255,255,0.04) 25%, transparent 25%),
+        linear-gradient(315deg, rgba(255,255,255,0.04) 25%, transparent 25%),
+        linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%);
+      background-size: 40px 40px;
+      background-position: 0 0, 20px 0, 20px -20px, 0px 20px;
+    `
+  },
+  overlappingCircles: {
+    name: 'Overlapping Circles',
+    css: `
+      background-image:
+        radial-gradient(circle at 100% 50%, transparent 30%, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.06) 40%, transparent 40%),
+        radial-gradient(circle at 0% 50%, transparent 30%, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.06) 40%, transparent 40%);
+      background-size: 80px 80px;
+      background-position: 0 0, 40px 40px;
+    `
+  },
+  geometricFlowers: {
+    name: 'Geometric Flowers',
+    css: `
+      background-image:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05) 20%, transparent 20%),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 35%, transparent 35%);
+      background-size: 60px 60px;
+      background-position: 0 0, 30px 30px;
+    `
   }
 };
 
