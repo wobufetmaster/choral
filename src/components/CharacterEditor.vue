@@ -242,7 +242,8 @@ watch(() => props.character, (newChar) => {
           system_prompt: newChar.data.system_prompt || '',
           post_history_instructions: newChar.data.post_history_instructions || '',
           alternate_greetings: newChar.data.alternate_greetings || [],
-          tags: newChar.data.tags || [],
+          tags: Array.isArray(newChar.data.tags) ? newChar.data.tags :
+                (typeof newChar.data.tags === 'string' ? newChar.data.tags.split(',').map(t => t.trim()).filter(t => t) : []),
           creator: newChar.data.creator || '',
           character_version: newChar.data.character_version || '',
           extensions: newChar.data.extensions || {}
@@ -257,11 +258,24 @@ watch(() => props.character, (newChar) => {
       imagePreview.value = newChar.image
     }
 
-    // Set tags string
-    if (editedCard.value.data.tags && editedCard.value.data.tags.length > 0) {
-      tagsString.value = editedCard.value.data.tags.join(', ')
+    // Set tags string (handle both array and string formats)
+    if (editedCard.value.data.tags) {
+      if (Array.isArray(editedCard.value.data.tags)) {
+        tagsString.value = editedCard.value.data.tags.join(', ')
+      } else if (typeof editedCard.value.data.tags === 'string') {
+        tagsString.value = editedCard.value.data.tags
+        // Convert string to array for consistency
+        editedCard.value.data.tags = editedCard.value.data.tags
+          .split(',')
+          .map(tag => tag.trim())
+          .filter(tag => tag.length > 0)
+      } else {
+        tagsString.value = ''
+        editedCard.value.data.tags = []
+      }
     } else {
       tagsString.value = ''
+      editedCard.value.data.tags = []
     }
 
     // Expand all textareas to fit content
@@ -286,6 +300,19 @@ watch(() => props.tabData, (newTabData) => {
   // Check if we have saved draft data or character data
   const sourceData = newTabData.draftCard || newTabData.character
 
+  // Defensive check: If in tab mode but no character data exists, this is likely corrupted localStorage
+  if (!sourceData && props.tabData) {
+    console.error('[CharacterEditor] Tab opened with missing character data - likely corrupted localStorage');
+    if (instance?.appContext?.config?.globalProperties?.$root?.$notify) {
+      instance.appContext.config.globalProperties.$root.$notify(
+        'Failed to load character data. This tab may have corrupted data. Please close it and try again.',
+        'error'
+      );
+    }
+    // Don't process further - leave form in default blank state so user knows something is wrong
+    return;
+  }
+
   if (sourceData) {
     // Use the character's data card structure
     if (sourceData.data) {
@@ -303,7 +330,8 @@ watch(() => props.tabData, (newTabData) => {
           system_prompt: sourceData.data.system_prompt || '',
           post_history_instructions: sourceData.data.post_history_instructions || '',
           alternate_greetings: sourceData.data.alternate_greetings || [],
-          tags: sourceData.data.tags || [],
+          tags: Array.isArray(sourceData.data.tags) ? sourceData.data.tags :
+                (typeof sourceData.data.tags === 'string' ? sourceData.data.tags.split(',').map(t => t.trim()).filter(t => t) : []),
           creator: sourceData.data.creator || '',
           character_version: sourceData.data.character_version || '',
           extensions: sourceData.data.extensions || {}
@@ -325,11 +353,24 @@ watch(() => props.tabData, (newTabData) => {
       imageFile.value = newTabData.draftImageFile
     }
 
-    // Set tags string
-    if (editedCard.value.data.tags && editedCard.value.data.tags.length > 0) {
-      tagsString.value = editedCard.value.data.tags.join(', ')
+    // Set tags string (handle both array and string formats)
+    if (editedCard.value.data.tags) {
+      if (Array.isArray(editedCard.value.data.tags)) {
+        tagsString.value = editedCard.value.data.tags.join(', ')
+      } else if (typeof editedCard.value.data.tags === 'string') {
+        tagsString.value = editedCard.value.data.tags
+        // Convert string to array for consistency
+        editedCard.value.data.tags = editedCard.value.data.tags
+          .split(',')
+          .map(tag => tag.trim())
+          .filter(tag => tag.length > 0)
+      } else {
+        tagsString.value = ''
+        editedCard.value.data.tags = []
+      }
     } else {
       tagsString.value = ''
+      editedCard.value.data.tags = []
     }
 
     // Save original state for change detection

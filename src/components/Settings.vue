@@ -330,13 +330,13 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-primary, #0d0d0d);
   color: var(--text-primary, #fff);
 }
 
 .settings-header {
   padding: 20px;
   border-bottom: 1px solid var(--border-color, #333);
+  background: var(--bg-secondary, #2d2d2d);
 }
 
 .settings-header h2 {

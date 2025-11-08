@@ -101,7 +101,20 @@ export default {
         const savedActiveTabId = localStorage.getItem('choral-active-tab');
 
         if (savedTabs) {
-          tabs.value = JSON.parse(savedTabs);
+          const parsedTabs = JSON.parse(savedTabs);
+
+          // Validate and clean up corrupted tabs
+          tabs.value = parsedTabs.filter(tab => {
+            // Remove character-editor tabs with missing character data (corrupted)
+            if (tab.type === 'character-editor') {
+              const hasValidData = tab.data && (tab.data.character || tab.data.draftCard);
+              if (!hasValidData) {
+                console.warn('[TabManager] Removing corrupted character-editor tab:', tab.id);
+                return false;  // Filter out this corrupted tab
+              }
+            }
+            return true;  // Keep valid tabs
+          });
 
           // Validate that the saved active tab ID exists in the loaded tabs
           const activeTabExists = tabs.value.some(tab => tab.id === savedActiveTabId);

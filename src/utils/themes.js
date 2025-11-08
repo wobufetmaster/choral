@@ -215,59 +215,44 @@ export const backgroundPatterns = {
       background-position: 0 0, 0 0, 40px 70px, 40px 70px;
     `
   },
-  waves: {
-    name: 'Waves',
-    css: `
-      background-image:
-        linear-gradient(135deg, rgba(255,255,255,0.06) 25%, transparent 25%),
-        linear-gradient(225deg, rgba(255,255,255,0.06) 25%, transparent 25%),
-        linear-gradient(45deg, rgba(255,255,255,0.06) 25%, transparent 25%),
-        linear-gradient(315deg, rgba(255,255,255,0.06) 25%, transparent 25%);
-      background-position: 20px 0, 20px 0, 0 0, 0 0;
-      background-size: 40px 40px;
-      background-repeat: repeat;
-    `
-  },
-  diagonalStripes: {
-    name: 'Diagonal Stripes',
-    css: `
-      background-image:
-        linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.05) 75%),
-        linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.05) 75%);
-      background-size: 60px 60px;
-      background-position: 0 0, 30px 30px;
-    `
-  },
   triangles: {
     name: 'Triangles',
     css: `
       background-image:
-        linear-gradient(135deg, rgba(255,255,255,0.04) 25%, transparent 25%),
-        linear-gradient(225deg, rgba(255,255,255,0.04) 25%, transparent 25%),
-        linear-gradient(315deg, rgba(255,255,255,0.04) 25%, transparent 25%),
-        linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%);
-      background-size: 40px 40px;
-      background-position: 0 0, 20px 0, 20px -20px, 0px 20px;
-    `
-  },
-  overlappingCircles: {
-    name: 'Overlapping Circles',
-    css: `
-      background-image:
-        radial-gradient(circle at 100% 50%, transparent 30%, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.06) 40%, transparent 40%),
-        radial-gradient(circle at 0% 50%, transparent 30%, rgba(255,255,255,0.06) 30%, rgba(255,255,255,0.06) 40%, transparent 40%);
+        linear-gradient(135deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+        linear-gradient(225deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+        linear-gradient(315deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+        linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%);
       background-size: 80px 80px;
-      background-position: 0 0, 40px 40px;
+      background-position: 40px 0, 40px 0, 0 0, 0 0;
     `
   },
-  geometricFlowers: {
-    name: 'Geometric Flowers',
+  waves: {
+    name: 'Waves',
     css: `
       background-image:
-        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05) 20%, transparent 20%),
-        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 35%, transparent 35%);
+        radial-gradient(100% 100% at 100% 0, transparent 24%, rgba(255,255,255,0.02) 26% 34%, rgba(255,255,255,0.04) 36% 44%, rgba(255,255,255,0.02) 46% 54%, rgba(255,255,255,0.04) 56% 64%, rgba(255,255,255,0.02) 66% 74%, transparent 76%),
+        radial-gradient(100% 100% at 0 100%, transparent 24%, rgba(255,255,255,0.02) 26% 34%, rgba(255,255,255,0.04) 36% 44%, rgba(255,255,255,0.02) 46% 54%, rgba(255,255,255,0.04) 56% 64%, rgba(255,255,255,0.02) 66% 74%, transparent 76%),
+        radial-gradient(rgba(255,255,255,0.02) 14%, rgba(255,255,255,0.04) 16%);
       background-size: 60px 60px;
-      background-position: 0 0, 30px 30px;
+      background-position: 0 0, 0 0, 30px 30px;
+    `
+  },
+  dots: {
+    name: 'Dots',
+    css: `
+      background-image:
+        radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 20px 20px;
+    `
+  },
+  grid: {
+    name: 'Grid',
+    css: `
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 30px 30px;
     `
   }
 };

@@ -128,7 +128,7 @@ export default {
   z-index: 0;
 
   /* Dynamic pattern styles applied via v-bind */
-  background: v-bind('patternLayerStyle?.background');
+  background-image: v-bind('patternLayerStyle?.backgroundImage');
   background-size: v-bind('patternLayerStyle?.backgroundSize');
   background-position: v-bind('patternLayerStyle?.backgroundPosition');
   background-repeat: v-bind('patternLayerStyle?.backgroundRepeat');
