@@ -465,6 +465,9 @@ app.put('/api/characters/:filename', upload.single('file'), async (req, res) => 
     const oldFilename = req.params.filename;
     const oldFilePath = path.join(CHARACTERS_DIR, oldFilename);
 
+    console.log('[PUT /api/characters/:filename] Updating character:', oldFilename);
+    console.log('[PUT /api/characters/:filename] Old file path:', oldFilePath);
+
     let cardData;
     let imageBuffer;
 
@@ -476,6 +479,8 @@ app.put('/api/characters/:filename', upload.single('file'), async (req, res) => 
     if (!validateCharacterCard(cardData)) {
       return res.status(400).json({ error: 'Invalid character card' });
     }
+
+    console.log('[PUT /api/characters/:filename] Character name in card:', cardData.data.name);
 
     // Handle image
     if (req.file) {
@@ -491,17 +496,44 @@ app.put('/api/characters/:filename', upload.single('file'), async (req, res) => 
       imageBuffer = Buffer.from(base64Data, 'base64');
     } else {
       // No new image, keep existing
-      imageBuffer = await fs.readFile(oldFilePath);
+      try {
+        // Check if the old file exists
+        await fs.access(oldFilePath);
+        imageBuffer = await fs.readFile(oldFilePath);
+      } catch (err) {
+        // Old file doesn't exist - this can happen if the filename in the request is wrong
+        console.error(`Cannot find character file: ${oldFilePath}`);
+        return res.status(404).json({
+          error: `Character file not found: ${oldFilename}. The file may have been deleted or renamed.`
+        });
+      }
     }
 
-    // Generate new filename based on character name
-    const newBasename = `${cardData.data.name}.png`;
-    let newFilename = newBasename;
+    // Check if character name changed by comparing with the name in the old file
+    let shouldRename = false;
+    try {
+      const oldCard = await readCharacterCard(oldFilePath);
+      const oldName = oldCard.data?.name;
+      const newName = cardData.data.name;
 
-    // If name changed, ensure unique filename and delete old file
-    if (newBasename !== oldFilename) {
+      // Only rename if the character name actually changed
+      shouldRename = oldName !== newName;
+      console.log('[PUT /api/characters/:filename] Old name:', oldName, 'New name:', newName, 'Should rename:', shouldRename);
+    } catch (err) {
+      // If we can't read the old file, assume we should rename
+      console.log('[PUT /api/characters/:filename] Could not read old file, will use new name');
+      shouldRename = true;
+    }
+
+    let newFilename = oldFilename; // Default to keeping the same filename
+
+    if (shouldRename) {
+      // Character name changed - create new file with new name
+      const newBasename = `${cardData.data.name}.png`;
       newFilename = await getUniqueFilename(newBasename, CHARACTERS_DIR);
       const newFilePath = path.join(CHARACTERS_DIR, newFilename);
+
+      console.log('[PUT /api/characters/:filename] Renaming file from', oldFilename, 'to', newFilename);
 
       // Write to new location
       await writeCharacterCard(newFilePath, cardData, imageBuffer);
@@ -513,7 +545,8 @@ app.put('/api/characters/:filename', upload.single('file'), async (req, res) => 
         console.error('Error deleting old character file:', err);
       }
     } else {
-      // Same filename, overwrite
+      // Character name unchanged - overwrite existing file
+      console.log('[PUT /api/characters/:filename] Overwriting existing file:', oldFilename);
       await writeCharacterCard(oldFilePath, cardData, imageBuffer);
     }
 

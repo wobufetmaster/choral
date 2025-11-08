@@ -146,9 +146,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, getCurrentInstance } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { useNotification } from '../composables/useNotification'
 
-const instance = getCurrentInstance()
+const { notify } = useNotification()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -303,12 +304,10 @@ watch(() => props.tabData, (newTabData) => {
   // Defensive check: If in tab mode but no character data exists, this is likely corrupted localStorage
   if (!sourceData && props.tabData) {
     console.error('[CharacterEditor] Tab opened with missing character data - likely corrupted localStorage');
-    if (instance?.appContext?.config?.globalProperties?.$root?.$notify) {
-      instance.appContext.config.globalProperties.$root.$notify(
-        'Failed to load character data. This tab may have corrupted data. Please close it and try again.',
-        'error'
-      );
-    }
+    notify(
+      'Failed to load character data. This tab may have corrupted data. Please close it and try again.',
+      'error'
+    );
     // Don't process further - leave form in default blank state so user knows something is wrong
     return;
   }
@@ -430,9 +429,7 @@ async function handleImageUpload(event) {
         imageFile.value = new File([blob], file.name.replace(/\.(jpg|jpeg)$/i, '.png'), { type: 'image/png' })
       } catch (error) {
         console.error('Failed to convert JPEG to PNG:', error)
-        if (instance?.appContext?.config?.globalProperties?.$root?.$notify) {
-          instance.appContext.config.globalProperties.$root.$notify('Failed to convert image to PNG', 'error')
-        }
+        notify('Failed to convert image to PNG', 'error')
       }
     } else {
       imageFile.value = file
@@ -565,12 +562,10 @@ async function save() {
         })
 
         // Show success notification
-        if (instance?.appContext?.config?.globalProperties?.$root?.$notify) {
-          instance.appContext.config.globalProperties.$root.$notify(
-            characterData.originalFilename ? 'Character saved successfully' : 'Character created successfully',
-            'success'
-          )
-        }
+        notify(
+          characterData.originalFilename ? 'Character saved successfully' : 'Character created successfully',
+          'success'
+        )
 
         // If it was a new character, update the tabData to have the filename and clear draft
         if (!characterData.originalFilename && result.filename) {
@@ -600,15 +595,11 @@ async function save() {
         }
       } else {
         const error = await response.json()
-        if (instance?.appContext?.config?.globalProperties?.$root?.$notify) {
-          instance.appContext.config.globalProperties.$root.$notify(`Failed to save character: ${error.error}`, 'error')
-        }
+        notify(`Failed to save character: ${error.error}`, 'error')
       }
     } catch (error) {
       console.error('Failed to save character:', error)
-      if (instance?.appContext?.config?.globalProperties?.$root?.$notify) {
-        instance.appContext.config.globalProperties.$root.$notify('Failed to save character', 'error')
-      }
+      notify('Failed to save character', 'error')
     }
   } else {
     // In modal mode, emit to parent

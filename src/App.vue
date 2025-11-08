@@ -24,6 +24,16 @@ export default {
       backgroundConfig: null
     }
   },
+  provide() {
+    return {
+      // Provide notify function to all child components
+      notify: (message, type = 'info', duration = 3000) => {
+        if (this.$refs.notification) {
+          this.$refs.notification.show(message, type, duration);
+        }
+      }
+    }
+  },
   computed: {
     backgroundStyle() {
       if (!this.backgroundConfig) return {}
