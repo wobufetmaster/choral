@@ -1,0 +1,16 @@
+{
+  "name": "PixiJB Import Test",
+  "model": "anthropic/claude-3-5-sonnet",
+  "genamt": 500,
+  "temp": 1.0,
+  "top_p": 1.0,
+  "prompts": [
+    {
+      "name": "Main",
+      "content": "Test system prompt",
+      "injection_position": 0,
+      "injection_depth": 4,
+      "role": "system"
+    }
+  ]
+}

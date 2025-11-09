@@ -1,0 +1,25 @@
+{
+  "character": "test-character-v3.png",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "What's in this image?"
+        },
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+          }
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": "I can see a small test image."
+    }
+  ],
+  "created": "2025-11-09T12:00:00.000Z"
+}

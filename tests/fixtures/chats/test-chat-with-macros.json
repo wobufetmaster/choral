@@ -1,0 +1,14 @@
+{
+  "character": "test-character-v3.png",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Tell me about {{char}}."
+    },
+    {
+      "role": "assistant",
+      "content": "I'm {{char}}, nice to meet {{user}}! {{random:Hello,Hi,Hey}} there!"
+    }
+  ],
+  "created": "2025-11-09T12:00:00.000Z"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Test Preset",
+  "model": "anthropic/claude-opus-4",
+  "temperature": 0.8,
+  "top_p": 0.9,
+  "top_k": 40,
+  "max_tokens": 2000,
+  "prompts": [
+    {
+      "name": "System",
+      "content": "You are a helpful assistant named {{char}}.",
+      "injection_position": 0,
+      "injection_depth": 0
+    }
+  ],
+  "prompt_processing_mode": "merge_system"
+}
