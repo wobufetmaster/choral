@@ -150,6 +150,17 @@ export default {
 
     // Create new tab (defaults to character list)
     const newTab = (type = 'character-list', data = {}, label = null) => {
+      // Check if this is a singleton type that should be de-duplicated
+      const singletonTypes = ['character-list', 'settings', 'bookkeeping-settings', 'tool-settings', 'presets', 'personas', 'lorebooks'];
+      if (singletonTypes.includes(type)) {
+        const existingTab = tabs.value.find(tab => tab.type === type);
+        if (existingTab) {
+          // Switch to existing tab instead of creating new one
+          switchTab(existingTab.id);
+          return;
+        }
+      }
+
       const id = generateTabId();
       const defaultLabels = {
         'character-list': 'Characters',
@@ -178,7 +189,7 @@ export default {
     // Open tab or switch to existing
     const openTab = (type, data = {}, label = null, replaceActive = true) => {
       // For settings pages and manager pages, check if one already exists and switch to it
-      const singletonTypes = ['settings', 'bookkeeping-settings', 'tool-settings', 'presets', 'personas', 'lorebooks'];
+      const singletonTypes = ['character-list', 'settings', 'bookkeeping-settings', 'tool-settings', 'presets', 'personas', 'lorebooks'];
       if (singletonTypes.includes(type)) {
         const existingTab = tabs.value.find(tab => tab.type === type);
         if (existingTab) {
