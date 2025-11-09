@@ -9,7 +9,16 @@
     "dev:client": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "node server/index.js"
+    "server": "node server/index.js",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "start-server-and-test 'node server/index.js' http://localhost:3000 'playwright test'",
+    "test:e2e:headed": "start-server-and-test 'node server/index.js' http://localhost:3000 'playwright test --headed'",
+    "test:all": "npm test && npm run test:e2e",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -26,10 +35,20 @@
     "pngjs": "^7.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@vitejs/plugin-vue": "^6.0.1",
+    "@vitest/coverage-v8": "^4.0.8",
+    "@vitest/ui": "^4.0.8",
+    "@vue/test-utils": "^2.4.6",
     "concurrently": "^9.2.1",
     "dompurify": "^3.2.7",
+    "happy-dom": "^20.0.10",
+    "husky": "^9.1.7",
+    "playwright": "^1.56.1",
+    "start-server-and-test": "^2.1.2",
+    "supertest": "^7.1.4",
     "vite": "^7.1.9",
+    "vitest": "^4.0.8",
     "vue": "^3.5.22",
     "vue-router": "^4.5.1"
   }

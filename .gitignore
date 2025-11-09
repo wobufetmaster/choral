@@ -64,3 +64,10 @@ config.json
 /*.json
 !package.json
 !package-lock.json
+
+# Test output
+coverage/
+test-results/
+playwright-report/
+data-test/
+.vitest/
