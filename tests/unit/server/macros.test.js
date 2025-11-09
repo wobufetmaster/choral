@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { processMacros, clearPickCache } from '../../../server/macros.js';
+import { processMacros, clearPickCache, processMessagesWithMacros } from '../../../server/macros.js';
 
 describe('Macro Processing', () => {
   const context = {
@@ -240,6 +240,265 @@ describe('Macro Processing', () => {
       const input = '{{char}} greets {{user}} {{// hidden}} and says {{random:hi,hello}}';
       const result = processMacros(input, context);
       expect(result).toMatch(/TestChar greets TestUser  and says (hi|hello)/);
+    });
+  });
+
+  describe('{{date}} macro', () => {
+    it('should return current date in readable format', () => {
+      const result = processMacros('Today is {{date}}', context);
+      // Match format like "January 1, 2025" or "December 31, 2024"
+      expect(result).toMatch(/^Today is [A-Z][a-z]+ \d{1,2}, \d{4}$/);
+    });
+
+    it('should replace multiple {{date}} instances', () => {
+      const result = processMacros('{{date}} and {{date}}', context);
+      const parts = result.split(' and ');
+      // Both should be the same date since called at same time
+      expect(parts[0]).toBe(parts[1]);
+    });
+
+    it('should be case insensitive', () => {
+      const result = processMacros('{{DATE}}', context);
+      expect(result).toMatch(/^[A-Z][a-z]+ \d{1,2}, \d{4}$/);
+    });
+
+    it('should contain month name not number', () => {
+      const result = processMacros('{{date}}', context);
+      const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+      const hasMonth = months.some(month => result.includes(month));
+      expect(hasMonth).toBe(true);
+    });
+  });
+
+  describe('{{isotime}} macro', () => {
+    it('should return time in HH:MM format', () => {
+      const result = processMacros('The time is {{isotime}}', context);
+      expect(result).toMatch(/^The time is \d{2}:\d{2}$/);
+    });
+
+    it('should have valid hours (00-23) and minutes (00-59)', () => {
+      const result = processMacros('{{isotime}}', context);
+      const [hours, minutes] = result.split(':').map(Number);
+      expect(hours).toBeGreaterThanOrEqual(0);
+      expect(hours).toBeLessThanOrEqual(23);
+      expect(minutes).toBeGreaterThanOrEqual(0);
+      expect(minutes).toBeLessThanOrEqual(59);
+    });
+
+    it('should replace multiple {{isotime}} instances', () => {
+      const result = processMacros('{{isotime}} - {{isotime}}', context);
+      // Both should be the same time since called at nearly same moment
+      const times = result.split(' - ');
+      expect(times[0]).toBe(times[1]);
+    });
+
+    it('should be case insensitive', () => {
+      const result = processMacros('{{ISOTIME}}', context);
+      expect(result).toMatch(/^\d{2}:\d{2}$/);
+    });
+
+    it('should always use zero padding', () => {
+      const result = processMacros('{{isotime}}', context);
+      const [hours, minutes] = result.split(':');
+      expect(hours).toHaveLength(2);
+      expect(minutes).toHaveLength(2);
+    });
+  });
+
+  describe('{{characters_list}} macro', () => {
+    it('should list available characters with filenames', () => {
+      const contextWithChars = {
+        ...context,
+        characters: [
+          { name: 'Alice', filename: 'alice.png' },
+          { name: 'Bob', filename: 'bob.png' }
+        ]
+      };
+      const result = processMacros('Characters: {{characters_list}}', contextWithChars);
+      expect(result).toBe('Characters: - Alice (alice.png)\n- Bob (bob.png)');
+    });
+
+    it('should handle single character', () => {
+      const contextWithChars = {
+        ...context,
+        characters: [
+          { name: 'Solo', filename: 'solo.png' }
+        ]
+      };
+      const result = processMacros('{{characters_list}}', contextWithChars);
+      expect(result).toBe('- Solo (solo.png)');
+    });
+
+    it('should return fallback message when no characters available', () => {
+      const result = processMacros('{{characters_list}}', context);
+      expect(result).toBe('(no characters available)');
+    });
+
+    it('should return fallback when characters array is empty', () => {
+      const contextWithEmptyChars = {
+        ...context,
+        characters: []
+      };
+      const result = processMacros('{{characters_list}}', contextWithEmptyChars);
+      expect(result).toBe('(no characters available)');
+    });
+
+    it('should be case insensitive', () => {
+      const contextWithChars = {
+        ...context,
+        characters: [
+          { name: 'Test', filename: 'test.png' }
+        ]
+      };
+      const result = processMacros('{{CHARACTERS_LIST}}', contextWithChars);
+      expect(result).toBe('- Test (test.png)');
+    });
+
+    it('should handle characters with special characters in names', () => {
+      const contextWithChars = {
+        ...context,
+        characters: [
+          { name: "O'Brien", filename: 'obrien.png' },
+          { name: 'Jean-Luc', filename: 'jean-luc.png' }
+        ]
+      };
+      const result = processMacros('{{characters_list}}', contextWithChars);
+      expect(result).toBe("- O'Brien (obrien.png)\n- Jean-Luc (jean-luc.png)");
+    });
+  });
+
+  describe('processMessagesWithMacros', () => {
+    describe('String content (legacy format)', () => {
+      it('should process macros in string content', () => {
+        const messages = [
+          { role: 'user', content: 'Hello {{char}}!' },
+          { role: 'assistant', content: 'Hi {{user}}!' }
+        ];
+        const result = processMessagesWithMacros(messages, context);
+        expect(result[0].content).toBe('Hello TestChar!');
+        expect(result[1].content).toBe('Hi TestUser!');
+      });
+
+      it('should preserve message structure', () => {
+        const messages = [
+          { role: 'user', content: 'Test {{char}}', metadata: { timestamp: 123 } }
+        ];
+        const result = processMessagesWithMacros(messages, context);
+        expect(result[0].role).toBe('user');
+        expect(result[0].metadata).toEqual({ timestamp: 123 });
+      });
+
+      it('should handle empty array', () => {
+        const result = processMessagesWithMacros([], context);
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe('Multimodal content (array format)', () => {
+      it('should process text parts and leave image parts unchanged', () => {
+        const messages = [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Hello {{char}}!' },
+              { type: 'image_url', image_url: { url: 'data:image/png;base64,abc123' } }
+            ]
+          }
+        ];
+        const result = processMessagesWithMacros(messages, context);
+        expect(result[0].content[0].text).toBe('Hello TestChar!');
+        expect(result[0].content[1]).toEqual({
+          type: 'image_url',
+          image_url: { url: 'data:image/png;base64,abc123' }
+        });
+      });
+
+      it('should handle multiple text parts', () => {
+        const messages = [
+          {
+            role: 'assistant',
+            content: [
+              { type: 'text', text: '{{char}} says:' },
+              { type: 'text', text: 'Hello {{user}}!' }
+            ]
+          }
+        ];
+        const result = processMessagesWithMacros(messages, context);
+        expect(result[0].content[0].text).toBe('TestChar says:');
+        expect(result[0].content[1].text).toBe('Hello TestUser!');
+      });
+
+      it('should handle mixed content with multiple images', () => {
+        const messages = [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Look {{user}}!' },
+              { type: 'image_url', image_url: { url: 'data:image/png;base64,img1' } },
+              { type: 'text', text: 'What does {{char}} think?' },
+              { type: 'image_url', image_url: { url: 'data:image/png;base64,img2' } }
+            ]
+          }
+        ];
+        const result = processMessagesWithMacros(messages, context);
+        expect(result[0].content[0].text).toBe('Look TestUser!');
+        expect(result[0].content[1].type).toBe('image_url');
+        expect(result[0].content[2].text).toBe('What does TestChar think?');
+        expect(result[0].content[3].type).toBe('image_url');
+      });
+
+      it('should preserve part structure with all fields', () => {
+        const messages = [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: '{{char}}', metadata: { source: 'test' } }
+            ]
+          }
+        ];
+        const result = processMessagesWithMacros(messages, context);
+        expect(result[0].content[0]).toEqual({
+          type: 'text',
+          text: 'TestChar',
+          metadata: { source: 'test' }
+        });
+      });
+    });
+
+    describe('Edge cases', () => {
+      it('should handle messages with neither string nor array content', () => {
+        const messages = [
+          { role: 'system', content: null },
+          { role: 'user', content: undefined },
+          { role: 'assistant', content: 123 }
+        ];
+        const result = processMessagesWithMacros(messages, context);
+        expect(result[0].content).toBeNull();
+        expect(result[1].content).toBeUndefined();
+        expect(result[2].content).toBe(123);
+      });
+
+      it('should handle empty content array', () => {
+        const messages = [
+          { role: 'user', content: [] }
+        ];
+        const result = processMessagesWithMacros(messages, context);
+        expect(result[0].content).toEqual([]);
+      });
+
+      it('should process all macros in multimodal messages', () => {
+        const messages = [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: '{{char}} rolled {{roll:6}} and said {{random:hi,hello}}' }
+            ]
+          }
+        ];
+        const result = processMessagesWithMacros(messages, context);
+        expect(result[0].content[0].text).toMatch(/TestChar rolled [1-6] and said (hi|hello)/);
+      });
     });
   });
 
