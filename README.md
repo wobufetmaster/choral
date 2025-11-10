@@ -339,6 +339,22 @@ npm run server     # Run production server
 - `GET /api/config` - Get sanitized config
 - `POST /api/config/active-preset` - Set active preset
 
+## Testing
+
+Choral has comprehensive test coverage across unit, integration, and end-to-end tests.
+
+### Quick Start
+```bash
+npm test              # Run unit + integration tests
+npm run test:e2e     # Run E2E tests
+npm run test:all     # Run everything
+```
+
+See [docs/testing.md](docs/testing.md) for detailed testing documentation.
+
+### Pre-commit Hooks
+Tests automatically run before each commit to prevent regressions.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details
