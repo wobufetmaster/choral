@@ -18,7 +18,8 @@
     "test:e2e": "start-server-and-test 'node server/index.js' http://localhost:3000 'playwright test'",
     "test:e2e:headed": "start-server-and-test 'node server/index.js' http://localhost:3000 'playwright test --headed'",
     "test:all": "npm test && npm run test:e2e",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "",
