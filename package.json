@@ -44,6 +44,7 @@
     "dompurify": "^3.2.7",
     "happy-dom": "^20.0.10",
     "husky": "^9.1.7",
+    "mermaid": "^11.4.1",
     "playwright": "^1.56.1",
     "start-server-and-test": "^2.1.2",
     "supertest": "^7.1.4",
