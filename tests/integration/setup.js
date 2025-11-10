@@ -2,9 +2,16 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 
-const TEST_DATA_DIR = path.join(process.cwd(), 'data-test');
+// Track the current test directory for cleanup
+let currentTestDataDir = null;
 
 export function setupTestDataDir() {
+  // Create a unique test directory for each test run to avoid race conditions
+  const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const TEST_DATA_DIR = path.join(process.cwd(), `data-test-${uniqueId}`);
+
+  currentTestDataDir = TEST_DATA_DIR;
+
   const dirs = [
     TEST_DATA_DIR,
     path.join(TEST_DATA_DIR, 'characters'),
@@ -25,16 +32,22 @@ export function setupTestDataDir() {
 }
 
 export async function cleanupTestDataDir() {
-  if (fs.existsSync(TEST_DATA_DIR)) {
+  if (!currentTestDataDir) {
+    return;
+  }
+
+  if (fs.existsSync(currentTestDataDir)) {
     try {
-      // Use a small delay to ensure any pending file operations complete
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true, maxRetries: 3 });
+      // Increase delay to ensure all file operations complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      fs.rmSync(currentTestDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     } catch (error) {
-      // Ignore cleanup errors
-      console.warn('Cleanup warning:', error.message);
+      // Ignore cleanup errors but log them for debugging
+      console.warn('Cleanup warning for', currentTestDataDir, ':', error.message);
     }
   }
+
+  currentTestDataDir = null;
 }
 
 export function createTestConfig(dataDir) {

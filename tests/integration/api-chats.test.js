@@ -39,6 +39,8 @@ describe('Chat API Endpoints', () => {
         created: new Date().toISOString()
       };
       await fs.promises.writeFile(chatPath, JSON.stringify(chatData));
+      // Add delay to ensure file system operations complete
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app).get('/api/chats');
 

@@ -54,6 +54,8 @@ describe('Preset API Endpoints', () => {
       // Create a test preset first
       const presetPath = path.join(testDataDir, 'presets/test-preset.json');
       await fs.promises.writeFile(presetPath, JSON.stringify({ name: 'Test' }));
+      // Add delay to ensure file system operations complete
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app).delete('/api/presets/test-preset.json');
 

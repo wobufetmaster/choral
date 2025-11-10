@@ -36,6 +36,8 @@ describe('Character API Endpoints', () => {
       const srcPath = path.join(process.cwd(), 'tests/fixtures/characters/test-character-v3.png');
       const destPath = path.join(testDataDir, 'characters/test-character-v3.png');
       await fs.promises.copyFile(srcPath, destPath);
+      // Add delay to ensure file system operations complete
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app).get('/api/characters');
 
@@ -50,6 +52,8 @@ describe('Character API Endpoints', () => {
       const srcPath = path.join(process.cwd(), 'tests/fixtures/characters/test-character-v3.png');
       const destPath = path.join(testDataDir, 'characters/test-character-v3.png');
       await fs.promises.copyFile(srcPath, destPath);
+      // Add delay to ensure file system operations complete
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app).get('/api/characters/test-character-v3.png');
 
@@ -85,6 +89,8 @@ describe('Character API Endpoints', () => {
       const srcPath = path.join(process.cwd(), 'tests/fixtures/characters/test-character-v3.png');
       const destPath = path.join(testDataDir, 'characters/test-character-v3.png');
       await fs.promises.copyFile(srcPath, destPath);
+      // Add delay to ensure file system operations complete
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app).delete('/api/characters/test-character-v3.png');
 
