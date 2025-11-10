@@ -20,8 +20,11 @@ const { processLorebook, injectEntries } = require('./lorebook');
  * @returns {Object} Object containing app and ensureDirectories function
  */
 function createApp(config) {
+  // Create defensive copy to prevent test pollution
+  const localConfig = { ...config };
+
   const app = express();
-  const upload = multer({ dest: 'uploads/' });
+  const upload = multer({ dest: localConfig.uploadDir || 'uploads/' });
 
   app.use(cors());
   app.use(express.json({ limit: '50mb' }));
@@ -29,7 +32,8 @@ function createApp(config) {
   // Serve documentation
   app.use('/docs', express.static(path.join(__dirname, '../docs')));
 
-  const DATA_DIR = path.resolve(config.dataDir || './data');
+  const configPath = localConfig.configPath || path.join(__dirname, '..', 'config.json');
+  const DATA_DIR = path.resolve(localConfig.dataDir || './data');
   const CHARACTERS_DIR = path.join(DATA_DIR, 'characters');
   const CHATS_DIR = path.join(DATA_DIR, 'chats');
   const LOREBOOKS_DIR = path.join(DATA_DIR, 'lorebooks');
@@ -80,7 +84,7 @@ async function loadBookkeepingSettings() {
     return {
       enableBookkeeping: false,
       autoRenameChats: false,
-      model: config.bookkeepingModel || 'openai/gpt-4o-mini',
+      model: localConfig.bookkeepingModel || 'openai/gpt-4o-mini',
       strictMode: false
     };
   }
@@ -704,7 +708,7 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || config.openRouterApiKey}`,
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || localConfig.openRouterApiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'http://localhost:3000',
         'X-Title': 'Choral'
@@ -1141,7 +1145,7 @@ Generate a short title (3-6 words) that captures the essence of this conversatio
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || config.openRouterApiKey}`,
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || localConfig.openRouterApiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'http://localhost:3000',
         'X-Title': 'Choral'
@@ -1755,7 +1759,7 @@ Generate a short title (3-6 words) that captures the essence of this conversatio
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || config.openRouterApiKey}`,
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || localConfig.openRouterApiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'http://localhost:3000',
         'X-Title': 'Choral'
@@ -2218,10 +2222,10 @@ app.post('/api/bookkeeping-settings', async (req, res) => {
 
 app.get('/api/config', (req, res) => {
   res.json({
-    port: config.port || 3000,
-    hasApiKey: !!(config.openRouterApiKey || process.env.OPENROUTER_API_KEY),
-    activePreset: config.activePreset || 'default.json',
-    defaultPersona: config.defaultPersona || null
+    port: localConfig.port || 3000,
+    hasApiKey: !!(localConfig.openRouterApiKey || process.env.OPENROUTER_API_KEY),
+    activePreset: localConfig.activePreset || 'default.json',
+    defaultPersona: localConfig.defaultPersona || null
   });
 });
 
@@ -2231,11 +2235,10 @@ app.post('/api/config/active-preset', async (req, res) => {
     const { preset } = req.body;
 
     // Update config
-    config.activePreset = preset;
+    localConfig.activePreset = preset;
 
     // Save config to disk
-    const configPath = path.join(__dirname, '..', 'config.json');
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+    await fs.writeFile(configPath, JSON.stringify(localConfig, null, 2));
 
     res.json({ success: true, activePreset: preset });
   } catch (error) {
@@ -2249,11 +2252,10 @@ app.post('/api/config/default-persona', async (req, res) => {
     const { persona } = req.body;
 
     // Update config
-    config.defaultPersona = persona;
+    localConfig.defaultPersona = persona;
 
     // Save config to disk
-    const configPath = path.join(__dirname, '..', 'config.json');
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+    await fs.writeFile(configPath, JSON.stringify(localConfig, null, 2));
 
     res.json({ success: true, defaultPersona: persona });
   } catch (error) {
