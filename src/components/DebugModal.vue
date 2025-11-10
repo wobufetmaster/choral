@@ -63,6 +63,76 @@
             </div>
           </div>
 
+          <!-- Character Information -->
+          <div class="debug-section" v-if="hasCharacterInfo()">
+            <div class="section-header" @click="toggleSection('character-info')">
+              <span class="expand-icon">{{ expandedSections['character-info'] ? '▼' : '▶' }}</span>
+              <h4>🎭 Character Information</h4>
+              <span class="section-hint" v-if="debugData.isGroupChat">
+                {{ debugData.groupChatStrategy === 'swap' ? 'Swap Strategy' : 'Join Strategy' }}
+              </span>
+            </div>
+            <div v-if="expandedSections['character-info']" class="section-content">
+              <div class="character-info">
+                <!-- Basic Info -->
+                <div class="debug-row" v-if="debugData.isGroupChat">
+                  <span class="debug-label">Chat Type:</span>
+                  <span class="debug-value">Group Chat ({{ debugData.groupChatStrategy }} strategy)</span>
+                </div>
+                <div class="debug-row" v-if="!debugData.isGroupChat">
+                  <span class="debug-label">Chat Type:</span>
+                  <span class="debug-value">1-on-1 Chat</span>
+                </div>
+                <div class="debug-row" v-if="debugData.characterName">
+                  <span class="debug-label">Speaking Character:</span>
+                  <span class="debug-value character-name-highlight">{{ debugData.characterName }}</span>
+                </div>
+
+                <!-- Strategy Explanation -->
+                <div v-if="debugData.isGroupChat" class="strategy-explanation">
+                  <p v-if="debugData.groupChatStrategy === 'swap'">
+                    <strong>Swap Strategy:</strong> Only the speaking character's description was sent to the AI.
+                  </p>
+                  <p v-else>
+                    <strong>Join Strategy:</strong> All characters' descriptions were sent to the AI.
+                  </p>
+                </div>
+
+                <!-- Character Descriptions (Collapsible) -->
+                <div v-if="debugData.characterDescriptions && debugData.characterDescriptions.length > 0" class="character-descriptions-list">
+                  <strong>Character Descriptions ({{ debugData.characterDescriptions.length }}):</strong>
+                  <div v-for="char in debugData.characterDescriptions" :key="char.filename" class="character-description-block">
+                    <div class="character-description-header" @click="toggleCharacterDescription(char.filename)">
+                      <div class="character-description-header-left">
+                        <span class="expand-icon">{{ isCharacterDescriptionExpanded(char.filename) ? '▼' : '▶' }}</span>
+                        <span class="character-description-name">{{ char.name }}</span>
+                        <span v-if="char.nickname" class="character-nickname">({{ char.nickname }})</span>
+                      </div>
+                      <span v-if="char.isSpeaking" class="speaking-badge-inline">Speaking</span>
+                    </div>
+                    <div v-if="isCharacterDescriptionExpanded(char.filename)" class="character-description-content">
+                      <div v-if="char.description" class="character-field">
+                        <strong>Description:</strong>
+                        <pre class="character-field-content">{{ char.description }}</pre>
+                      </div>
+                      <div v-if="char.personality" class="character-field">
+                        <strong>Personality:</strong>
+                        <pre class="character-field-content">{{ char.personality }}</pre>
+                      </div>
+                      <div v-if="char.scenario" class="character-field">
+                        <strong>Scenario:</strong>
+                        <pre class="character-field-content">{{ char.scenario }}</pre>
+                      </div>
+                      <div v-if="!char.description && !char.personality && !char.scenario" class="no-character-data">
+                        <em>No character data available</em>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- System Prompts -->
           <div class="debug-section" v-if="getSystemPrompts().length > 0">
             <div class="section-header" @click="toggleSection('system')">
@@ -288,6 +358,7 @@ export default {
     return {
       expandedSections: {
         tokens: true,
+        'character-info': true,
         system: true,
         character: false,
         persona: false,
@@ -297,7 +368,8 @@ export default {
         final: false,
         raw: false
       },
-      expandedCharacters: {} // Track which character blocks are expanded (by index)
+      expandedCharacters: {}, // Track which character blocks are expanded (by index)
+      expandedCharacterDescriptions: {} // Track which character descriptions are expanded
     };
   },
   methods: {
@@ -316,6 +388,18 @@ export default {
     isCharacterExpanded(index) {
       // Default to expanded (true) if not explicitly set
       return this.expandedCharacters[index] !== false;
+    },
+    toggleCharacterDescription(filename) {
+      // Toggle character description expanded state
+      const currentState = this.expandedCharacterDescriptions[filename];
+      this.expandedCharacterDescriptions = {
+        ...this.expandedCharacterDescriptions,
+        [filename]: !currentState
+      };
+    },
+    isCharacterDescriptionExpanded(filename) {
+      // Default to collapsed (false)
+      return this.expandedCharacterDescriptions[filename] === true;
     },
     getSystemPrompts() {
       if (!this.debugData?.messages) return [];
@@ -392,6 +476,10 @@ export default {
     countMessagesByRole(role) {
       if (!this.debugData?.messages) return 0;
       return this.debugData.messages.filter(m => m.role === role).length;
+    },
+    hasCharacterInfo() {
+      // Show character info section if we have character data
+      return this.debugData?.characterDescriptions && this.debugData.characterDescriptions.length > 0;
     },
     hasPersonaInfo() {
       // Show persona section if we have any persona data
@@ -997,5 +1085,142 @@ export default {
 .character-block .message-content {
   margin: 0;
   background: var(--bg-tertiary);
+}
+
+/* Character Information Section */
+.character-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.character-name-highlight {
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 1.1rem;
+}
+
+.strategy-explanation {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-left: 3px solid var(--primary);
+  border-radius: 4px;
+}
+
+.strategy-explanation p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.strategy-explanation strong {
+  color: var(--text-primary);
+}
+
+.character-descriptions-list {
+  margin-top: 1rem;
+}
+
+.character-descriptions-list > strong {
+  display: block;
+  margin-bottom: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.character-description-block {
+  margin-bottom: 0.75rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.character-description-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+  border-bottom: 1px solid transparent;
+}
+
+.character-description-header:hover {
+  background: var(--hover-bg);
+}
+
+.character-description-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.character-description-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.character-nickname {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.speaking-badge-inline {
+  padding: 0.25rem 0.5rem;
+  background: var(--primary);
+  color: white;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.character-description-content {
+  padding: 0.75rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.character-field {
+  margin-bottom: 1rem;
+}
+
+.character-field:last-child {
+  margin-bottom: 0;
+}
+
+.character-field strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.character-field-content {
+  margin: 0;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.no-character-data {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 </style>

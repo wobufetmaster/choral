@@ -1398,11 +1398,24 @@ export default {
       this.abortController = new AbortController();
 
       // Build macro context
-      const macroContext = {
-        charName: this.character?.data.name || 'Character',
-        charNickname: this.character?.data.nickname || '',
-        userName: this.persona?.name || 'User'
-      };
+      let macroContext;
+      if (this.isGroupChat && this.currentSpeaker) {
+        // For group chats, use the speaking character's info
+        const speakingChar = this.groupChatCharacters.find(c => c.filename === this.currentSpeaker);
+        const charData = speakingChar?.data?.data || speakingChar?.data || {};
+        macroContext = {
+          charName: speakingChar?.name || 'Character',
+          charNickname: charData.nickname || '',
+          userName: this.persona?.name || 'User'
+        };
+      } else {
+        // For 1-on-1 chats, use this.character
+        macroContext = {
+          charName: this.character?.data.name || 'Character',
+          charNickname: this.character?.data.nickname || '',
+          userName: this.persona?.name || 'User'
+        };
+      }
 
       const requestBody = {
         messages,
@@ -3167,6 +3180,69 @@ export default {
       // Use processed messages from server if available, otherwise use original request messages
       const finalMessages = debugInfoFromServer?.processedMessages || requestBody.messages;
 
+      // Gather character info
+      let characterInfo = {};
+      if (this.isGroupChat) {
+        characterInfo.isGroupChat = true;
+        characterInfo.groupChatStrategy = this.groupChatStrategy;
+
+        if (this.currentSpeaker) {
+          const speakingChar = this.groupChatCharacters.find(c => c.filename === this.currentSpeaker);
+          if (speakingChar) {
+            characterInfo.characterName = speakingChar.name;
+            characterInfo.characterFilename = speakingChar.filename;
+          }
+        }
+
+        // Store character descriptions based on strategy
+        if (this.groupChatStrategy === 'swap') {
+          // For SWAP: Only store the speaking character's full description
+          if (this.currentSpeaker) {
+            const speakingChar = this.groupChatCharacters.find(c => c.filename === this.currentSpeaker);
+            if (speakingChar) {
+              const charData = speakingChar.data?.data || speakingChar.data || {};
+              characterInfo.characterDescriptions = [{
+                name: speakingChar.name,
+                filename: speakingChar.filename,
+                nickname: charData.nickname || '',
+                description: charData.description || '',
+                personality: charData.personality || '',
+                scenario: charData.scenario || '',
+                isSpeaking: true
+              }];
+            }
+          }
+        } else {
+          // For JOIN: Store all characters' full descriptions
+          characterInfo.characterDescriptions = this.groupChatCharacters.map(c => {
+            const charData = c.data?.data || c.data || {};
+            return {
+              name: c.name,
+              filename: c.filename,
+              nickname: charData.nickname || '',
+              description: charData.description || '',
+              personality: charData.personality || '',
+              scenario: charData.scenario || '',
+              isSpeaking: c.filename === this.currentSpeaker
+            };
+          });
+        }
+      } else if (this.character) {
+        characterInfo.isGroupChat = false;
+        characterInfo.characterName = this.character.data?.name || 'Character';
+        characterInfo.characterFilename = this.characterFilename;
+        // Store full description for 1-on-1 chats
+        characterInfo.characterDescriptions = [{
+          name: this.character.data?.name || 'Character',
+          filename: this.characterFilename,
+          nickname: this.character.data?.nickname || '',
+          description: this.character.data?.description || '',
+          personality: this.character.data?.personality || '',
+          scenario: this.character.data?.scenario || '',
+          isSpeaking: true
+        }];
+      }
+
       // Simply store the debug data in memory for the current session
       this.currentDebugData = {
         timestamp: Date.now(),
@@ -3182,6 +3258,8 @@ export default {
         personaName: this.persona?.name || 'User',
         personaNickname: this.persona?.nickname || '',
         personaDescription: this.persona?.description || '',
+        // Character info
+        ...characterInfo,
         // Debug info from server
         matchedEntriesByLorebook: debugInfoFromServer?.matchedEntriesByLorebook || {},
         // Computed info
