@@ -2,19 +2,25 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import path from 'path';
 import fs from 'fs';
-import { setupTestDataDir, cleanupTestDataDir } from './setup.js';
+import { setupTestDataDir, cleanupTestDataDir, createTestConfig } from './setup.js';
+import { createApp } from '../../server/app.js';
 
 describe('Preset API Endpoints', () => {
   let app;
   let testDataDir;
+  let ensureDirectories;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDataDir = setupTestDataDir();
-    // TODO: Initialize app with test config
+    const config = createTestConfig(testDataDir);
+    const appContext = createApp(config);
+    app = appContext.app;
+    ensureDirectories = appContext.ensureDirectories;
+    await ensureDirectories();
   });
 
-  afterEach(() => {
-    cleanupTestDataDir();
+  afterEach(async () => {
+    await cleanupTestDataDir();
   });
 
   describe('GET /api/presets', () => {
@@ -70,7 +76,9 @@ describe('Preset API Endpoints', () => {
         .send(pixijbConfig);
 
       expect(response.status).toBe(200);
-      expect(response.body.name).toBe('Imported Preset');
+      expect(response.body.success).toBe(true);
+      expect(response.body.preset.name).toBe('Imported PixiJB Preset');
+      expect(response.body.filename).toBe('imported_pixijb.json');
     });
   });
 });

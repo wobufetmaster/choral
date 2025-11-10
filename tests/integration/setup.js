@@ -24,9 +24,16 @@ export function setupTestDataDir() {
   return TEST_DATA_DIR;
 }
 
-export function cleanupTestDataDir() {
+export async function cleanupTestDataDir() {
   if (fs.existsSync(TEST_DATA_DIR)) {
-    fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true });
+    try {
+      // Use a small delay to ensure any pending file operations complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+      fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true, maxRetries: 3 });
+    } catch (error) {
+      // Ignore cleanup errors
+      console.warn('Cleanup warning:', error.message);
+    }
   }
 }
 

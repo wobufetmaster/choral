@@ -1,25 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
-import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { setupTestDataDir, cleanupTestDataDir } from './setup.js';
-
-// We'll need to import and set up a test version of the server
-// For now, this is a template - actual implementation will depend on server structure
+import { setupTestDataDir, cleanupTestDataDir, createTestConfig } from './setup.js';
+import { createApp } from '../../server/app.js';
 
 describe('Character API Endpoints', () => {
   let app;
   let testDataDir;
+  let ensureDirectories;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDataDir = setupTestDataDir();
-    // TODO: Initialize app with test config
-    // app = createTestApp({ dataDir: testDataDir });
+    const config = createTestConfig(testDataDir);
+    const appContext = createApp(config);
+    app = appContext.app;
+    ensureDirectories = appContext.ensureDirectories;
+    await ensureDirectories();
   });
 
-  afterEach(() => {
-    cleanupTestDataDir();
+  afterEach(async () => {
+    await cleanupTestDataDir();
   });
 
   describe('GET /api/characters', () => {
@@ -68,7 +69,7 @@ describe('Character API Endpoints', () => {
 
       const response = await request(app)
         .post('/api/characters')
-        .attach('character', charPath);
+        .attach('file', charPath);
 
       expect(response.status).toBe(200);
       expect(response.body.filename).toBeDefined();
