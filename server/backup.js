@@ -42,7 +42,50 @@ async function listBackupFiles(directory) {
   }
 }
 
+/**
+ * Create backup archive of data directory
+ * @param {string} sourceDir - Directory to backup (e.g., './data')
+ * @param {string} destDir - Destination directory for backup file
+ * @param {boolean} encrypt - Whether to encrypt the archive
+ * @param {string} password - Password for encryption (if encrypt=true)
+ * @returns {Promise<string>} Created backup filename
+ */
+async function createBackupArchive(sourceDir, destDir, encrypt, password) {
+  // Ensure destination directory exists
+  await fs.mkdir(destDir, { recursive: true });
+
+  const filename = generateBackupFilename();
+  const outputPath = path.join(destDir, filename);
+
+  return new Promise((resolve, reject) => {
+    const output = require('fs').createWriteStream(outputPath);
+
+    // Create archive with appropriate format
+    const archive = encrypt
+      ? archiver.create('zip-encrypted', { zlib: { level: 8 }, encryptionMethod: 'aes256', password })
+      : archiver('zip', { zlib: { level: 8 } });
+
+    output.on('close', () => {
+      console.log(`[Backup] Created ${filename} (${archive.pointer()} bytes)`);
+      resolve(filename);
+    });
+
+    archive.on('error', (err) => {
+      console.error('[Backup] Archive error:', err);
+      reject(err);
+    });
+
+    archive.pipe(output);
+
+    // Add entire directory to archive, preserving structure
+    archive.directory(sourceDir, 'data');
+
+    archive.finalize();
+  });
+}
+
 module.exports = {
   generateBackupFilename,
-  listBackupFiles
+  listBackupFiles,
+  createBackupArchive
 };
