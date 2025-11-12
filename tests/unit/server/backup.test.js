@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateBackupFilename, listBackupFiles, createBackupArchive } from '../../../server/backup.js';
+import { generateBackupFilename, listBackupFiles, createBackupArchive, cleanupOldBackups } from '../../../server/backup.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -42,6 +42,39 @@ describe('Backup Module', () => {
 
       // Cleanup
       await fs.promises.rm(testDataDir, { recursive: true });
+      await fs.promises.rm(testBackupDir, { recursive: true });
+    });
+  });
+
+  describe('cleanupOldBackups', () => {
+    it('should delete oldest backups when exceeding retention limit', async () => {
+      const testBackupDir = path.join(__dirname, 'test-backups-cleanup');
+      await fs.promises.mkdir(testBackupDir, { recursive: true });
+
+      // Create 5 backup files
+      const files = [
+        'choral-backup-2025-11-01-120000.zip',
+        'choral-backup-2025-11-02-120000.zip',
+        'choral-backup-2025-11-03-120000.zip',
+        'choral-backup-2025-11-04-120000.zip',
+        'choral-backup-2025-11-05-120000.zip'
+      ];
+
+      for (const file of files) {
+        await fs.promises.writeFile(path.join(testBackupDir, file), 'test');
+      }
+
+      // Keep only 3
+      await cleanupOldBackups(testBackupDir, 3);
+
+      // Check that only 3 newest remain
+      const remaining = await fs.promises.readdir(testBackupDir);
+      expect(remaining.length).toBe(3);
+      expect(remaining).toContain('choral-backup-2025-11-05-120000.zip');
+      expect(remaining).toContain('choral-backup-2025-11-04-120000.zip');
+      expect(remaining).toContain('choral-backup-2025-11-03-120000.zip');
+
+      // Cleanup
       await fs.promises.rm(testBackupDir, { recursive: true });
     });
   });

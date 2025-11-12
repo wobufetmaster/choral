@@ -84,8 +84,33 @@ async function createBackupArchive(sourceDir, destDir, encrypt, password) {
   });
 }
 
+/**
+ * Delete old backups to maintain retention limit
+ * @param {string} directory - Backup directory
+ * @param {number} retention - Number of backups to keep
+ * @returns {Promise<number>} Number of backups deleted
+ */
+async function cleanupOldBackups(directory, retention) {
+  const backupFiles = await listBackupFiles(directory);
+
+  if (backupFiles.length <= retention) {
+    return 0;
+  }
+
+  const toDelete = backupFiles.slice(0, backupFiles.length - retention);
+
+  for (const file of toDelete) {
+    const filePath = path.join(directory, file);
+    await fs.unlink(filePath);
+    console.log(`[Backup] Deleted old backup: ${file}`);
+  }
+
+  return toDelete.length;
+}
+
 module.exports = {
   generateBackupFilename,
   listBackupFiles,
-  createBackupArchive
+  createBackupArchive,
+  cleanupOldBackups
 };
