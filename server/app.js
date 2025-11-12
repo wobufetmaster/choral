@@ -2384,7 +2384,7 @@ app.post('/api/config/backup', async (req, res) => {
   const newConfig = req.body;
 
   // Validate configuration
-  const validation = validateBackupConfig(newConfig);
+  const validation = validateBackupConfig(newConfig, localConfig.dataDir || './data');
   if (!validation.valid) {
     return res.status(400).json({
       success: false,
@@ -2397,7 +2397,7 @@ app.post('/api/config/backup', async (req, res) => {
 
   // Save to file
   const fs = require('fs').promises;
-  await fs.writeFile('config.json', JSON.stringify(localConfig, null, 2));
+  await fs.writeFile(configPath, JSON.stringify(localConfig, null, 2));
 
   // Restart scheduler (will be implemented in next task)
   if (global.backupScheduler) {
