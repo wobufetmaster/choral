@@ -6,6 +6,9 @@ const ArchiverZipEncrypted = require('archiver-zip-encrypted');
 // Register encrypted zip format
 archiver.registerFormat('zip-encrypted', ArchiverZipEncrypted);
 
+// Lock flag to prevent concurrent backups
+let backupInProgress = false;
+
 /**
  * Generate backup filename with timestamp
  * @returns {string} Filename like "choral-backup-2025-11-11-143052.zip"
@@ -108,9 +111,61 @@ async function cleanupOldBackups(directory, retention) {
   return toDelete.length;
 }
 
+/**
+ * Perform full backup operation
+ * @param {Object} config - Backup configuration
+ * @param {string} dataDir - Data directory path (default: './data')
+ * @returns {Promise<Object>} { success: boolean, filename?: string, error?: string }
+ */
+async function performBackup(config, dataDir = './data') {
+  // Check if backup already in progress
+  if (backupInProgress) {
+    return { success: false, error: 'Backup already in progress' };
+  }
+
+  backupInProgress = true;
+
+  try {
+    console.log('[Backup] Starting backup...');
+
+    // Create backup archive
+    const filename = await createBackupArchive(
+      dataDir,
+      config.directory,
+      config.encrypt,
+      config.password
+    );
+
+    // Cleanup old backups
+    const deleted = await cleanupOldBackups(config.directory, config.retention);
+    if (deleted > 0) {
+      console.log(`[Backup] Cleaned up ${deleted} old backup(s)`);
+    }
+
+    console.log('[Backup] Backup completed successfully');
+    return { success: true, filename };
+
+  } catch (error) {
+    console.error('[Backup] Backup failed:', error);
+    return { success: false, error: error.message };
+  } finally {
+    backupInProgress = false;
+  }
+}
+
+/**
+ * Check if backup is currently in progress
+ * @returns {boolean}
+ */
+function isBackupInProgress() {
+  return backupInProgress;
+}
+
 module.exports = {
   generateBackupFilename,
   listBackupFiles,
   createBackupArchive,
-  cleanupOldBackups
+  cleanupOldBackups,
+  performBackup,
+  isBackupInProgress
 };
