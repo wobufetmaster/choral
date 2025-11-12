@@ -2364,6 +2364,55 @@ app.post('/api/backup/trigger', async (req, res) => {
   }
 });
 
+// Get backup configuration
+app.get('/api/config/backup', (req, res) => {
+  const { DEFAULT_CONFIG } = require('./backupConfig.js');
+  const backupConfig = localConfig.backup || DEFAULT_CONFIG;
+
+  // Don't send password to frontend
+  const sanitized = { ...backupConfig };
+  if (sanitized.password) {
+    sanitized.password = '********';
+  }
+
+  res.json(sanitized);
+});
+
+// Update backup configuration
+app.post('/api/config/backup', async (req, res) => {
+  const { validateBackupConfig } = require('./backupConfig.js');
+  const newConfig = req.body;
+
+  // Validate configuration
+  const validation = validateBackupConfig(newConfig);
+  if (!validation.valid) {
+    return res.status(400).json({
+      success: false,
+      errors: validation.errors
+    });
+  }
+
+  // Update config
+  localConfig.backup = newConfig;
+
+  // Save to file
+  const fs = require('fs').promises;
+  await fs.writeFile('config.json', JSON.stringify(localConfig, null, 2));
+
+  // Restart scheduler (will be implemented in next task)
+  if (global.backupScheduler) {
+    global.backupScheduler.stop();
+    global.backupScheduler = null;
+  }
+
+  if (newConfig.enabled) {
+    const { startBackupScheduler } = require('./backupScheduler.js');
+    global.backupScheduler = startBackupScheduler(localConfig);
+  }
+
+  res.json({ success: true });
+});
+
 // ===== Tool Settings Routes =====
 
 // Get tool settings
