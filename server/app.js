@@ -10,6 +10,7 @@ const { DEFAULT_PRESET, convertPixiJBToPreset, validatePreset } = require('./pre
 const { logRequest, logResponse, logStreamChunk } = require('./logger');
 const { processPrompt, MODES } = require('./promptProcessor');
 const { processLorebook, injectEntries } = require('./lorebook');
+const { performBackup, isBackupInProgress } = require('./backup');
 
 /**
  * Create Express app with given configuration
@@ -2261,6 +2262,155 @@ app.post('/api/config/default-persona', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// ===== Backup Routes =====
+
+// Backup path validation endpoint
+app.post('/api/backup/validate-path', async (req, res) => {
+  const { path: backupPath } = req.body;
+
+  if (!backupPath) {
+    return res.status(400).json({ valid: false, error: 'Path is required' });
+  }
+
+  // Check for path traversal
+  if (backupPath.includes('../')) {
+    return res.status(400).json({ valid: false, error: 'Path cannot contain ../' });
+  }
+
+  const path = require('path');
+  const fs = require('fs').promises;
+
+  // Check if path is inside data directory
+  const resolvedPath = path.resolve(backupPath);
+  const dataDir = path.resolve(localConfig.dataDir || './data');
+
+  if (resolvedPath.startsWith(dataDir)) {
+    return res.status(400).json({
+      valid: false,
+      error: 'Cannot backup into data directory'
+    });
+  }
+
+  try {
+    // Check if directory exists
+    const stats = await fs.stat(resolvedPath);
+
+    if (!stats.isDirectory()) {
+      return res.status(400).json({ valid: false, error: 'Path is not a directory' });
+    }
+
+    // Test write permission
+    const testFile = path.join(resolvedPath, '.backup-test');
+    await fs.writeFile(testFile, '');
+    await fs.unlink(testFile);
+
+    return res.json({ valid: true, exists: true });
+
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      // Directory doesn't exist - check if parent exists
+      const parentDir = path.dirname(resolvedPath);
+      try {
+        await fs.access(parentDir);
+        return res.json({
+          valid: true,
+          exists: false,
+          canCreate: true
+        });
+      } catch {
+        return res.status(400).json({
+          valid: false,
+          error: 'Parent directory does not exist'
+        });
+      }
+    } else if (error.code === 'EACCES') {
+      return res.status(400).json({
+        valid: false,
+        error: 'Cannot write to this directory'
+      });
+    }
+
+    return res.status(500).json({
+      valid: false,
+      error: error.message
+    });
+  }
+});
+
+// Manual backup trigger endpoint
+app.post('/api/backup/trigger', async (req, res) => {
+  if (!localConfig.backup || !localConfig.backup.enabled) {
+    return res.status(400).json({
+      success: false,
+      error: 'Backups are not enabled'
+    });
+  }
+
+  if (isBackupInProgress()) {
+    return res.status(409).json({
+      success: false,
+      error: 'Backup already in progress'
+    });
+  }
+
+  const result = await performBackup(localConfig.backup, localConfig.dataDir || './data');
+
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(500).json(result);
+  }
+});
+
+// Get backup configuration
+app.get('/api/config/backup', (req, res) => {
+  const { DEFAULT_CONFIG } = require('./backupConfig.js');
+  const backupConfig = localConfig.backup || DEFAULT_CONFIG;
+
+  // Don't send password to frontend
+  const sanitized = { ...backupConfig };
+  if (sanitized.password) {
+    sanitized.password = '********';
+  }
+
+  res.json(sanitized);
+});
+
+// Update backup configuration
+app.post('/api/config/backup', async (req, res) => {
+  const { validateBackupConfig } = require('./backupConfig.js');
+  const newConfig = req.body;
+
+  // Validate configuration
+  const validation = validateBackupConfig(newConfig, localConfig.dataDir || './data');
+  if (!validation.valid) {
+    return res.status(400).json({
+      success: false,
+      errors: validation.errors
+    });
+  }
+
+  // Update config
+  localConfig.backup = newConfig;
+
+  // Save to file
+  const fs = require('fs').promises;
+  await fs.writeFile(configPath, JSON.stringify(localConfig, null, 2));
+
+  // Restart scheduler (will be implemented in next task)
+  if (global.backupScheduler) {
+    global.backupScheduler.stop();
+    global.backupScheduler = null;
+  }
+
+  if (newConfig.enabled) {
+    const { startBackupScheduler } = require('./backupScheduler.js');
+    global.backupScheduler = startBackupScheduler(localConfig);
+  }
+
+  res.json({ success: true });
 });
 
 // ===== Tool Settings Routes =====

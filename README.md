@@ -152,6 +152,67 @@ Edit `config.json` to customize:
 }
 ```
 
+## Backup System
+
+Choral includes an automatic backup system to protect your data from loss.
+
+### Configuration
+
+Configure backups in Settings > Backup or edit `config.json`:
+
+```json
+{
+  "backup": {
+    "enabled": false,
+    "interval": "6h",
+    "retention": 10,
+    "directory": "./backups",
+    "encrypt": false,
+    "password": ""
+  }
+}
+```
+
+**Options:**
+- `enabled` - Enable/disable automatic backups
+- `interval` - How often to backup: `15m`, `1h`, `6h`, `12h`, `24h`
+- `retention` - Number of backups to keep (1-100)
+- `directory` - Where to save backups (can be cloud sync folder)
+- `encrypt` - Enable password protection
+- `password` - Encryption password (min 8 characters)
+
+### Manual Backups
+
+Click "Backup Now" in Settings to create an immediate backup.
+
+### Restoring from Backup
+
+1. Locate your backup file: `choral-backup-YYYY-MM-DD-HHmmss.zip`
+2. If encrypted, unzip with your password
+3. Extract the `data/` folder to replace your current `data/` directory
+4. Restart Choral
+
+**Important:** Backups only include user data (characters, chats, personas, lorebooks, presets). They do not include `config.json` (contains API keys) or application code.
+
+### Cloud Storage
+
+Point the backup directory to a cloud-synced folder for off-site storage:
+- Google Drive: `/Users/you/Google Drive/choral-backups`
+- Dropbox: `/Users/you/Dropbox/choral-backups`
+- Syncthing: Any synced folder
+
+### Troubleshooting
+
+**Backups not running:**
+- Check that backups are enabled in Settings
+- Verify the backup directory is writable
+- Check server console for error messages
+
+**Out of disk space:**
+- Reduce retention count to keep fewer backups
+- Use a larger external drive for backups
+- Enable compression (enabled by default)
+
 ## Data Storage
 
 User data is stored in the `data/` directory:
