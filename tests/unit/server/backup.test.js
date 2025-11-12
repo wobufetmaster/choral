@@ -65,7 +65,10 @@ describe('Backup Module', () => {
       }
 
       // Keep only 3
-      await cleanupOldBackups(testBackupDir, 3);
+      const deleted = await cleanupOldBackups(testBackupDir, 3);
+
+      // Verify return value
+      expect(deleted).toBe(2);
 
       // Check that only 3 newest remain
       const remaining = await fs.promises.readdir(testBackupDir);
