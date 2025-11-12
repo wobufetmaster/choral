@@ -10,6 +10,7 @@ const { DEFAULT_PRESET, convertPixiJBToPreset, validatePreset } = require('./pre
 const { logRequest, logResponse, logStreamChunk } = require('./logger');
 const { processPrompt, MODES } = require('./promptProcessor');
 const { processLorebook, injectEntries } = require('./lorebook');
+const { performBackup, isBackupInProgress } = require('./backup');
 
 /**
  * Create Express app with given configuration
@@ -2335,6 +2336,31 @@ app.post('/api/backup/validate-path', async (req, res) => {
       valid: false,
       error: error.message
     });
+  }
+});
+
+// Manual backup trigger endpoint
+app.post('/api/backup/trigger', async (req, res) => {
+  if (!localConfig.backup || !localConfig.backup.enabled) {
+    return res.status(400).json({
+      success: false,
+      error: 'Backups are not enabled'
+    });
+  }
+
+  if (isBackupInProgress()) {
+    return res.status(409).json({
+      success: false,
+      error: 'Backup already in progress'
+    });
+  }
+
+  const result = await performBackup(localConfig.backup, localConfig.dataDir || './data');
+
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(500).json(result);
   }
 });
 
