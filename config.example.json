@@ -2,5 +2,14 @@
   "port": 3000,
   "dataDir": "./data",
   "openRouterApiKey": "",
-  "activePreset": "default.json"
+  "activePreset": "default.json",
+  "defaultPersona": "",
+  "backup": {
+    "enabled": false,
+    "interval": "6h",
+    "retention": 10,
+    "directory": "./backups",
+    "encrypt": false,
+    "password": ""
+  }
 }
