@@ -2263,6 +2263,81 @@ app.post('/api/config/default-persona', async (req, res) => {
   }
 });
 
+// ===== Backup Routes =====
+
+// Backup path validation endpoint
+app.post('/api/backup/validate-path', async (req, res) => {
+  const { path: backupPath } = req.body;
+
+  if (!backupPath) {
+    return res.status(400).json({ valid: false, error: 'Path is required' });
+  }
+
+  // Check for path traversal
+  if (backupPath.includes('../')) {
+    return res.status(400).json({ valid: false, error: 'Path cannot contain ../' });
+  }
+
+  const path = require('path');
+  const fs = require('fs').promises;
+
+  // Check if path is inside data directory
+  const resolvedPath = path.resolve(backupPath);
+  const dataDir = path.resolve(localConfig.dataDir || './data');
+
+  if (resolvedPath.startsWith(dataDir)) {
+    return res.status(400).json({
+      valid: false,
+      error: 'Cannot backup into data directory'
+    });
+  }
+
+  try {
+    // Check if directory exists
+    const stats = await fs.stat(resolvedPath);
+
+    if (!stats.isDirectory()) {
+      return res.status(400).json({ valid: false, error: 'Path is not a directory' });
+    }
+
+    // Test write permission
+    const testFile = path.join(resolvedPath, '.backup-test');
+    await fs.writeFile(testFile, '');
+    await fs.unlink(testFile);
+
+    return res.json({ valid: true, exists: true });
+
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      // Directory doesn't exist - check if parent exists
+      const parentDir = path.dirname(resolvedPath);
+      try {
+        await fs.access(parentDir);
+        return res.json({
+          valid: true,
+          exists: false,
+          canCreate: true
+        });
+      } catch {
+        return res.status(400).json({
+          valid: false,
+          error: 'Parent directory does not exist'
+        });
+      }
+    } else if (error.code === 'EACCES') {
+      return res.status(400).json({
+        valid: false,
+        error: 'Cannot write to this directory'
+      });
+    }
+
+    return res.status(500).json({
+      valid: false,
+      error: error.message
+    });
+  }
+});
+
 // ===== Tool Settings Routes =====
 
 // Get tool settings
