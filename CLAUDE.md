@@ -137,6 +137,15 @@ choral/
 - **Clean Interface**: Minimalist, focused on functionality
 - **Favicon**: Custom icon.png displayed in browser tab
 
+### Backup System
+- **Automatic Backups**: Scheduled backups on configurable interval (15m to 24h)
+- **Manual Trigger**: "Backup Now" button in Settings
+- **Retention Management**: Automatically delete old backups beyond retention limit
+- **Optional Encryption**: Password-protected backups with AES-256
+- **Path Validation**: Prevents invalid backup locations with directory picker
+- **Multiple Destinations**: Support local, external drive, or cloud sync folders
+- **Simple Restoration**: Manual unzip and copy - no complex restore UI
+
 ## API Endpoints Reference
 
 ### Characters
