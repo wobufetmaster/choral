@@ -47,6 +47,99 @@
       </div>
 
       <div class="setting-group">
+        <h3>Backup</h3>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" v-model="backupEnabled" @change="saveBackupConfig" />
+            Enable automatic backups
+          </label>
+        </div>
+
+        <template v-if="backupEnabled">
+          <div class="form-group">
+            <label>Backup Interval</label>
+            <select v-model="backupInterval" @change="saveBackupConfig">
+              <option value="15m">Every 15 minutes</option>
+              <option value="1h">Every hour</option>
+              <option value="6h">Every 6 hours</option>
+              <option value="12h">Every 12 hours</option>
+              <option value="24h">Daily</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Keep last</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input
+                type="number"
+                v-model.number="backupRetention"
+                @blur="saveBackupConfig"
+                min="1"
+                max="100"
+                style="width: 80px;"
+              />
+              <span>backups</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Backup Directory</label>
+            <div style="display: flex; gap: 8px;">
+              <input
+                type="text"
+                v-model="backupDirectory"
+                @blur="validateBackupPath"
+                style="flex: 1;"
+              />
+              <button @click="chooseBackupDirectory" class="choose-btn">Choose...</button>
+            </div>
+            <small v-if="backupPathStatus === 'valid'" class="status-success">
+              ✓ Directory is writable
+            </small>
+            <small v-else-if="backupPathStatus === 'can-create'" class="status-warning">
+              ⚠️ Directory doesn't exist.
+              <a href="#" @click.prevent="createBackupDirectory">Create it?</a>
+            </small>
+            <small v-else-if="backupPathError" class="status-error">
+              ❌ {{ backupPathError }}
+            </small>
+          </div>
+
+          <div class="form-group">
+            <label>
+              <input type="checkbox" v-model="backupEncrypt" @change="saveBackupConfig" />
+              Encrypt backups
+            </label>
+          </div>
+
+          <div v-if="backupEncrypt" class="form-group">
+            <label>Password</label>
+            <input
+              type="password"
+              v-model="backupPassword"
+              @blur="saveBackupConfig"
+              placeholder="Minimum 8 characters"
+              minlength="8"
+            />
+            <small class="status-warning">⚠️ Remember this password - it cannot be recovered!</small>
+          </div>
+
+          <div class="form-group">
+            <button
+              @click="triggerBackup"
+              :disabled="backupInProgress || !isBackupConfigValid"
+              class="backup-btn"
+            >
+              {{ backupInProgress ? 'Backup in progress...' : 'Backup Now' }}
+            </button>
+            <small v-if="lastBackupTime">Last backup: {{ lastBackupTime }}</small>
+            <small v-if="backupMessage" :class="backupMessageClass">{{ backupMessage }}</small>
+          </div>
+        </template>
+      </div>
+
+      <div class="setting-group">
         <h3>Appearance</h3>
 
         <div class="form-group">
@@ -134,7 +227,7 @@
 </template>
 
 <script>
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { themes, backgroundPatterns, getStoredTheme, getStoredBackground, saveTheme as saveThemeUtil, saveBackground, applyTheme } from '../utils/themes.js';
 import BackgroundPreview from './BackgroundPreview.vue';
 
@@ -162,6 +255,27 @@ export default {
     const customBackgroundUrl = ref('');
     const isLoading = ref(true);
     const showPreview = ref(false);
+
+    // Backup settings
+    const backupEnabled = ref(false);
+    const backupInterval = ref('6h');
+    const backupRetention = ref(10);
+    const backupDirectory = ref('./backups');
+    const backupEncrypt = ref(false);
+    const backupPassword = ref('');
+    const backupPathStatus = ref(''); // 'valid', 'can-create', or empty
+    const backupPathError = ref('');
+    const backupInProgress = ref(false);
+    const backupMessage = ref('');
+    const backupMessageClass = ref('');
+    const lastBackupTime = ref('');
+
+    const isBackupConfigValid = computed(() => {
+      if (!backupEnabled.value) return false;
+      if (backupPathStatus.value !== 'valid' && backupPathStatus.value !== 'can-create') return false;
+      if (backupEncrypt.value && backupPassword.value.length < 8) return false;
+      return true;
+    });
 
     const themeOptions = Object.entries(themes).map(([key, theme]) => ({
       key,
@@ -286,6 +400,134 @@ export default {
       showPreview.value = !showPreview.value;
     };
 
+    const loadBackupConfig = async () => {
+      try {
+        const response = await fetch('/api/config/backup');
+        const config = await response.json();
+        backupEnabled.value = config.enabled || false;
+        backupInterval.value = config.interval || '6h';
+        backupRetention.value = config.retention || 10;
+        backupDirectory.value = config.directory || './backups';
+        backupEncrypt.value = config.encrypt || false;
+        // Don't load password (it's sanitized from server)
+      } catch (error) {
+        console.error('Failed to load backup config:', error);
+      }
+    };
+
+    const saveBackupConfig = async () => {
+      try {
+        const config = {
+          enabled: backupEnabled.value,
+          interval: backupInterval.value,
+          retention: backupRetention.value,
+          directory: backupDirectory.value,
+          encrypt: backupEncrypt.value,
+          password: backupPassword.value
+        };
+
+        const response = await fetch('/api/config/backup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+          console.error('Failed to save backup config:', result.errors);
+        }
+      } catch (error) {
+        console.error('Failed to save backup config:', error);
+      }
+    };
+
+    const validateBackupPath = async () => {
+      if (!backupDirectory.value) return;
+
+      try {
+        const response = await fetch('/api/backup/validate-path', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: backupDirectory.value })
+        });
+
+        const result = await response.json();
+
+        if (result.valid) {
+          if (result.exists) {
+            backupPathStatus.value = 'valid';
+            backupPathError.value = '';
+          } else if (result.canCreate) {
+            backupPathStatus.value = 'can-create';
+            backupPathError.value = '';
+          }
+        } else {
+          backupPathStatus.value = '';
+          backupPathError.value = result.error;
+        }
+      } catch (error) {
+        backupPathStatus.value = '';
+        backupPathError.value = 'Failed to validate path';
+      }
+    };
+
+    const chooseBackupDirectory = () => {
+      // Create hidden file input for directory selection
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.webkitdirectory = true;
+      input.onchange = (e) => {
+        const files = e.target.files;
+        if (files.length > 0) {
+          // Get directory path from first file
+          const path = files[0].path || files[0].webkitRelativePath;
+          if (path) {
+            const dirPath = path.substring(0, path.lastIndexOf('/'));
+            backupDirectory.value = dirPath;
+            validateBackupPath();
+          }
+        }
+      };
+      input.click();
+    };
+
+    const createBackupDirectory = async () => {
+      await saveBackupConfig(); // This will create the directory via the backend
+      await validateBackupPath();
+    };
+
+    const triggerBackup = async () => {
+      backupInProgress.value = true;
+      backupMessage.value = '';
+
+      try {
+        const response = await fetch('/api/backup/trigger', {
+          method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          backupMessage.value = `Backup completed: ${result.filename}`;
+          backupMessageClass.value = 'status-success';
+          lastBackupTime.value = 'Just now';
+        } else {
+          backupMessage.value = `Backup failed: ${result.error}`;
+          backupMessageClass.value = 'status-error';
+        }
+      } catch (error) {
+        backupMessage.value = `Backup failed: ${error.message}`;
+        backupMessageClass.value = 'status-error';
+      } finally {
+        backupInProgress.value = false;
+
+        // Clear message after 5 seconds
+        setTimeout(() => {
+          backupMessage.value = '';
+        }, 5000);
+      }
+    };
+
     // Watch for background changes
     watch([backgroundType, backgroundPattern, backgroundOpacity, customBackgroundUrl], () => {
       updateBackground();
@@ -293,6 +535,7 @@ export default {
 
     onMounted(async () => {
       await loadSettings();
+      await loadBackupConfig();
       // Allow saves after initial load completes
       setTimeout(() => {
         isLoading.value = false;
@@ -320,6 +563,25 @@ export default {
       updateTheme,
       updateBackground,
       togglePreview,
+      // Backup settings
+      backupEnabled,
+      backupInterval,
+      backupRetention,
+      backupDirectory,
+      backupEncrypt,
+      backupPassword,
+      backupPathStatus,
+      backupPathError,
+      backupInProgress,
+      backupMessage,
+      backupMessageClass,
+      lastBackupTime,
+      isBackupConfigValid,
+      saveBackupConfig,
+      validateBackupPath,
+      chooseBackupDirectory,
+      createBackupDirectory,
+      triggerBackup,
     };
   },
 };
@@ -458,5 +720,45 @@ export default {
 .preview-toggle-btn:hover {
   background: var(--hover-color, #404040);
   border-color: var(--accent-color, #4a9eff);
+}
+
+.choose-btn,
+.backup-btn {
+  padding: 8px 16px;
+  background: var(--bg-tertiary, #2a2a2a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.choose-btn:hover,
+.backup-btn:hover:not(:disabled) {
+  background: var(--hover-color, #404040);
+  border-color: var(--accent-color, #4a9eff);
+}
+
+.backup-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-success {
+  color: #4caf50;
+}
+
+.status-warning {
+  color: #ff9800;
+}
+
+.status-error {
+  color: #f44336;
+}
+
+.status-warning a {
+  color: #ff9800;
+  text-decoration: underline;
 }
 </style>
