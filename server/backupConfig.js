@@ -1,5 +1,7 @@
 // Backup configuration defaults and validation
 
+const path = require('path');
+
 const VALID_INTERVALS = ['15m', '1h', '6h', '12h', '24h'];
 
 const DEFAULT_CONFIG = {
@@ -14,9 +16,10 @@ const DEFAULT_CONFIG = {
 /**
  * Validate backup configuration
  * @param {Object} config - Backup config object
+ * @param {string} dataDir - Data directory path (default: './data')
  * @returns {Object} { valid: boolean, errors: string[] }
  */
-function validateBackupConfig(config) {
+function validateBackupConfig(config, dataDir = './data') {
   const errors = [];
 
   if (config.retention < 1 || config.retention > 100) {
@@ -32,15 +35,15 @@ function validateBackupConfig(config) {
   }
 
   // Check for path traversal attempts
-  if (config.directory.includes('../')) {
+  const normalizedPath = path.normalize(config.directory);
+  if (normalizedPath.includes('..')) {
     errors.push('Directory path cannot contain ../');
   }
 
   // Check if path is inside data directory
-  const path = require('path');
   const resolvedDir = path.resolve(config.directory);
-  const dataDir = path.resolve('./data');
-  if (resolvedDir.startsWith(dataDir)) {
+  const resolvedDataDir = path.resolve(dataDir);
+  if (resolvedDir.startsWith(resolvedDataDir)) {
     errors.push('Cannot backup into data directory');
   }
 
