@@ -51,5 +51,17 @@ ensureDirectories().then(() => {
       console.warn('\nWARNING: No OpenRouter API key configured!');
       console.warn('Set OPENROUTER_API_KEY environment variable or add it to config.json\n');
     }
+
+    // Start backup scheduler
+    const { startBackupScheduler } = require('./backupScheduler.js');
+    global.backupScheduler = startBackupScheduler(config);
   });
+});
+
+// Add graceful shutdown
+process.on('SIGINT', () => {
+  if (global.backupScheduler) {
+    global.backupScheduler.stop();
+  }
+  process.exit(0);
 });
