@@ -227,6 +227,13 @@ export default {
     await this.loadCharacters();
     await this.loadConfig();
   },
+  beforeUnmount() {
+    // Clean up pending auto-save timeout to prevent memory leaks
+    if (this.autoSavePersonaTimeout) {
+      clearTimeout(this.autoSavePersonaTimeout);
+      this.autoSavePersonaTimeout = null;
+    }
+  },
   methods: {
     async loadPersonas(preserveSelection = false) {
       try {
