@@ -333,21 +333,6 @@ export default {
         this.$root.$notify('Failed to create persona', 'error');
       }
     },
-    isCharacterBound(filename) {
-      return this.selectedPersona?.characterBindings?.includes(filename);
-    },
-    toggleBinding(filename) {
-      if (!this.selectedPersona.characterBindings) {
-        this.selectedPersona.characterBindings = [];
-      }
-
-      const index = this.selectedPersona.characterBindings.indexOf(filename);
-      if (index > -1) {
-        this.selectedPersona.characterBindings.splice(index, 1);
-      } else {
-        this.selectedPersona.characterBindings.push(filename);
-      }
-    },
     async uploadAvatar(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -797,56 +782,6 @@ export default {
   color: var(--text-secondary);
   margin-top: 4px;
   margin-bottom: 8px;
-}
-
-.bindings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 8px;
-  background: var(--bg-secondary);
-  border-radius: 4px;
-}
-
-.binding-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.binding-item:hover {
-  background: var(--bg-tertiary);
-}
-
-.binding-item.bound {
-  border-color: var(--accent-color);
-  background: var(--bg-tertiary);
-}
-
-.binding-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.binding-name {
-  flex: 1;
-  font-size: 14px;
-}
-
-.binding-check {
-  color: var(--accent-color);
-  font-weight: 600;
-  font-size: 18px;
 }
 
 .tag-bindings {
