@@ -151,8 +151,13 @@
 </template>
 
 <script>
+import CharacterGridPicker from './CharacterGridPicker.vue'
+
 export default {
   name: 'PersonaManager',
+  components: {
+    CharacterGridPicker
+  },
   props: {
     currentPersona: Object
   },
