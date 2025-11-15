@@ -180,6 +180,15 @@ export default {
         characterTags.forEach(tag => tags.add(tag));
       });
       return Array.from(tags).sort();
+    },
+    boundCharacters() {
+      // Filter available characters by binding array
+      if (!this.selectedPersona?.characterBindings || !this.availableCharacters) {
+        return [];
+      }
+      return this.availableCharacters.filter(char =>
+        this.selectedPersona.characterBindings.includes(char.filename)
+      );
     }
   },
   async mounted() {
