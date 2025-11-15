@@ -168,7 +168,8 @@ export default {
       availableCharacters: [],
       newTagBinding: '',
       tagBindingSuggestions: [],
-      defaultPersona: ''
+      defaultPersona: '',
+      autoSavePersonaTimeout: null
     }
   },
   computed: {
@@ -467,6 +468,54 @@ export default {
       } catch (error) {
         console.error('Failed to load config:', error);
       }
+    },
+    isBound(filename) {
+      return this.selectedPersona?.characterBindings?.includes(filename);
+    },
+    bindCharacter(filename) {
+      if (!this.selectedPersona.characterBindings) {
+        this.selectedPersona.characterBindings = [];
+      }
+      if (!this.selectedPersona.characterBindings.includes(filename)) {
+        this.selectedPersona.characterBindings.push(filename);
+        this.autoSavePersonaChanges();
+      }
+    },
+    unbindCharacter(filename) {
+      if (!this.selectedPersona?.characterBindings) return;
+
+      const index = this.selectedPersona.characterBindings.indexOf(filename);
+      if (index > -1) {
+        this.selectedPersona.characterBindings.splice(index, 1);
+        this.autoSavePersonaChanges();
+      }
+    },
+    toggleCharacterBinding(character) {
+      if (this.isBound(character.filename)) {
+        this.unbindCharacter(character.filename);
+      } else {
+        this.bindCharacter(character.filename);
+      }
+    },
+    autoSavePersonaChanges() {
+      // Debounce auto-save (similar to tag editing pattern)
+      if (this.autoSavePersonaTimeout) {
+        clearTimeout(this.autoSavePersonaTimeout);
+      }
+
+      this.autoSavePersonaTimeout = setTimeout(async () => {
+        try {
+          const { _filename, ...personaData } = this.selectedPersona;
+          await fetch('/api/personas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(personaData)
+          });
+          console.log('Persona bindings auto-saved');
+        } catch (error) {
+          console.error('Failed to auto-save persona:', error);
+        }
+      }, 1000); // 1 second debounce
     },
     isDefaultPersona(identifier) {
       const filename = `${identifier}.json`;
