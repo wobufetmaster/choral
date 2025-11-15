@@ -119,21 +119,51 @@
           <div class="form-group">
             <label>Character Bindings</label>
             <p class="hint">Auto-select this persona for specific characters (overrides tag bindings)</p>
-            <div class="bindings-list">
-              <div
-                v-for="char in availableCharacters"
-                :key="char.filename"
-                :class="['binding-item', { bound: isCharacterBound(char.filename) }]"
-                @click="toggleBinding(char.filename)"
-              >
-                <img
-                  :src="`/api/characters/${char.filename}/image`"
-                  :alt="char.name"
-                  class="binding-avatar"
-                />
-                <span class="binding-name">{{ char.name }}</span>
-                <span v-if="isCharacterBound(char.filename)" class="binding-check">✓</span>
+
+            <!-- Bound Characters Display -->
+            <div class="bound-characters-section">
+              <div class="bound-characters-header">
+                <span class="section-label">Bound Characters ({{ boundCharacters.length }})</span>
               </div>
+
+              <div v-if="boundCharacters.length === 0" class="bound-characters-empty">
+                No characters bound. Search and click characters below to bind them.
+              </div>
+
+              <div v-else class="bound-characters-grid">
+                <div
+                  v-for="char in boundCharacters"
+                  :key="char.filename"
+                  class="bound-character-card"
+                >
+                  <button
+                    @click="unbindCharacter(char.filename)"
+                    class="unbind-button"
+                    title="Unbind character"
+                  >×</button>
+                  <img
+                    :src="`/api/characters/${char.filename}/image`"
+                    :alt="char.name"
+                    class="bound-character-avatar"
+                  />
+                  <div class="bound-character-name">{{ char.name }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Character Selection Area -->
+            <div class="character-selection-section">
+              <div class="section-label">Available Characters</div>
+              <CharacterGridPicker
+                :characters="availableCharacters"
+                @select="toggleCharacterBinding"
+                gridClass="persona-picker-grid"
+                cardClass="persona-picker-card"
+              >
+                <template #card-footer="{ character }">
+                  <div v-if="isBound(character.filename)" class="bound-checkmark">✓</div>
+                </template>
+              </CharacterGridPicker>
             </div>
           </div>
 
@@ -896,6 +926,163 @@ export default {
 @media (max-width: 768px) {
   .persona-body {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Bound Characters Section */
+.bound-characters-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.bound-characters-header {
+  margin-bottom: 12px;
+}
+
+.section-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bound-characters-empty {
+  text-align: center;
+  padding: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.bound-characters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.bound-character-card {
+  position: relative;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--accent-color);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.bound-character-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.unbind-button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+
+.unbind-button:hover {
+  background: #b91c1c;
+  transform: scale(1.1);
+}
+
+.bound-character-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.bound-character-name {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Character Selection Section */
+.character-selection-section {
+  margin-top: 16px;
+}
+
+.character-selection-section .section-label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* Checkmark badge for bound characters in picker */
+.bound-checkmark {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  background: var(--accent-color);
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  font-weight: bold;
+}
+
+/* Persona picker customization */
+.persona-picker-grid {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.persona-picker-card {
+  position: relative;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .bound-characters-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 6px;
+  }
+
+  .bound-character-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  .bound-character-name {
+    font-size: 11px;
+  }
+
+  .unbind-button {
+    width: 16px;
+    height: 16px;
+    font-size: 11px;
   }
 }
 </style>
