@@ -466,7 +466,21 @@ export default {
       }
     },
     filteredGroupChats() {
-      let filtered = this.groupChats;
+      // First, group chats by conversationGroup and keep only the most recent from each group
+      const groupedByConversation = {};
+
+      for (const chat of this.groupChats) {
+        const conversationId = chat.conversationGroup || chat.filename; // Use filename as fallback
+
+        // If we haven't seen this conversation group, or this chat is newer, keep it
+        if (!groupedByConversation[conversationId] ||
+            (chat.timestamp || 0) > (groupedByConversation[conversationId].timestamp || 0)) {
+          groupedByConversation[conversationId] = chat;
+        }
+      }
+
+      // Convert back to array (only the most recent from each conversation group)
+      let filtered = Object.values(groupedByConversation);
 
       // Filter by selected tags (must have ALL selected tags - case insensitive)
       if (this.selectedTags.length > 0) {
@@ -1112,10 +1126,28 @@ export default {
           };
         });
 
+        // Generate deterministic conversationGroup based on character filenames
+        const characterFilenames = selectedCharacters.map(c => c.filename).sort();
+        const sortedFilenames = characterFilenames.join('|');
+        let hash = 0;
+        for (let i = 0; i < sortedFilenames.length; i++) {
+          const char = sortedFilenames.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash;
+        }
+        const hex = Math.abs(hash).toString(16).padStart(8, '0');
+        const conversationGroup = `gc-${hex}-${characterFilenames.length}-xxxx-xxxxxxxxxxxx`.replace(/[x]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          return r.toString(16);
+        });
+
         // Create the group chat
         const groupChat = {
           filename: `group_chat_${Date.now()}.json`,
+          isGroupChat: true,
           characters: selectedCharacters,
+          characterFilenames: characterFilenames,
+          conversationGroup: conversationGroup,
           strategy: 'join',
           messages: [],
           timestamp: Date.now()

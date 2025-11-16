@@ -78,52 +78,21 @@
     <div v-if="showChatHistory" class="chat-history-sidebar">
       <h3>Chat History</h3>
       <div class="history-list">
-        <template v-for="item in chatHistory" :key="item.filename || item.conversationGroup">
-          <!-- Group Header (for multiple related chats) -->
-          <div v-if="item.isGroupHeader" class="history-group">
-            <div class="history-group-header" @click="item.expanded = !item.expanded">
-              <span class="expand-icon">{{ item.expanded ? '▼' : '▶' }}</span>
-              <div class="history-info">
-                <span class="history-date">{{ formatDate(item.latestTimestamp) }}</span>
-                <span class="history-preview">{{ item.chatCount }} conversations</span>
-              </div>
-            </div>
-            <!-- Expanded chat list -->
-            <div v-if="item.expanded" class="history-group-items">
-              <div
-                v-for="chat in item.chats"
-                :key="chat.filename"
-                :class="['history-item', 'grouped', { active: chat.filename === groupChatId }]"
-                @click="loadChatFromHistory(chat)"
-              >
-                <div class="history-info">
-                  <span class="history-date">{{ formatDate(chat.timestamp) }}</span>
-                  <span class="history-preview">{{ getPreview(chat) }}</span>
-                </div>
-                <div class="history-actions">
-                  <button @click.stop="renameChatFromHistory(chat)" class="history-rename" title="Rename chat">✏️</button>
-                  <button @click.stop="deleteChat(chat.filename)" class="history-delete" title="Delete chat">🗑️</button>
-                </div>
-              </div>
-            </div>
+        <div
+          v-for="item in chatHistory"
+          :key="item.filename"
+          :class="['history-item', { active: item.filename === chatId || item.filename === groupChatId }]"
+          @click="loadChatFromHistory(item)"
+        >
+          <div class="history-info">
+            <span class="history-date">{{ formatDate(item.timestamp) }}</span>
+            <span class="history-preview">{{ getPreview(item) }}</span>
           </div>
-
-          <!-- Single Chat (ungrouped) -->
-          <div
-            v-else
-            :class="['history-item', { active: item.filename === chatId || item.filename === groupChatId }]"
-            @click="loadChatFromHistory(item)"
-          >
-            <div class="history-info">
-              <span class="history-date">{{ formatDate(item.timestamp) }}</span>
-              <span class="history-preview">{{ getPreview(item) }}</span>
-            </div>
-            <div class="history-actions">
-              <button @click.stop="renameChatFromHistory(item)" class="history-rename" title="Rename chat">✏️</button>
-              <button @click.stop="deleteChat(item.filename)" class="history-delete" title="Delete chat">🗑️</button>
-            </div>
+          <div class="history-actions">
+            <button @click.stop="renameChatFromHistory(item)" class="history-rename" title="Rename chat">✏️</button>
+            <button @click.stop="deleteChat(item.filename)" class="history-delete" title="Delete chat">🗑️</button>
           </div>
-        </template>
+        </div>
       </div>
       <button @click="showChatHistory = false" class="close-history">Close</button>
     </div>
@@ -2698,17 +2667,24 @@ export default {
                   newChatData = event.chatData;
                   narratorCharacter = event.narrator;
 
-                  // Preserve conversationGroup from current chat (for history grouping)
-                  const inheritedConversationGroup = this.conversationGroup;
-
                   // Clear current chat state
                   this.messages = [];
                   this.chatId = null;
                   this.groupChatId = null; // New chat ID will be generated on save
                   this.chatDisplayTitle = newChatData.title;
 
-                  // Inherit the conversationGroup to link this continuation to the original
-                  this.conversationGroup = inheritedConversationGroup;
+                  // Generate or inherit conversationGroup
+                  // If we have an existing conversationGroup, keep it
+                  // Otherwise, generate a deterministic one based on character filenames
+                  if (this.conversationGroup) {
+                    // Keep existing conversationGroup
+                  } else if (newChatData.characterFilenames && newChatData.characterFilenames.length > 0) {
+                    // Generate deterministic conversationGroup based on characters
+                    this.conversationGroup = this.getConversationGroupId(newChatData.characterFilenames);
+                  } else {
+                    // Fallback to random UUID
+                    this.conversationGroup = this.generateUUID();
+                  }
 
                   // Determine if this should be a group chat or single character chat
                   const shouldBeGroupChat = newChatData.characterFilenames.length > 1;
@@ -2734,6 +2710,11 @@ export default {
 
                   if (shouldBeGroupChat) {
                     this.groupChatCharacters = characters;
+                    // Initialize group chat settings (preserve from old chat if they exist, otherwise use defaults)
+                    this.groupChatStrategy = this.groupChatStrategy || 'join';
+                    this.groupChatExplicitMode = this.groupChatExplicitMode || false;
+                    this.groupChatName = ''; // Clear name for new chat
+                    this.groupChatTags = this.groupChatTags || [];
                   } else {
                     // Single character chat
                     this.character = characters[0] ? { data: characters[0].data, filename: characters[0].filename } : null;
@@ -2781,6 +2762,10 @@ export default {
                     } else {
                       await this.saveChat(false); // Save single character chat
                     }
+
+                    // Update tab data with the saved chat ID so it can be reloaded
+                    this.updateTabData();
+
                     this.$root.$notify('Summary complete! Chat continued with narrator.', 'success');
                   } catch (saveError) {
                     console.error('Failed to save chat:', saveError);
@@ -2853,46 +2838,8 @@ export default {
     },
 
     groupChatsByConversationGroup(chats) {
-      // Group chats by conversationGroup
-      const groups = {};
-
-      for (const chat of chats) {
-        const groupId = chat.conversationGroup || chat.filename; // Use filename as fallback for ungrouped chats
-        if (!groups[groupId]) {
-          groups[groupId] = [];
-        }
-        groups[groupId].push(chat);
-      }
-
-      // Flatten groups back into a list, with most recent group first
-      // Within each group, sort by timestamp
-      const result = [];
-      const sortedGroupIds = Object.keys(groups).sort((a, b) => {
-        const maxTimestampA = Math.max(...groups[a].map(c => c.timestamp || 0));
-        const maxTimestampB = Math.max(...groups[b].map(c => c.timestamp || 0));
-        return maxTimestampB - maxTimestampA;
-      });
-
-      for (const groupId of sortedGroupIds) {
-        const groupChats = groups[groupId].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-        if (groupChats.length > 1) {
-          // Multiple chats in group - add a group header
-          result.push({
-            isGroupHeader: true,
-            conversationGroup: groupId,
-            chatCount: groupChats.length,
-            latestTimestamp: Math.max(...groupChats.map(c => c.timestamp || 0)),
-            chats: groupChats,
-            expanded: false // Start collapsed
-          });
-        } else {
-          // Single chat - add directly
-          result.push(groupChats[0]);
-        }
-      }
-
-      return result;
+      // Just return all chats sorted by timestamp (flatten, no grouping)
+      return chats.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     },
     async loadChatFromHistory(chat) {
       // Handle both branch-based structure and old flat structure
@@ -2917,7 +2864,11 @@ export default {
         await this.handlePersonaChange(chat.personaFilename);
       }
 
-      if (chat.isGroupChat) {
+      // Detect group chats (explicit flag or presence of characters/characterFilenames)
+      const isGroupChat = chat.isGroupChat || chat.characters || chat.characterFilenames;
+
+      if (isGroupChat) {
+        this.isGroupChat = true;
         this.groupChatId = chat.filename;
         this.groupChatCharacters = chat.characters || [];
         this.groupChatStrategy = chat.strategy || 'join';
@@ -3474,13 +3425,16 @@ export default {
           this.branches[this.currentBranch].messages = this.messages;
         }
 
-        // Generate conversationGroup UUID if it doesn't exist
+        // Generate conversationGroup ID if it doesn't exist
+        // Use deterministic ID based on character filenames so all chats with same characters are grouped
         if (!this.conversationGroup) {
-          this.conversationGroup = this.generateUUID();
+          const characterFilenames = this.groupChatCharacters.map(c => c.filename);
+          this.conversationGroup = this.getConversationGroupId(characterFilenames);
         }
 
         const groupChat = {
           filename: this.groupChatId || `group_chat_${Date.now()}.json`,
+          isGroupChat: true,
           characters: this.groupChatCharacters,
           characterFilenames: this.groupChatCharacters.map(c => c.filename), // Add for compatibility
           conversationGroup: this.conversationGroup, // Link related chats together
@@ -3926,6 +3880,32 @@ export default {
         const r = Math.random() * 16 | 0;
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
+      });
+    },
+
+    // Generate a deterministic conversation group ID based on character filenames
+    // This ensures all group chats with the same characters share the same conversationGroup
+    getConversationGroupId(characterFilenames) {
+      if (!characterFilenames || characterFilenames.length === 0) {
+        return this.generateUUID(); // Fallback to random UUID
+      }
+
+      // Sort filenames to ensure order doesn't matter
+      const sortedFilenames = [...characterFilenames].sort().join('|');
+
+      // Simple hash function to create a deterministic "UUID"
+      let hash = 0;
+      for (let i = 0; i < sortedFilenames.length; i++) {
+        const char = sortedFilenames.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+
+      // Convert hash to hex and format as UUID
+      const hex = Math.abs(hash).toString(16).padStart(8, '0');
+      return `gc-${hex}-${sortedFilenames.length}-xxxx-xxxxxxxxxxxx`.replace(/[x]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        return r.toString(16);
       });
     }
   }
