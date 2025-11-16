@@ -24,8 +24,9 @@
       </div>
     </div>
 
-    <!-- Character Grid -->
-    <div :class="['character-grid', gridClass]">
+    <!-- Character Grid (Scrollable Container) -->
+    <div class="character-grid-wrapper">
+      <div :class="['character-grid', gridClass]">
       <div
         v-for="(char, index) in filteredCharacters"
         :key="char.filename || `char-${index}`"
@@ -47,6 +48,7 @@
       </div>
       <div v-if="filteredCharacters.length === 0" class="no-characters">
         No characters match your search
+      </div>
       </div>
     </div>
   </div>
@@ -238,6 +240,11 @@ export default {
   font-size: 1em;
 }
 
+.character-grid-wrapper {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
 .search-input::placeholder {
   color: var(--text-muted, #666);
 }
@@ -250,7 +257,7 @@ export default {
 .tag-filter {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tag-filter-label {

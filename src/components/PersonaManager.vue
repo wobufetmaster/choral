@@ -900,9 +900,9 @@ export default {
 
 .bound-characters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 8px;
-  max-height: 250px;
+  max-height: 300px;
   overflow-y: auto;
 }
 
@@ -950,8 +950,8 @@ export default {
 }
 
 .bound-character-avatar {
-  width: 32px;
-  height: 32px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   object-fit: cover;
 }
@@ -1008,13 +1008,18 @@ export default {
 /* Mobile responsive */
 @media (max-width: 768px) {
   .bound-characters-grid {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
     gap: 6px;
   }
 
+  .bound-character-card {
+    padding: 6px;
+    gap: 4px;
+  }
+
   .bound-character-avatar {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
   }
 
   .bound-character-name {
