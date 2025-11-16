@@ -42,7 +42,7 @@ test_platform() {
     log_info "[${platform}] Building Docker image..."
     if ! docker build -f "$dockerfile" -t "$image_name" . &> "/tmp/choral-test-${platform}-build.log"; then
         log_error "[${platform}] ✗ Docker build failed"
-        cat "/tmp/choral-test-${platform}-build.log" | tail -50
+        tail -50 "/tmp/choral-test-${platform}-build.log"
         FAILURES[$platform]="Docker build failed"
         ((FAILED++))
         return 1
@@ -52,7 +52,7 @@ test_platform() {
     log_info "[${platform}] Running installation..."
     if ! docker run --name "$container_name" "$image_name" bash -c "./install.sh" &> "/tmp/choral-test-${platform}-install.log"; then
         log_error "[${platform}] ✗ Installation failed"
-        cat "/tmp/choral-test-${platform}-install.log" | tail -50
+        tail -50 "/tmp/choral-test-${platform}-install.log"
         docker rm -f "$container_name" 2>/dev/null || true
         docker rmi "$image_name" 2>/dev/null || true
         FAILURES[$platform]="Installation failed"
@@ -69,7 +69,7 @@ test_platform() {
     log_info "[${platform}] Testing server startup..."
     if ! docker run --name "$container_name" -d "${image_name}-installed" bash -c "npm run dev:server" &> "/tmp/choral-test-${platform}-server.log"; then
         log_error "[${platform}] ✗ Server start failed"
-        cat "/tmp/choral-test-${platform}-server.log" | tail -50
+        tail -50 "/tmp/choral-test-${platform}-server.log"
         docker rm -f "$container_name" 2>/dev/null || true
         docker rmi "$image_name" "${image_name}-installed" 2>/dev/null || true
         FAILURES[$platform]="Server start failed"
@@ -77,12 +77,24 @@ test_platform() {
         return 1
     fi
 
-    # Wait for server to be ready (check port 3000)
-    sleep 5
-    if docker exec "$container_name" bash -c "curl -s http://localhost:3000 > /dev/null"; then
+    # Wait for server to be ready (check port 3000 with retry)
+    local max_retries=30
+    local retry_count=0
+    local server_ready=false
+
+    while [ $retry_count -lt $max_retries ]; do
+        if docker exec "$container_name" bash -c "curl -s http://localhost:3000 > /dev/null" 2>/dev/null; then
+            server_ready=true
+            break
+        fi
+        sleep 1
+        ((retry_count++))
+    done
+
+    if [ "$server_ready" = true ]; then
         log_info "[${platform}] ✓ Server started"
     else
-        log_error "[${platform}] ✗ Server failed to respond"
+        log_error "[${platform}] ✗ Server failed to respond after ${max_retries} seconds"
         docker logs "$container_name" | tail -50
         docker rm -f "$container_name" 2>/dev/null || true
         docker rmi "$image_name" "${image_name}-installed" 2>/dev/null || true
@@ -99,7 +111,7 @@ test_platform() {
     log_info "[${platform}] Testing frontend build..."
     if ! docker run --name "$container_name" "${image_name}-installed" bash -c "npm run build" &> "/tmp/choral-test-${platform}-build-frontend.log"; then
         log_error "[${platform}] ✗ Build failed"
-        cat "/tmp/choral-test-${platform}-build-frontend.log" | tail -50
+        tail -50 "/tmp/choral-test-${platform}-build-frontend.log"
         docker rm -f "$container_name" 2>/dev/null || true
         docker rmi "$image_name" "${image_name}-installed" 2>/dev/null || true
         FAILURES[$platform]="Frontend build failed"
@@ -130,6 +142,9 @@ test_platform() {
 
 # Main execution
 main() {
+    # Clean up old log files
+    rm -f /tmp/choral-test-*.log 2>/dev/null || true
+
     log_info "Running installation tests..."
     echo ""
 
