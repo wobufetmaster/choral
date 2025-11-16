@@ -73,6 +73,9 @@ data-test/
 data-test*/
 .vitest/
 
+# Installation test artifacts
+/tmp/choral-test-*.log
+
 # Backups and archives
 backups/
 *.zip
