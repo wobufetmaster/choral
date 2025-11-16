@@ -1,0 +1,64 @@
+name: Installation Tests
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'install.sh'
+      - 'tests/install/**'
+  workflow_dispatch:
+
+jobs:
+  test-installation:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [ubuntu, debian, wsl2]
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -f tests/install/dockerfiles/${{ matrix.platform }}.Dockerfile \
+            -t choral-test-${{ matrix.platform }} .
+
+      - name: Run installation
+        run: |
+          docker run --name test-container choral-test-${{ matrix.platform }} \
+            bash -c "./install.sh"
+
+      - name: Commit installed state
+        run: |
+          docker commit test-container choral-test-${{ matrix.platform }}-installed
+          docker rm -f test-container
+
+      - name: Test server startup
+        run: |
+          docker run --name test-container -d choral-test-${{ matrix.platform }}-installed \
+            bash -c "npm run dev:server"
+          sleep 5
+          docker exec test-container bash -c "curl -s http://localhost:3000 > /dev/null"
+          docker stop test-container
+          docker rm -f test-container
+
+      - name: Test frontend build
+        run: |
+          docker run --name test-container choral-test-${{ matrix.platform }}-installed \
+            bash -c "npm run build"
+          docker run --rm choral-test-${{ matrix.platform }}-installed \
+            bash -c "test -d dist"
+          docker rm -f test-container
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f test-container 2>/dev/null || true
+          docker rmi choral-test-${{ matrix.platform }} 2>/dev/null || true
+          docker rmi choral-test-${{ matrix.platform }}-installed 2>/dev/null || true
