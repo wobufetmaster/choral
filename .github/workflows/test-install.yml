@@ -31,34 +31,36 @@ jobs:
 
       - name: Run installation
         run: |
-          docker run --name test-container choral-test-${{ matrix.platform }} \
+          docker run --name install-container choral-test-${{ matrix.platform }} \
             bash -c "./install.sh"
 
       - name: Commit installed state
         run: |
-          docker commit test-container choral-test-${{ matrix.platform }}-installed
-          docker rm -f test-container
+          docker commit install-container choral-test-${{ matrix.platform }}-installed
+          docker rm -f install-container
 
       - name: Test server startup
         run: |
-          docker run --name test-container -d choral-test-${{ matrix.platform }}-installed \
+          docker run --name server-container -d choral-test-${{ matrix.platform }}-installed \
             bash -c "npm run dev:server"
           sleep 5
-          docker exec test-container bash -c "curl -s http://localhost:3000 > /dev/null"
-          docker stop test-container
-          docker rm -f test-container
+          docker exec server-container bash -c "curl -s http://localhost:3000 > /dev/null"
+          docker stop server-container
+          docker rm -f server-container
 
       - name: Test frontend build
         run: |
-          docker run --name test-container choral-test-${{ matrix.platform }}-installed \
+          docker run --name build-container choral-test-${{ matrix.platform }}-installed \
             bash -c "npm run build"
           docker run --rm choral-test-${{ matrix.platform }}-installed \
             bash -c "test -d dist"
-          docker rm -f test-container
+          docker rm -f build-container
 
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f test-container 2>/dev/null || true
+          docker rm -f install-container 2>/dev/null || true
+          docker rm -f server-container 2>/dev/null || true
+          docker rm -f build-container 2>/dev/null || true
           docker rmi choral-test-${{ matrix.platform }} 2>/dev/null || true
           docker rmi choral-test-${{ matrix.platform }}-installed 2>/dev/null || true
