@@ -106,7 +106,8 @@ export function useApi() {
 
     // Config
     getConfig: () => get('/api/config'),
-    setActivePreset: (filename) => post('/api/config/active-preset', { filename }),
+    setActivePreset: (preset) => post('/api/config/active-preset', { preset }),
+    setDefaultPersona: (persona) => post('/api/config/default-persona', { persona }),
     getBookkeepingSettings: () => get('/api/bookkeeping-settings'),
     saveBookkeepingSettings: (data) => post('/api/bookkeeping-settings', data),
     getToolSettings: () => get('/api/tool-settings'),
@@ -114,9 +115,9 @@ export function useApi() {
 
     // Backup
     createBackup: (encrypted) => post('/api/backup/trigger', { encrypted }),
-    getBackupConfig: () => get('/api/backup/config'),
-    saveBackupConfig: (data) => post('/api/backup/config', data),
-    testBackupPath: (path) => post('/api/backup/test-path', { path }),
+    getBackupConfig: () => get('/api/config/backup'),
+    saveBackupConfig: (data) => post('/api/config/backup', data),
+    validateBackupPath: (path) => post('/api/backup/validate-path', { path }),
     chooseBackupDirectory: () => get('/api/backup/choose-directory'),
 
     // Auto-functions

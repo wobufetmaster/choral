@@ -141,7 +141,7 @@ describe('useApi', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/config/active-preset', {
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
-        body: JSON.stringify({ filename: 'default.json' })
+        body: JSON.stringify({ preset: 'default.json' })
       });
       expect(result).toEqual({ success: true });
     });
