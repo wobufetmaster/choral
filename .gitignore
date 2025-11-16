@@ -70,4 +70,13 @@ coverage/
 test-results/
 playwright-report/
 data-test/
+data-test*/
 .vitest/
+
+# Backups and archives
+backups/
+*.zip
+
+# Development notes and user-specific files
+TODO.md
+setting-card-builder-*.json
