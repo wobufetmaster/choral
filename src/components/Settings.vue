@@ -230,6 +230,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { themes, backgroundPatterns, getStoredTheme, getStoredBackground, saveTheme as saveThemeUtil, saveBackground, applyTheme } from '../utils/themes.js';
 import BackgroundPreview from './BackgroundPreview.vue';
+import { useApi } from '../composables/useApi.js';
 
 export default {
   name: 'Settings',
@@ -243,6 +244,8 @@ export default {
     },
   },
   setup() {
+    const api = useApi();
+
     const apiKey = ref('');
     const activePreset = ref('');
     const presets = ref([]);
@@ -294,8 +297,7 @@ export default {
 
       // Load config (active preset and default persona)
       try {
-        const configResponse = await fetch('/api/config');
-        const config = await configResponse.json();
+        const config = await api.getConfig();
         activePreset.value = config.activePreset || '';
         defaultPersona.value = config.defaultPersona || '';
       } catch (error) {
@@ -304,16 +306,14 @@ export default {
 
       // Load presets list
       try {
-        const presetsResponse = await fetch('/api/presets');
-        presets.value = await presetsResponse.json();
+        presets.value = await api.getPresets();
       } catch (error) {
         console.error('Failed to load presets:', error);
       }
 
       // Load personas list
       try {
-        const personasResponse = await fetch('/api/personas');
-        personas.value = await personasResponse.json();
+        personas.value = await api.getPersonas();
       } catch (error) {
         console.error('Failed to load personas:', error);
       }
@@ -345,11 +345,7 @@ export default {
 
     const saveActivePreset = async () => {
       try {
-        await fetch('/api/config/active-preset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ preset: activePreset.value }),
-        });
+        await api.setActivePreset(activePreset.value);
       } catch (error) {
         console.error('Failed to save active preset:', error);
       }
@@ -357,11 +353,7 @@ export default {
 
     const saveDefaultPersona = async () => {
       try {
-        await fetch('/api/config/default-persona', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ persona: defaultPersona.value }),
-        });
+        await api.setDefaultPersona(defaultPersona.value);
       } catch (error) {
         console.error('Failed to save default persona:', error);
       }
@@ -402,8 +394,7 @@ export default {
 
     const loadBackupConfig = async () => {
       try {
-        const response = await fetch('/api/config/backup');
-        const config = await response.json();
+        const config = await api.getBackupConfig();
         backupEnabled.value = config.enabled || false;
         backupInterval.value = config.interval || '6h';
         backupRetention.value = config.retention || 10;
@@ -426,13 +417,7 @@ export default {
           password: backupPassword.value
         };
 
-        const response = await fetch('/api/config/backup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config)
-        });
-
-        const result = await response.json();
+        const result = await api.saveBackupConfig(config);
         if (!result.success) {
           console.error('Failed to save backup config:', result.errors);
         }
@@ -445,13 +430,7 @@ export default {
       if (!backupDirectory.value) return;
 
       try {
-        const response = await fetch('/api/backup/validate-path', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: backupDirectory.value })
-        });
-
-        const result = await response.json();
+        const result = await api.validateBackupPath(backupDirectory.value);
 
         if (result.valid) {
           if (result.exists) {
@@ -501,11 +480,7 @@ export default {
       backupMessage.value = '';
 
       try {
-        const response = await fetch('/api/backup/trigger', {
-          method: 'POST'
-        });
-
-        const result = await response.json();
+        const result = await api.createBackup(backupEncrypt.value);
 
         if (result.success) {
           backupMessage.value = `Backup completed: ${result.filename}`;
