@@ -12,6 +12,7 @@ const { processPrompt, MODES } = require('./promptProcessor');
 const { processLorebook, injectEntries } = require('./lorebook');
 const { performBackup, isBackupInProgress } = require('./backup');
 const errorHandler = require('./middleware/errorHandler');
+const { loadJSON, saveJSON } = require('./utils/fileService');
 
 /**
  * Create Express app with given configuration
@@ -49,70 +50,28 @@ function createApp(config) {
 
 
 // Tag management helpers
-async function loadTags() {
-  try {
-    const data = await fs.readFile(TAGS_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    return {};
-  }
-}
-
-async function saveTags(tags) {
-  await fs.writeFile(TAGS_FILE, JSON.stringify(tags, null, 2));
-}
+const loadTags = () => loadJSON(TAGS_FILE, {});
+const saveTags = (tags) => saveJSON(TAGS_FILE, tags);
 
 // Core tags management (global tags that can't be removed from characters)
-async function loadCoreTags() {
-  try {
-    const data = await fs.readFile(CORE_TAGS_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    return [];
-  }
-}
-
-async function saveCoreTags(coreTags) {
-  await fs.writeFile(CORE_TAGS_FILE, JSON.stringify(coreTags, null, 2));
-}
+const loadCoreTags = () => loadJSON(CORE_TAGS_FILE, []);
+const saveCoreTags = (coreTags) => saveJSON(CORE_TAGS_FILE, coreTags);
 
 // Bookkeeping settings management
-async function loadBookkeepingSettings() {
-  try {
-    const data = await fs.readFile(BOOKKEEPING_SETTINGS_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    // Return default settings
-    return {
-      enableBookkeeping: false,
-      autoRenameChats: false,
-      model: localConfig.bookkeepingModel || 'openai/gpt-4o-mini',
-      strictMode: false
-    };
-  }
-}
-
-async function saveBookkeepingSettings(settings) {
-  await fs.writeFile(BOOKKEEPING_SETTINGS_FILE, JSON.stringify(settings, null, 2));
-}
+const loadBookkeepingSettings = () => loadJSON(BOOKKEEPING_SETTINGS_FILE, {
+  enableBookkeeping: false,
+  autoRenameChats: false,
+  model: localConfig.bookkeepingModel || 'openai/gpt-4o-mini',
+  strictMode: false
+});
+const saveBookkeepingSettings = (settings) => saveJSON(BOOKKEEPING_SETTINGS_FILE, settings);
 
 // Tool settings management
-async function loadToolSettings() {
-  try {
-    const data = await fs.readFile(TOOL_SETTINGS_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    // Return default settings
-    return {
-      enableToolCalling: true,
-      characterTools: []
-    };
-  }
-}
-
-async function saveToolSettings(settings) {
-  await fs.writeFile(TOOL_SETTINGS_FILE, JSON.stringify(settings, null, 2));
-}
+const loadToolSettings = () => loadJSON(TOOL_SETTINGS_FILE, {
+  enableToolCalling: true,
+  characterTools: []
+});
+const saveToolSettings = (settings) => saveJSON(TOOL_SETTINGS_FILE, settings);
 
 function normalizeTag(tag) {
   return tag.toLowerCase().trim();
