@@ -70,6 +70,49 @@ describe('useApi', () => {
     });
   });
 
+  describe('Preset API', () => {
+    it('should fetch presets with GET /api/presets', async () => {
+      const mockPresets = [{ filename: 'default.json', name: 'Default' }];
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify(mockPresets)
+      });
+
+      const result = await api.getPresets();
+      expect(result).toEqual(mockPresets);
+    });
+
+    it('should save preset with POST /api/presets', async () => {
+      const preset = { name: 'Test', temperature: 0.7 };
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify(preset)
+      });
+
+      const result = await api.savePreset(preset);
+      expect(result).toEqual(preset);
+    });
+  });
+
+  describe('Backup API', () => {
+    it('should create backup with POST /api/backup/trigger', async () => {
+      const mockResponse = { filename: 'backup.zip', message: 'Success' };
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify(mockResponse)
+      });
+
+      const result = await api.createBackup(false);
+
+      expect(fetchMock).toHaveBeenCalledWith('/api/backup/trigger', {
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        body: JSON.stringify({ encrypted: false })
+      });
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
   describe('Config API', () => {
     it('should fetch config with GET /api/config', async () => {
       const mockConfig = { port: 3000 };

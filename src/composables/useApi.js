@@ -67,8 +67,64 @@ export function useApi() {
     saveCharacter: (formData) => post('/api/characters', formData),
     deleteCharacter: (filename) => del(`/api/characters/${filename}`),
 
+    // Chats
+    getChats: () => get('/api/chats'),
+    getChat: (filename) => get(`/api/chats/${filename}`),
+    saveChat: (data) => post('/api/chats', data),
+    deleteChat: (filename) => del(`/api/chats/${filename}`),
+
+    // Group Chats
+    getGroupChats: () => get('/api/group-chats'),
+    getGroupChat: (filename) => get(`/api/group-chats/${filename}`),
+    saveGroupChat: (data) => post('/api/group-chats', data),
+    deleteGroupChat: (filename) => del(`/api/group-chats/${filename}`),
+    getGroupChatHistory: (filename) => get(`/api/group-chats/${filename}/history`),
+
+    // Personas
+    getPersonas: () => get('/api/personas'),
+    savePersona: (data) => post('/api/personas', data),
+
+    // Lorebooks
+    getLorebooks: () => get('/api/lorebooks'),
+    getLorebook: (filename) => get(`/api/lorebooks/${filename}`),
+    saveLorebook: (data) => post('/api/lorebooks', data),
+    deleteLorebook: (filename) => del(`/api/lorebooks/${filename}`),
+    importLorebook: (formData) => post('/api/lorebooks/import', formData),
+
+    // Presets
+    getPresets: () => get('/api/presets'),
+    getPreset: (filename) => get(`/api/presets/${filename}`),
+    savePreset: (data) => post('/api/presets', data),
+    deletePreset: (filename) => del(`/api/presets/${filename}`),
+    importPixiJB: (data) => post('/api/presets/import/pixijb', data),
+
+    // Tags
+    getTags: () => get('/api/tags'),
+    saveTags: (tags) => post('/api/tags', { tags }),
+    getCoreTags: () => get('/api/tags/core'),
+    saveCoreTags: (tags) => post('/api/tags/core', { tags }),
+
     // Config
     getConfig: () => get('/api/config'),
     setActivePreset: (filename) => post('/api/config/active-preset', { filename }),
+    getBookkeepingSettings: () => get('/api/bookkeeping-settings'),
+    saveBookkeepingSettings: (data) => post('/api/bookkeeping-settings', data),
+    getToolSettings: () => get('/api/tool-settings'),
+    saveToolSettings: (data) => post('/api/tool-settings', data),
+
+    // Backup
+    createBackup: (encrypted) => post('/api/backup/trigger', { encrypted }),
+    getBackupConfig: () => get('/api/backup/config'),
+    saveBackupConfig: (data) => post('/api/backup/config', data),
+    testBackupPath: (path) => post('/api/backup/test-path', { path }),
+    chooseBackupDirectory: () => get('/api/backup/choose-directory'),
+
+    // Auto-functions
+    autoNameChat: (messages) => post('/api/chat/auto-name', { messages }),
+    autoTagCharacter: (character) => post('/api/characters/auto-tag', { character }),
+
+    // Tools
+    getCharacterTools: (filename) => get(`/api/tools/character/${filename}`),
+    callTool: (toolName, args) => post('/api/tools/call', { toolName, args }),
   };
 }
