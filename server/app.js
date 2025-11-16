@@ -11,6 +11,7 @@ const { logRequest, logResponse, logStreamChunk } = require('./logger');
 const { processPrompt, MODES } = require('./promptProcessor');
 const { processLorebook, injectEntries } = require('./lorebook');
 const { performBackup, isBackupInProgress } = require('./backup');
+const errorHandler = require('./middleware/errorHandler');
 
 /**
  * Create Express app with given configuration
@@ -3225,6 +3226,9 @@ app.post('/api/chat', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+  // Error handling middleware (must be last)
+  app.use(errorHandler);
 
   return { app, ensureDirectories };
 }
