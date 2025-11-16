@@ -150,45 +150,52 @@ function streamChatCompletion({ messages, model, options = {}, tools, stoppingSt
 
             // Handle text content
             if (delta?.content) {
-              accumulatedText += delta.content;
-
-              // Check for stopping strings
-              let contentToSend = delta.content;
+              // Check for stopping strings BEFORE adding to accumulated text
+              let contentToAdd = delta.content;
               let shouldStop = false;
 
               if (stoppingStrings && stoppingStrings.length > 0) {
+                // Check if adding this content would trigger a stopping string
+                const potentialText = accumulatedText + contentToAdd;
+
                 for (const stopString of stoppingStrings) {
-                  const stopIndex = accumulatedText.indexOf(stopString);
+                  const stopIndex = potentialText.indexOf(stopString);
                   if (stopIndex !== -1) {
-                    // Found a stopping string - truncate content
-                    const previousLength = accumulatedText.length - delta.content.length;
-                    if (stopIndex >= previousLength) {
-                      // Stopping string is in current chunk
-                      const relativeIndex = stopIndex - previousLength;
-                      contentToSend = delta.content.substring(0, relativeIndex);
+                    // Found a stopping string - calculate how much content to include
+                    // We want everything BEFORE the stopping string, excluding the string itself
+                    const allowedLength = stopIndex - accumulatedText.length;
+
+                    if (allowedLength > 0) {
+                      // Part of current chunk is before the stopping string
+                      contentToAdd = contentToAdd.substring(0, allowedLength);
+                    } else {
+                      // Stopping string starts at or before current position
+                      contentToAdd = '';
                     }
+
                     shouldStop = true;
                     break;
                   }
                 }
               }
 
-              // Send content if there's any to send
-              if (contentToSend) {
-                onChunk(contentToSend);
+              // Add the (possibly truncated) content to accumulated text
+              if (contentToAdd) {
+                accumulatedText += contentToAdd;
+                onChunk(contentToAdd);
               }
 
               // Stop if we found a stopping string
               if (shouldStop) {
                 stopped = true;
                 if (onStop) {
-                  onStop(accumulatedText.substring(0, accumulatedText.indexOf(stoppingStrings.find(s => accumulatedText.includes(s)))));
+                  onStop(accumulatedText);
                 }
                 if (!completed) {
                   completed = true;
                   onComplete();
                 }
-                // Abort the request
+                // Abort the request to prevent further chunks
                 req.destroy();
                 return;
               }
