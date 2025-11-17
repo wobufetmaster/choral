@@ -16,6 +16,7 @@ const { loadJSON, saveJSON } = require('./utils/fileService');
 const createCharacterRouter = require('./routes/characters');
 const createChatRouter = require('./routes/chats');
 const createGroupChatRouter = require('./routes/group-chats');
+const createPersonaRouter = require('./routes/personas');
 
 /**
  * Create Express app with given configuration
@@ -227,70 +228,11 @@ const groupChatRouter = createGroupChatRouter({
 });
 app.use('/api/group-chats', groupChatRouter);
 
-// ===== Persona Routes =====
-
-// Get all personas
-app.get('/api/personas', async (req, res) => {
-  try {
-    const files = await fs.readdir(PERSONAS_DIR);
-    const jsonFiles = files.filter(f => f.endsWith('.json'));
-
-    const personas = await Promise.all(
-      jsonFiles.map(async (file) => {
-        try {
-          const filePath = path.join(PERSONAS_DIR, file);
-          const content = await fs.readFile(filePath, 'utf-8');
-          const persona = JSON.parse(content);
-          // Return persona data along with the actual filename
-          return {
-            ...persona,
-            _filename: file
-          };
-        } catch (err) {
-          return null;
-        }
-      })
-    );
-
-    res.json(personas.filter(p => p !== null));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+// Mount persona routes
+const personaRouter = createPersonaRouter({
+  PERSONAS_DIR
 });
-
-// Create/update persona
-app.post('/api/personas', async (req, res) => {
-  try {
-    const persona = req.body;
-
-    // Use nickname as the unique identifier for filenames
-    // If no nickname, fall back to name for backward compatibility
-    const identifier = persona.nickname || persona.name;
-
-    if (!identifier || !identifier.trim()) {
-      return res.status(400).json({ error: 'Persona must have a nickname or name' });
-    }
-
-    const filename = `${identifier}.json`;
-    const filePath = path.join(PERSONAS_DIR, filename);
-
-    await fs.writeFile(filePath, JSON.stringify(persona, null, 2));
-    res.json({ success: true, filename });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Delete persona
-app.delete('/api/personas/:filename', async (req, res) => {
-  try {
-    const filePath = path.join(PERSONAS_DIR, req.params.filename);
-    await fs.unlink(filePath);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+app.use('/api/personas', personaRouter);
 
 // ===== Lorebook Routes =====
 
