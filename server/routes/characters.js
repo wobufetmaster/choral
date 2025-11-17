@@ -291,7 +291,8 @@ Return ONLY a comma-separated list of lowercase tags, nothing else.`;
       });
 
       // Parse tags from response
-      const content = response.choices[0]?.message?.content || '';
+      // chatCompletion returns just the content string, not the full response object
+      const content = response || '';
       const suggestedTags = content
         .split(',')
         .map(t => t.trim().toLowerCase())

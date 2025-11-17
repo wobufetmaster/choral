@@ -151,7 +151,8 @@ ${messagePreview}`;
         max_tokens: 50
       });
 
-      const suggestedName = response.choices[0]?.message?.content?.trim() || 'Untitled Chat';
+      // chatCompletion returns just the content string, not the full response object
+      const suggestedName = response?.trim() || 'Untitled Chat';
 
       // Update chat with suggested name
       chat.name = suggestedName;
@@ -335,7 +336,8 @@ ${conversationText}`;
         max_tokens: 1000
       });
 
-      const summary = response.choices[0]?.message?.content || 'Summary unavailable.';
+      // chatCompletion returns just the content string, not the full response object
+      const summary = response || 'Summary unavailable.';
 
       // Create summarized message array
       const summarizedMessages = [
