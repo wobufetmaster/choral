@@ -340,7 +340,7 @@ ${conversationText}`;
       // Create narrator character
       const narrator = {
         name: 'Narrator',
-        avatar: null
+        avatar: '📖'
       };
 
       // Create new chat data
