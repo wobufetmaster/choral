@@ -491,7 +491,7 @@ export default {
         const text = await file.text();
         const config = JSON.parse(text);
 
-        const result = await this.api.importPixiJB(config);
+        const result = await this.api.importChatCompletionPreset(config);
         await this.loadPresets();
         this.selectedPreset = result.preset;
         this.$root.$notify('Config imported successfully', 'success');

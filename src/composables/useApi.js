@@ -96,7 +96,7 @@ export function useApi() {
     getPreset: (filename) => get(`/api/presets/${filename}`),
     savePreset: (data) => post('/api/presets', data),
     deletePreset: (filename) => del(`/api/presets/${filename}`),
-    importPixiJB: (data) => post('/api/presets/import/pixijb', data),
+    importChatCompletionPreset: (data) => post('/api/presets/import/pixijb', data),
 
     // Tags
     getTags: () => get('/api/tags'),
