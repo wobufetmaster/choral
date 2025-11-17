@@ -18,6 +18,7 @@ const createChatRouter = require('./routes/chats');
 const createGroupChatRouter = require('./routes/group-chats');
 const createPersonaRouter = require('./routes/personas');
 const createLorebookRouter = require('./routes/lorebooks');
+const createPresetRouter = require('./routes/presets');
 
 /**
  * Create Express app with given configuration
@@ -281,93 +282,13 @@ function convertSillyTavernLorebook(lorebook) {
   };
 }
 
-// ===== Preset Routes =====
-
-// Get all presets
-app.get('/api/presets', async (req, res) => {
-  try {
-    const files = await fs.readdir(PRESETS_DIR);
-    const jsonFiles = files.filter(f => f.endsWith('.json'));
-
-    const presets = await Promise.all(
-      jsonFiles.map(async (file) => {
-        try {
-          const filePath = path.join(PRESETS_DIR, file);
-          const content = await fs.readFile(filePath, 'utf-8');
-          const preset = JSON.parse(content);
-          return {
-            filename: file,
-            ...preset
-          };
-        } catch (err) {
-          return null;
-        }
-      })
-    );
-
-    res.json(presets.filter(p => p !== null));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+// Mount preset routes
+const presetRouter = createPresetRouter({
+  PRESETS_DIR,
+  validatePreset,
+  convertPixiJBToPreset
 });
-
-// Get specific preset
-app.get('/api/presets/:filename', async (req, res) => {
-  try {
-    const filePath = path.join(PRESETS_DIR, req.params.filename);
-    const content = await fs.readFile(filePath, 'utf-8');
-    const preset = JSON.parse(content);
-    res.json(preset);
-  } catch (error) {
-    res.status(404).json({ error: 'Preset not found' });
-  }
-});
-
-// Create/update preset
-app.post('/api/presets', async (req, res) => {
-  try {
-    const preset = req.body;
-
-    if (!validatePreset(preset)) {
-      return res.status(400).json({ error: 'Invalid preset' });
-    }
-
-    const filename = preset.filename || `${preset.name.toLowerCase().replace(/\s+/g, '_')}.json`;
-    const filePath = path.join(PRESETS_DIR, filename);
-
-    await fs.writeFile(filePath, JSON.stringify(preset, null, 2));
-    res.json({ success: true, filename });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Delete preset
-app.delete('/api/presets/:filename', async (req, res) => {
-  try {
-    const filePath = path.join(PRESETS_DIR, req.params.filename);
-    await fs.unlink(filePath);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Import PixiJB config as preset
-app.post('/api/presets/import/pixijb', async (req, res) => {
-  try {
-    const pixijbConfig = req.body;
-    const preset = convertPixiJBToPreset(pixijbConfig);
-
-    const filename = 'imported_pixijb.json';
-    const filePath = path.join(PRESETS_DIR, filename);
-
-    await fs.writeFile(filePath, JSON.stringify(preset, null, 2));
-    res.json({ success: true, filename, preset });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+app.use('/api/presets', presetRouter);
 
 // ===== Config Routes =====
 
