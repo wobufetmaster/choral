@@ -419,6 +419,7 @@
 import DOMPurify from 'dompurify';
 import MarkdownIt from 'markdown-it';
 import { processMacrosForDisplay } from '../utils/macros';
+import { useApi } from '../composables/useApi.js';
 import GroupChatManager from './GroupChatManager.vue';
 import LorebookEditor from './LorebookEditor.vue';
 import ChatSidebar from './ChatSidebar.vue';
@@ -440,6 +441,10 @@ export default {
     BranchNameInput,
     BranchTreeModal,
     ImageAttachmentModal
+  },
+  setup() {
+    const api = useApi();
+    return { api };
   },
   props: {
     tabData: {
@@ -751,8 +756,7 @@ export default {
     },
     async loadCharacter(filename) {
       try {
-        const response = await fetch(`/api/characters/${filename}`);
-        this.character = await response.json();
+        this.character = await this.api.getCharacter(filename);
 
         // Handle both V3 format (with data) and direct format
         if (this.character.data) {
@@ -768,8 +772,7 @@ export default {
     },
     async loadPersona() {
       try {
-        const response = await fetch('/api/personas');
-        const personas = await response.json();
+        const personas = await this.api.getPersonas();
 
         if (personas.length > 0) {
           const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
@@ -791,8 +794,7 @@ export default {
           let defaultPersona = null;
           if (!boundPersona) {
             try {
-              const configResponse = await fetch('/api/config');
-              const config = await configResponse.json();
+              const config = await this.api.getConfig();
               if (config.defaultPersona) {
                 defaultPersona = personas.find(p =>
                   p._filename === config.defaultPersona
@@ -819,13 +821,11 @@ export default {
     async loadActivePreset() {
       try {
         // Get active preset filename from config
-        const configResponse = await fetch('/api/config');
-        const config = await configResponse.json();
+        const config = await this.api.getConfig();
         const activePresetFilename = config.activePreset || 'default.json';
 
         // Load the preset
-        const presetResponse = await fetch(`/api/presets/${activePresetFilename}`);
-        const preset = await presetResponse.json();
+        const preset = await this.api.getPreset(activePresetFilename);
 
         // Apply to settings
         this.settings = {
@@ -864,8 +864,7 @@ export default {
     },
     async loadChat(chatId) {
       try {
-        const response = await fetch(`/api/chats/${chatId}`);
-        const chat = await response.json();
+        const chat = await this.api.getChat(chatId);
 
         // Handle branch-based structure
         if (chat.branches && chat.mainBranch) {
@@ -1029,13 +1028,7 @@ export default {
           chat.messages = this.messages;
         }
 
-        const response = await fetch('/api/chats', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(chat)
-        });
-
-        const result = await response.json();
+        const result = await this.api.saveChat(chat);
         this.chatId = result.filename;
         if (showNotification) {
           this.$root.$notify('Chat saved successfully', 'success');
@@ -2353,13 +2346,8 @@ export default {
       if (this.avatarMenu.message?.role === 'assistant' && this.avatarMenu.characterFilename) {
         try {
           // Load character data
-          const response = await fetch(`/api/characters/${this.avatarMenu.characterFilename}`);
-          if (response.ok) {
-            this.viewingCharacter = await response.json();
-            this.showCharacterCard = true;
-          } else {
-            this.$root.$notify('Failed to load character card', 'error');
-          }
+          this.viewingCharacter = await this.api.getCharacter(this.avatarMenu.characterFilename);
+          this.showCharacterCard = true;
         } catch (error) {
           console.error('Error loading character card:', error);
           this.$root.$notify('Error loading character card', 'error');
@@ -2382,20 +2370,15 @@ export default {
       if (this.avatarMenu.message?.role === 'assistant' && this.avatarMenu.characterFilename) {
         try {
           // Load character data
-          const response = await fetch(`/api/characters/${this.avatarMenu.characterFilename}`);
-          if (response.ok) {
-            const characterData = await response.json();
-            // Open character editor in a new tab
-            this.$emit('open-tab', 'character-editor', {
-              character: {
-                ...characterData,
-                filename: this.avatarMenu.characterFilename,
-                image: `/api/characters/${this.avatarMenu.characterFilename}/image`
-              }
-            }, `Edit: ${characterData.data.name}`, false);
-          } else {
-            this.$root.$notify('Failed to load character', 'error');
-          }
+          const characterData = await this.api.getCharacter(this.avatarMenu.characterFilename);
+          // Open character editor in a new tab
+          this.$emit('open-tab', 'character-editor', {
+            character: {
+              ...characterData,
+              filename: this.avatarMenu.characterFilename,
+              image: `/api/characters/${this.avatarMenu.characterFilename}/image`
+            }
+          }, `Edit: ${characterData.data.name}`, false);
         } catch (error) {
           console.error('Error loading character for editing:', error);
           this.$root.$notify('Error loading character', 'error');
@@ -2419,7 +2402,7 @@ export default {
     },
     async loadAvailablePresets() {
       try {
-        const response = await fetch('/api/presets');
+        const presets = await this.api.getPresets();
         this.availablePresets = await response.json();
       } catch (error) {
         console.error('Failed to load available presets:', error);
@@ -2427,7 +2410,7 @@ export default {
     },
     async loadAvailablePersonas() {
       try {
-        const response = await fetch('/api/personas');
+        const personas = await this.api.getPersonas();
         this.availablePersonas = await response.json();
         // Ensure "User" default persona is available
         if (!this.availablePersonas.find(p => p.name === 'User')) {
@@ -2444,8 +2427,7 @@ export default {
       this.currentPresetFilename = filename;
 
       try {
-        const response = await fetch(`/api/presets/${filename}`);
-        const preset = await response.json();
+        const preset = await this.api.getPreset(filename);
         this.applyPreset(preset);
       } catch (error) {
         console.error('Failed to load preset:', error);
@@ -2460,8 +2442,8 @@ export default {
       if (!personaFilename) return;
 
       try {
-        const response = await fetch('/api/personas');
-        const personas = await response.json();
+        const personas = await this.api.getPersonas();
+        
         console.log('ChatView: Available personas from API:', personas.map(p => `${p.name} (${p._filename})`));
 
         const selectedPersona = personas.find(p => p._filename === personaFilename || p.name === personaFilename);
@@ -2565,10 +2547,7 @@ export default {
         let preset;
         if (this.currentPresetFilename) {
           try {
-            const presetResponse = await fetch(`/api/presets/${this.currentPresetFilename}`);
-            if (presetResponse.ok) {
-              preset = await presetResponse.json();
-            }
+            preset = await this.api.getPreset(this.currentPresetFilename);
           } catch (err) {
             console.error('Failed to load preset:', err);
           }
@@ -2694,15 +2673,12 @@ export default {
                   const characters = [];
                   for (const filename of newChatData.characterFilenames) {
                     try {
-                      const charResponse = await fetch(`/api/characters/${filename}`);
-                      if (charResponse.ok) {
-                        const charData = await charResponse.json();
-                        characters.push({
-                          filename: filename,
-                          name: charData.data.name,
-                          data: charData.data
-                        });
-                      }
+                      const charData = await this.api.getCharacter(filename);
+                      characters.push({
+                        filename: filename,
+                        name: charData.data.name,
+                        data: charData.data
+                      });
                     } catch (err) {
                       console.error(`Failed to load character ${filename}:`, err);
                     }
@@ -2791,8 +2767,7 @@ export default {
       try {
         if (this.isGroupChat) {
           // Load group chat history
-          const response = await fetch('/api/group-chats');
-          const allGroupChats = await response.json();
+          const allGroupChats = await this.api.getGroupChats();
 
           // Filter group chats to only show those with the same character set
           const currentCharacterSet = this.groupChatCharacters
@@ -2824,8 +2799,7 @@ export default {
         } else {
           // Load regular character chat history
           const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
-          const response = await fetch('/api/chats');
-          const allChats = await response.json();
+          const allChats = await this.api.getChats();
 
           // Filter chats for current character and sort by timestamp
           this.chatHistory = allChats
@@ -2935,9 +2909,9 @@ export default {
 
       try {
         if (this.isGroupChat) {
-          await fetch(`/api/group-chats/${filename}`, { method: 'DELETE' });
+          await this.api.deleteGroupChat(filename);
         } else {
-          await fetch(`/api/chats/${filename}`, { method: 'DELETE' });
+          await this.api.deleteChat(filename);
         }
 
         await this.loadChatHistory();
@@ -3058,7 +3032,7 @@ export default {
     },
     async loadLorebooks() {
       try {
-        const response = await fetch('/api/lorebooks');
+        const lorebooks = await this.api.getLorebooks();
         this.lorebooks = await response.json();
 
         // Clean up selectedLorebookFilenames: remove any that don't exist anymore
@@ -3231,13 +3205,7 @@ export default {
     },
     async saveEditingLorebook(lorebook) {
       try {
-        const response = await fetch('/api/lorebooks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(lorebook)
-        });
-
-        const result = await response.json();
+        const result = await this.api.saveLorebook(lorebook);
 
         if (result.success) {
           await this.loadLorebooks();
@@ -3251,8 +3219,8 @@ export default {
     },
     async autoSelectLorebook() {
       try {
-        const response = await fetch('/api/lorebooks');
-        const lorebooks = await response.json();
+        const lorebooks = await this.api.getLorebooks();
+        
 
         if (!lorebooks || lorebooks.length === 0) return;
 
@@ -3305,7 +3273,7 @@ export default {
     // ===== Group Chat Methods =====
     async loadAllCharacters() {
       try {
-        const response = await fetch('/api/characters');
+        const characters = await this.api.getCharacters();
         const chars = await response.json();
         this.allCharacters = chars;
       } catch (error) {
@@ -3315,24 +3283,21 @@ export default {
 
     async loadGroupChat(groupChatId) {
       try {
-        const response = await fetch(`/api/group-chats/${groupChatId}`);
-        const groupChat = await response.json();
+        const groupChat = await this.api.getGroupChat(groupChatId);
 
         // Refresh character data from actual PNG files to get latest edits
         const refreshedCharacters = [];
         for (const cachedChar of groupChat.characters || []) {
           try {
-            const charResponse = await fetch(`/api/characters/${cachedChar.filename}`);
-            if (charResponse.ok) {
-              const freshCharData = await charResponse.json();
-              refreshedCharacters.push({
-                filename: cachedChar.filename,
-                name: freshCharData.data.name,
-                data: freshCharData.data  // Store just the data object, not the whole character
-              });
-            } else {
-              // If character file is missing, keep the cached version
-              console.warn(`Character ${cachedChar.filename} not found, using cached data`);
+            const freshCharData = await this.api.getCharacter(cachedChar.filename);
+            refreshedCharacters.push({
+              filename: cachedChar.filename,
+              name: freshCharData.data.name,
+              data: freshCharData.data  // Store just the data object, not the whole character
+            });
+          } catch (error) {
+            // If character file is missing, keep the cached version
+            console.warn(`Character ${cachedChar.filename} not found, using cached data`);
               refreshedCharacters.push(cachedChar);
             }
           } catch (err) {
@@ -3387,8 +3352,7 @@ export default {
 
       for (const char of this.groupChatCharacters) {
         try {
-          const response = await fetch(`/api/characters/${char.filename}`);
-          const charData = await response.json();
+          const charData = await this.api.getCharacter(char.filename);
 
           console.log(`Loaded character data for ${char.filename}:`, charData);
 
@@ -3456,18 +3420,7 @@ export default {
           groupChat.messages = this.messages;
         }
 
-        const response = await fetch('/api/group-chats', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(groupChat)
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Server error: ${response.status} - ${errorText}`);
-        }
-
-        const result = await response.json();
+        const result = await this.api.saveGroupChat(groupChat);
         this.groupChatId = result.filename;
 
         if (showNotification) {
