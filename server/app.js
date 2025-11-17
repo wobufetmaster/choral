@@ -218,6 +218,7 @@ app.use('/api/characters', characterRouter);
 const chatRouter = createChatRouter({
   CHATS_DIR,
   chatCompletion,
+  streamChatCompletion,
   processMacros
 });
 app.use('/api/chats', chatRouter);

@@ -18,12 +18,13 @@ const path = require('path');
  * @param {Object} deps - Dependencies
  * @param {string} deps.CHATS_DIR - Path to chats directory
  * @param {Function} deps.chatCompletion - OpenRouter chat completion function
+ * @param {Function} deps.streamChatCompletion - OpenRouter streaming chat completion function
  * @param {Function} deps.processMacros - Macro processing function
  * @returns {express.Router} Express router
  */
 function createChatRouter(deps) {
   const router = express.Router();
-  const { CHATS_DIR, chatCompletion, processMacros } = deps;
+  const { CHATS_DIR, chatCompletion, streamChatCompletion, processMacros } = deps;
 
   // GET /api/chats - List all chats
   router.get('/', async (req, res, next) => {
@@ -294,61 +295,106 @@ ${messagePreview}`;
     }
   });
 
-  // POST /api/chat/summarize-and-continue - Summarize old messages and continue
+  // POST /api/chat/summarize-and-continue - Summarize old messages and continue with streaming
   router.post('/summarize-and-continue', async (req, res, next) => {
     try {
-      const { messages, model, summaryModel, keepRecentCount } = req.body;
+      const { messages, chatTitle, preset, context, isGroupChat, characterFilenames, characterFilename } = req.body;
 
       if (!Array.isArray(messages) || messages.length === 0) {
         return res.status(400).json({ error: 'messages array is required' });
       }
 
-      const keepCount = keepRecentCount || 10;
-      const recentMessages = messages.slice(-keepCount);
+      const model = preset?.model || 'anthropic/claude-3.5-sonnet';
+      const keepCount = 10; // Keep last 10 messages
       const oldMessages = messages.slice(0, -keepCount);
 
       if (oldMessages.length === 0) {
-        return res.json({ summarizedMessages: messages });
+        return res.status(400).json({ error: 'Not enough messages to summarize' });
       }
 
-      // Build summary prompt
+      // Build summary prompt from old messages
       const conversationText = oldMessages
         .map(m => {
+          const charName = m.character || m.role;
           if (typeof m.content === 'string') {
-            return `${m.role}: ${m.content}`;
+            return `${charName}: ${m.content}`;
           } else if (Array.isArray(m.content)) {
             const textParts = m.content.filter(p => p.type === 'text');
-            return `${m.role}: ${textParts.map(p => p.text).join(' ')}`;
+            return `${charName}: ${textParts.map(p => p.text).join(' ')}`;
           }
           return '';
         })
+        .filter(Boolean)
         .join('\n\n');
 
-      const summaryPrompt = `Summarize this conversation concisely, preserving key events, character development, and important details. Keep it under 500 words.
+      const summaryPrompt = `You are a narrator for a chat story. Summarize this conversation concisely but engagingly, preserving key events, character development, and important details. Keep it under 500 words. Write in a narrative style.
 
 Conversation:
 ${conversationText}`;
 
-      const response = await chatCompletion({
+      // Setup SSE streaming
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      // Create narrator character
+      const narrator = {
+        name: 'Narrator',
+        avatar: null
+      };
+
+      // Create new chat data
+      const newChatData = {
+        title: `${chatTitle} (Continued)`,
+        characterFilenames: isGroupChat ? characterFilenames : [characterFilename],
+        timestamp: Date.now()
+      };
+
+      // Send init event
+      res.write(`data: ${JSON.stringify({
+        type: 'init',
+        chatData: newChatData,
+        narrator: narrator
+      })}\n\n`);
+
+      let fullSummary = '';
+
+      // Stream the summary generation
+      streamChatCompletion({
         messages: [{ role: 'user', content: summaryPrompt }],
-        model: summaryModel || model || 'anthropic/claude-3.5-sonnet',
-        temperature: 0.5,
-        max_tokens: 1000
+        model: model,
+        options: {
+          temperature: 0.7,
+          max_tokens: 1000
+        },
+        onChunk: (content) => {
+          fullSummary += content;
+          res.write(`data: ${JSON.stringify({
+            type: 'chunk',
+            content: content
+          })}\n\n`);
+        },
+        onComplete: () => {
+          // Send complete event with final message
+          res.write(`data: ${JSON.stringify({
+            type: 'complete',
+            message: {
+              content: fullSummary,
+              swipes: [fullSummary]
+            }
+          })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+        },
+        onError: (error) => {
+          res.write(`data: ${JSON.stringify({
+            type: 'error',
+            error: error.message
+          })}\n\n`);
+          res.end();
+        }
       });
 
-      // chatCompletion returns just the content string, not the full response object
-      const summary = response || 'Summary unavailable.';
-
-      // Create summarized message array
-      const summarizedMessages = [
-        {
-          role: 'system',
-          content: `Previous conversation summary:\n\n${summary}`
-        },
-        ...recentMessages
-      ];
-
-      res.json({ summarizedMessages, summary });
     } catch (error) {
       next(error);
     }
