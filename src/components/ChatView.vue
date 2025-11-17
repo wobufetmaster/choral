@@ -3298,11 +3298,6 @@ export default {
           } catch (error) {
             // If character file is missing, keep the cached version
             console.warn(`Character ${cachedChar.filename} not found, using cached data`);
-              refreshedCharacters.push(cachedChar);
-            }
-          } catch (err) {
-            console.error(`Failed to refresh character ${cachedChar.filename}:`, err);
-            // Fall back to cached data if refresh fails
             refreshedCharacters.push(cachedChar);
           }
         }
