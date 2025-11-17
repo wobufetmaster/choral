@@ -2403,7 +2403,7 @@ export default {
     async loadAvailablePresets() {
       try {
         const presets = await this.api.getPresets();
-        this.availablePresets = await response.json();
+        this.availablePresets = presets;
       } catch (error) {
         console.error('Failed to load available presets:', error);
       }
@@ -2411,7 +2411,7 @@ export default {
     async loadAvailablePersonas() {
       try {
         const personas = await this.api.getPersonas();
-        this.availablePersonas = await response.json();
+        this.availablePersonas = personas;
         // Ensure "User" default persona is available
         if (!this.availablePersonas.find(p => p.name === 'User')) {
           this.availablePersonas.unshift({ name: 'User', avatar: null });
@@ -3274,8 +3274,7 @@ export default {
     async loadAllCharacters() {
       try {
         const characters = await this.api.getCharacters();
-        const chars = await response.json();
-        this.allCharacters = chars;
+        this.allCharacters = characters;
       } catch (error) {
         console.error('Failed to load all characters:', error);
       }
