@@ -374,11 +374,16 @@
 
 <script>
 import CharacterEditor from './CharacterEditor.vue'
+import { useApi } from '../composables/useApi.js';
 
 export default {
   name: 'CharacterList',
   components: {
     CharacterEditor
+  },
+  setup() {
+    const api = useApi();
+    return { api };
   },
   props: {
     tabData: {
@@ -586,8 +591,7 @@ export default {
   methods: {
     async loadCharacters() {
       try {
-        const response = await fetch('/api/characters');
-        this.characters = await response.json();
+        this.characters = await this.api.getCharacters();
       } catch (error) {
         console.error('Failed to load characters:', error);
       }
@@ -617,10 +621,7 @@ export default {
       formData.append('file', file);
 
       try {
-        await fetch('/api/characters', {
-          method: 'POST',
-          body: formData
-        });
+        await this.api.saveCharacter(formData);
 
         this.loadCharacters();
         event.target.value = '';
@@ -720,14 +721,7 @@ export default {
           }
           formData.append('card', JSON.stringify(card));
 
-          const response = await fetch(`/api/characters/${originalFilename}`, {
-            method: 'PUT',
-            body: formData
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to update character');
-          }
+          await this.api.updateCharacter(originalFilename, formData);
 
           this.$root.$notify('Character updated successfully', 'success');
         } else {
@@ -739,14 +733,7 @@ export default {
           }
           formData.append('card', JSON.stringify(card));
 
-          const response = await fetch('/api/characters', {
-            method: 'POST',
-            body: formData
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to create character');
-          }
+          await this.api.saveCharacter(formData);
 
           this.$root.$notify('Character created successfully', 'success');
         }
@@ -760,10 +747,7 @@ export default {
     },
     async loadTagColors() {
       try {
-        const response = await fetch('/api/tags');
-        if (response.ok) {
-          this.tagColors = await response.json();
-        }
+        this.tagColors = await this.api.getTags();
       } catch (error) {
         console.error('Failed to load tag colors:', error);
       }
@@ -903,30 +887,18 @@ export default {
             };
             delete updatedGroup.isGroupChat; // Remove temporary flag
 
-            await fetch('/api/group-chats', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updatedGroup)
-            });
+            await this.api.saveGroupChat(updatedGroup);
 
             await this.loadGroupChats();
           } else {
             // Update character tags
-            await fetch(`/api/characters/${this.characterBeingTagged.filename}/tags`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tags })
-            });
+            await this.api.updateCharacterTags(this.characterBeingTagged.filename, tags);
 
             await this.loadCharacters();
           }
 
           // Save tag colors
-          await fetch('/api/tags', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(this.tagColors)
-          });
+          await this.api.saveTags(this.tagColors);
 
           console.log('Tags auto-saved');
         } catch (error) {
@@ -962,34 +934,18 @@ export default {
           };
           delete updatedGroup.isGroupChat; // Remove temporary flag
 
-          await fetch('/api/group-chats', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatedGroup)
-          });
+          await this.api.saveGroupChat(updatedGroup);
 
           await this.loadGroupChats();
         } else {
           // Update character tags
-          const response = await fetch(`/api/characters/${this.characterBeingTagged.filename}/tags`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tags })
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to update tags');
-          }
+          await this.api.updateCharacterTags(this.characterBeingTagged.filename, tags);
 
           await this.loadCharacters();
         }
 
         // Save tag colors
-        await fetch('/api/tags', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.tagColors)
-        });
+        await this.api.saveTags(this.tagColors);
 
         this.$root.$notify('Tags updated successfully', 'success');
         this.closeTagEditor();
@@ -1003,20 +959,7 @@ export default {
 
       try {
         this.isAutoTagging = true;
-        const response = await fetch(`/api/characters/${this.characterBeingTagged.filename}/auto-tag`, {
-          method: 'POST'
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          if (response.status === 400 && errorData.error) {
-            // Show specific error message from server (e.g., bookkeeping disabled)
-            throw new Error(errorData.error);
-          }
-          throw new Error('Failed to auto-generate tags');
-        }
-
-        const result = await response.json();
+        const result = await this.api.autoGenerateCharacterTags(this.characterBeingTagged.filename);
 
         // Add generated tags to editing tags
         result.tags.forEach(tag => {
@@ -1042,8 +985,7 @@ export default {
     // Group chat methods
     async loadGroupChats() {
       try {
-        const response = await fetch('/api/group-chats');
-        this.groupChats = await response.json();
+        this.groupChats = await this.api.getGroupChats();
       } catch (error) {
         console.error('Failed to load group chats:', error);
       }
@@ -1071,7 +1013,7 @@ export default {
         'Delete',
         async () => {
           try {
-            await fetch(`/api/group-chats/${group.filename}`, { method: 'DELETE' });
+            await this.api.deleteGroupChat(group.filename);
             await this.loadGroupChats();
             this.$root.$notify('Group chat deleted', 'success');
           } catch (error) {
@@ -1089,7 +1031,7 @@ export default {
         'Delete',
         async () => {
           try {
-            await fetch(`/api/characters/${char.filename}`, { method: 'DELETE' });
+            await this.api.deleteCharacter(char.filename);
             await this.loadCharacters();
             this.$root.$notify('Character deleted', 'success');
           } catch (error) {
@@ -1153,13 +1095,7 @@ export default {
           timestamp: Date.now()
         };
 
-        const response = await fetch('/api/group-chats', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(groupChat)
-        });
-
-        const result = await response.json();
+        const result = await this.api.saveGroupChat(groupChat);
 
         // Navigate to the new group chat
         const groupName = selectedCharacters.map(c => c.name).join(', ');
@@ -1202,11 +1138,7 @@ export default {
           name: newName.trim()
         };
 
-        await fetch('/api/group-chats', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedGroup)
-        });
+        await this.api.saveGroupChat(updatedGroup);
 
         await this.loadGroupChats();
         this.$root.$notify('Group chat renamed', 'success');
@@ -1231,13 +1163,10 @@ export default {
     async loadChatMetadata() {
       try {
         // Load all chats to get metadata
-        const [chatsResponse, groupChatsResponse] = await Promise.all([
-          fetch('/api/chats'),
-          fetch('/api/group-chats')
+        const [chats, groupChatsData] = await Promise.all([
+          this.api.getChats(),
+          this.api.getGroupChats()
         ]);
-
-        const chats = await chatsResponse.json();
-        const groupChatsData = await groupChatsResponse.json();
 
         const metadata = {};
 
@@ -1402,22 +1331,7 @@ export default {
 
           try {
             // Call the auto-tag API for this character
-            const response = await fetch(`/api/characters/${char.filename}/auto-tag`, {
-              method: 'POST'
-            });
-
-            if (!response.ok) {
-              // Check for bookkeeping disabled error
-              const errorData = await response.json().catch(() => ({}));
-              if (response.status === 400 && errorData.error) {
-                // Show the specific error (e.g., bookkeeping disabled) and stop
-                throw new Error(errorData.error);
-              }
-              console.error(`Failed to auto-tag ${char.name}`);
-              continue;
-            }
-
-            const result = await response.json();
+            const result = await this.api.autoGenerateCharacterTags(char.filename);
 
             // Apply the tags to the character
             const tags = result.tags.map(t => t.name);
@@ -1431,11 +1345,7 @@ export default {
             this.tagColors = { ...this.tagColors, ...updatedColors };
 
             // Save tags to character
-            await fetch(`/api/characters/${char.filename}/tags`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tags })
-            });
+            await this.api.updateCharacterTags(char.filename, tags);
 
             // Small delay to avoid overwhelming the API
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -1450,11 +1360,7 @@ export default {
         }
 
         // Save tag colors
-        await fetch('/api/tags', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.tagColors)
-        });
+        await this.api.saveTags(this.tagColors);
 
         // Reload characters to show updated tags
         await this.loadCharacters();
@@ -1497,11 +1403,7 @@ export default {
 
       // Save updated tag colors
       try {
-        await fetch('/api/tags', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.tagColors)
-        });
+        await this.api.saveTags(this.tagColors);
 
         this.$root.$notify(`Randomized ${totalRandomized} gray tag${totalRandomized === 1 ? '' : 's'}!`, 'success');
 

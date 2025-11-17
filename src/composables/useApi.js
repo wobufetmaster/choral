@@ -57,6 +57,10 @@ export function useApi() {
     method: 'POST',
     body: body instanceof FormData ? body : JSON.stringify(body)
   });
+  const put = (endpoint, body) => request(endpoint, {
+    method: 'PUT',
+    body: body instanceof FormData ? body : JSON.stringify(body)
+  });
   const del = (endpoint) => request(endpoint, { method: 'DELETE' });
 
   // Return API interface
@@ -65,7 +69,10 @@ export function useApi() {
     getCharacters: () => get('/api/characters'),
     getCharacter: (filename) => get(`/api/characters/${filename}`),
     saveCharacter: (formData) => post('/api/characters', formData),
+    updateCharacter: (filename, formData) => put(`/api/characters/${filename}`, formData),
     deleteCharacter: (filename) => del(`/api/characters/${filename}`),
+    updateCharacterTags: (filename, tags) => put(`/api/characters/${filename}/tags`, { tags }),
+    autoGenerateCharacterTags: (filename) => post(`/api/characters/${filename}/auto-tag`),
 
     // Chats
     getChats: () => get('/api/chats'),
@@ -100,7 +107,7 @@ export function useApi() {
 
     // Tags
     getTags: () => get('/api/tags'),
-    saveTags: (tags) => post('/api/tags', { tags }),
+    saveTags: (tags) => post('/api/tags', tags),
     getCoreTags: () => get('/api/tags/core'),
     saveCoreTags: (tags) => post('/api/tags/core', { tags }),
 
