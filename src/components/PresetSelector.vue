@@ -176,11 +176,16 @@
 <script>
 import { MACRO_DEFINITIONS, MACRO_CATEGORIES } from '../utils/macros.js';
 import MacroWarningDialog from './MacroWarningDialog.vue';
+import { useApi } from '../composables/useApi.js';
 
 export default {
   name: 'PresetSelector',
   components: {
     MacroWarningDialog
+  },
+  setup() {
+    const api = useApi();
+    return { api };
   },
   props: {
     currentSettings: Object,
@@ -299,8 +304,7 @@ export default {
     },
     async loadConfig() {
       try {
-        const response = await fetch('/api/config');
-        const config = await response.json();
+        const config = await this.api.getConfig();
         this.activePresetFilename = config.activePreset || 'default.json';
       } catch (error) {
         console.error('Failed to load config:', error);
@@ -308,8 +312,7 @@ export default {
     },
     async loadPresets() {
       try {
-        const response = await fetch('/api/presets');
-        this.presets = await response.json();
+        this.presets = await this.api.getPresets();
         if (this.presets.length > 0) {
           // Select the active preset by default
           const activePreset = this.presets.find(p => p.filename === this.activePresetFilename);
@@ -360,18 +363,7 @@ export default {
         }
 
         // Save the duplicated preset immediately
-        const response = await fetch('/api/presets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(duplicated)
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to duplicate preset');
-        }
-
-        const result = await response.json();
+        const result = await this.api.savePreset(duplicated);
 
         // Reload the preset list to show the new preset
         await this.loadPresets();
@@ -437,18 +429,7 @@ export default {
           this.selectedPreset.prompts = [];
         }
 
-        const response = await fetch('/api/presets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.selectedPreset)
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to save preset');
-        }
-
-        const result = await response.json();
+        const result = await this.api.savePreset(this.selectedPreset);
         this.selectedPreset.filename = result.filename;
         await this.loadPresets();
 
@@ -479,7 +460,7 @@ export default {
       if (!confirm('Delete this preset?')) return;
 
       try {
-        await fetch(`/api/presets/${filename}`, { method: 'DELETE' });
+        await this.api.deletePreset(filename);
         await this.loadPresets();
         this.$root.$notify('Preset deleted', 'success');
       } catch (error) {
@@ -494,16 +475,7 @@ export default {
       }
 
       try {
-        const response = await fetch('/api/config/active-preset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ preset: this.selectedPreset.filename })
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to set active preset');
-        }
-
+        await this.api.setActivePreset(this.selectedPreset.filename);
         this.activePresetFilename = this.selectedPreset.filename;
         this.$root.$notify(`"${this.selectedPreset.name}" is now the active preset`, 'success');
       } catch (error) {
@@ -519,18 +491,7 @@ export default {
         const text = await file.text();
         const config = JSON.parse(text);
 
-        const response = await fetch('/api/presets/import/pixijb', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config)
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to import config');
-        }
-
-        const result = await response.json();
+        const result = await this.api.importPixiJB(config);
         await this.loadPresets();
         this.selectedPreset = result.preset;
         this.$root.$notify('Config imported successfully', 'success');
