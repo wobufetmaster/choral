@@ -189,8 +189,14 @@
 </template>
 
 <script>
+import { useApi } from '../composables/useApi.js';
+
 export default {
   name: 'LorebookManager',
+  setup() {
+    const api = useApi();
+    return { api };
+  },
   data() {
     return {
       lorebooks: [],
@@ -227,8 +233,7 @@ export default {
   methods: {
     async loadLorebooks() {
       try {
-        const response = await fetch('/api/lorebooks');
-        this.lorebooks = await response.json();
+        this.lorebooks = await this.api.getLorebooks();
       } catch (error) {
         console.error('Failed to load lorebooks:', error);
       }
@@ -307,13 +312,7 @@ export default {
     },
     async saveLorebook() {
       try {
-        const response = await fetch('/api/lorebooks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.selectedLorebook)
-        });
-
-        const result = await response.json();
+        const result = await this.api.saveLorebook(this.selectedLorebook);
 
         if (result.success) {
           await this.loadLorebooks();
@@ -327,9 +326,7 @@ export default {
       if (!confirm('Delete this lorebook?')) return;
 
       try {
-        await fetch(`/api/lorebooks/${filename}`, {
-          method: 'DELETE'
-        });
+        await this.api.deleteLorebook(filename);
 
         await this.loadLorebooks();
         if (this.selectedLorebook?.filename === filename) {
@@ -377,13 +374,7 @@ export default {
         const lorebookData = JSON.parse(text);
 
         // Send to import endpoint
-        const response = await fetch('/api/lorebooks/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(lorebookData)
-        });
-
-        const result = await response.json();
+        const result = await this.api.importLorebook(lorebookData);
 
         if (result.success) {
           await this.loadLorebooks();
@@ -401,8 +392,7 @@ export default {
     },
     async loadCharacters() {
       try {
-        const response = await fetch('/api/characters');
-        this.availableCharacters = await response.json();
+        this.availableCharacters = await this.api.getCharacters();
       } catch (error) {
         console.error('Failed to load characters:', error);
       }
