@@ -182,11 +182,16 @@
 
 <script>
 import CharacterGridPicker from './CharacterGridPicker.vue'
+import { useApi } from '../composables/useApi.js';
 
 export default {
   name: 'PersonaManager',
   components: {
     CharacterGridPicker
+  },
+  setup() {
+    const api = useApi();
+    return { api };
   },
   props: {
     currentPersona: Object
@@ -237,8 +242,7 @@ export default {
   methods: {
     async loadPersonas(preserveSelection = false) {
       try {
-        const response = await fetch('/api/personas');
-        const data = await response.json();
+        const data = await this.api.getPersonas();
 
         // Store personas with their actual filenames from the API
         // The API now includes _filename which is the real filename on disk
@@ -274,8 +278,7 @@ export default {
     },
     async loadCharacters() {
       try {
-        const response = await fetch('/api/characters');
-        this.availableCharacters = await response.json();
+        this.availableCharacters = await this.api.getCharacters();
       } catch (error) {
         console.error('Failed to load characters:', error);
       }
@@ -315,15 +318,7 @@ export default {
         };
 
         // Immediately save it to disk
-        const response = await fetch('/api/personas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newPersona)
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to create persona');
-        }
+        await this.api.savePersona(newPersona);
 
         // Reload personas and select the new one
         await this.loadPersonas();
@@ -433,7 +428,7 @@ export default {
         // If this persona came from a file and the nickname changed, delete the old file
         if (oldFilename && newFilename !== oldFilename) {
           try {
-            await fetch(`/api/personas/${oldFilename}`, { method: 'DELETE' });
+            await this.api.deletePersona(oldFilename);
           } catch (err) {
             console.error('Failed to delete old persona file:', err);
             // Continue with save even if delete fails
@@ -442,15 +437,7 @@ export default {
 
         // Save the persona (without the internal _filename field)
         const { _filename, ...personaData } = this.selectedPersona;
-        const response = await fetch('/api/personas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(personaData)
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to save persona');
-        }
+        await this.api.savePersona(personaData);
 
         // Update the filename tracking to the new filename
         this.selectedPersona._filename = newFilename;
@@ -473,7 +460,7 @@ export default {
           return;
         }
 
-        await fetch(`/api/personas/${this.selectedPersona._filename}`, { method: 'DELETE' });
+        await this.api.deletePersona(this.selectedPersona._filename);
 
         await this.loadPersonas();
         this.$root.$notify('Persona deleted', 'success');
@@ -484,8 +471,7 @@ export default {
     },
     async loadConfig() {
       try {
-        const response = await fetch('/api/config');
-        const config = await response.json();
+        const config = await this.api.getConfig();
         this.defaultPersona = config.defaultPersona || '';
       } catch (error) {
         console.error('Failed to load config:', error);
@@ -528,11 +514,7 @@ export default {
       this.autoSavePersonaTimeout = setTimeout(async () => {
         try {
           const { _filename, ...personaData } = this.selectedPersona;
-          await fetch('/api/personas', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(personaData)
-          });
+          await this.api.savePersona(personaData);
           console.log('Persona bindings auto-saved');
         } catch (error) {
           console.error('Failed to auto-save persona:', error);
@@ -547,11 +529,7 @@ export default {
       try {
         const identifier = this.selectedPersona.nickname || this.selectedPersona.name;
         const filename = `${identifier}.json`;
-        await fetch('/api/config/default-persona', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ persona: filename })
-        });
+        await this.api.setDefaultPersona(filename);
         this.defaultPersona = filename;
         this.$root.$notify(`${this.selectedPersona.nickname || this.selectedPersona.name} set as default persona`, 'success');
       } catch (error) {
