@@ -17,6 +17,7 @@ const createCharacterRouter = require('./routes/characters');
 const createChatRouter = require('./routes/chats');
 const createGroupChatRouter = require('./routes/group-chats');
 const createPersonaRouter = require('./routes/personas');
+const createLorebookRouter = require('./routes/lorebooks');
 
 /**
  * Create Express app with given configuration
@@ -234,9 +235,14 @@ const personaRouter = createPersonaRouter({
 });
 app.use('/api/personas', personaRouter);
 
-// ===== Lorebook Routes =====
+// Mount lorebook routes
+const lorebookRouter = createLorebookRouter({
+  LOREBOOKS_DIR
+});
+app.use('/api/lorebooks', lorebookRouter);
 
 // Helper function to convert SillyTavern lorebook format to Choral format
+// (used by streaming/non-streaming chat routes for lorebook processing)
 function convertSillyTavernLorebook(lorebook) {
   // If entries is already an array, it's in Choral format
   if (Array.isArray(lorebook.entries)) {
@@ -274,153 +280,6 @@ function convertSillyTavernLorebook(lorebook) {
     entries: entries
   };
 }
-
-// Get all lorebooks
-app.get('/api/lorebooks', async (req, res) => {
-  try {
-    const files = await fs.readdir(LOREBOOKS_DIR);
-    const jsonFiles = files.filter(f => f.endsWith('.json'));
-
-    const lorebooks = await Promise.all(
-      jsonFiles.map(async (file) => {
-        try {
-          const filePath = path.join(LOREBOOKS_DIR, file);
-          const content = await fs.readFile(filePath, 'utf-8');
-          let lorebook = JSON.parse(content);
-
-          // Auto-convert SillyTavern format to Choral format
-          lorebook = convertSillyTavernLorebook(lorebook);
-
-          return {
-            filename: file,
-            ...lorebook
-          };
-        } catch (err) {
-          console.error(`Error loading lorebook ${file}:`, err);
-          return null;
-        }
-      })
-    );
-
-    res.json(lorebooks.filter(l => l !== null));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get specific lorebook
-app.get('/api/lorebooks/:filename', async (req, res) => {
-  try {
-    const filePath = path.join(LOREBOOKS_DIR, req.params.filename);
-    const content = await fs.readFile(filePath, 'utf-8');
-    let lorebook = JSON.parse(content);
-
-    // Auto-convert SillyTavern format to Choral format
-    lorebook = convertSillyTavernLorebook(lorebook);
-
-    res.json(lorebook);
-  } catch (error) {
-    res.status(404).json({ error: 'Lorebook not found' });
-  }
-});
-
-// Create/update lorebook
-app.post('/api/lorebooks', async (req, res) => {
-  try {
-    const lorebook = req.body;
-    const filename = lorebook.filename || `${lorebook.name || 'lorebook'}.json`;
-    const filePath = path.join(LOREBOOKS_DIR, filename);
-
-    // Create a copy without the filename property for storage
-    const { filename: _, ...lorebookData } = lorebook;
-
-    await fs.writeFile(filePath, JSON.stringify(lorebookData, null, 2));
-    res.json({ success: true, filename });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Delete lorebook
-app.delete('/api/lorebooks/:filename', async (req, res) => {
-  try {
-    const filePath = path.join(LOREBOOKS_DIR, req.params.filename);
-    await fs.unlink(filePath);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Import lorebook
-app.post('/api/lorebooks/import', async (req, res) => {
-  try {
-    const importedLorebook = req.body;
-
-    // Extract name from various possible locations (prioritize originalData)
-    const lorebookName =
-      importedLorebook.originalData?.name ||
-      importedLorebook.name ||
-      'Imported Lorebook';
-
-    // Extract scan depth from various locations
-    const scanDepth =
-      importedLorebook.originalData?.scan_depth ||
-      importedLorebook.scanDepth ||
-      importedLorebook.scan_depth ||
-      0;
-
-    // Convert entries object to Choral entries array
-    const entries = [];
-    if (importedLorebook.entries) {
-      const entriesObj = importedLorebook.entries;
-      for (const key in entriesObj) {
-        const entry = entriesObj[key];
-
-        // Map to Choral fields, keep only supported ones
-        const choralEntry = {
-          name: entry.comment || entry.key?.[0] || 'Entry',
-          enabled: !entry.disable,
-          constant: entry.constant || false,
-          keys: Array.isArray(entry.key) ? entry.key : [],
-          keysInput: Array.isArray(entry.key) ? entry.key.join(', ') : '',
-          regex: entry.regex || '',
-          content: entry.content || '',
-          priority: entry.order || entry.priority || 0
-        };
-
-        entries.push(choralEntry);
-      }
-    }
-
-    // Create Choral lorebook format
-    const choralLorebook = {
-      name: lorebookName,
-      autoSelect: importedLorebook.autoSelect || false,
-      matchTags: importedLorebook.matchTags || '',
-      scanDepth: scanDepth,
-      entries: entries
-    };
-
-    // Generate unique filename
-    let baseFilename = choralLorebook.name.replace(/[^a-zA-Z0-9 ]/g, '_');
-    let filename = `${baseFilename}.json`;
-    let filePath = path.join(LOREBOOKS_DIR, filename);
-    let counter = 1;
-
-    // Check for existing files and add counter if needed
-    while (await fs.access(filePath).then(() => true).catch(() => false)) {
-      filename = `${baseFilename}_${counter}.json`;
-      filePath = path.join(LOREBOOKS_DIR, filename);
-      counter++;
-    }
-
-    await fs.writeFile(filePath, JSON.stringify(choralLorebook, null, 2));
-    res.json({ success: true, filename, lorebook: choralLorebook });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // ===== Preset Routes =====
 
