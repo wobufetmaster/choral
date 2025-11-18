@@ -694,15 +694,22 @@ export default {
       // Open character editor in a new tab for creating a new character
       this.$emit('open-tab', 'character-editor', {}, 'New Character', false);
     },
-    editCharacter(character) {
-      // Open character editor in a new tab
-      this.$emit('open-tab', 'character-editor', {
-        character: {
-          ...character.data,
-          filename: character.filename,
-          image: `/api/characters/${character.filename}/image`
-        }
-      }, `Edit: ${character.data.data.name}`, false);
+    async editCharacter(character) {
+      // Need to fetch the full character card for editing
+      try {
+        const fullCard = await this.api.getCharacter(character.filename);
+
+        // Open character editor in a new tab with the full card data
+        this.$emit('open-tab', 'character-editor', {
+          character: {
+            ...fullCard,
+            filename: character.filename,
+            image: `/api/characters/${character.filename}/image`
+          }
+        }, `Edit: ${character.name}`, false);
+      } catch (error) {
+        console.error('Failed to load character for editing:', error);
+      }
     },
     closeEditor() {
       this.isEditorOpen = false;
