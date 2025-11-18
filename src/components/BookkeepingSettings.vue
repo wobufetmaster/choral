@@ -211,6 +211,8 @@
 </template>
 
 <script>
+import { useApi } from '../composables/useApi';
+
 export default {
   name: 'BookkeepingSettings',
   props: {
@@ -218,6 +220,10 @@ export default {
       type: Object,
       default: () => ({})
     }
+  },
+  setup() {
+    const api = useApi();
+    return { api };
   },
   data() {
     return {
@@ -299,20 +305,17 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
     },
     async loadSettings() {
       try {
-        const response = await fetch('/api/bookkeeping-settings');
-        if (response.ok) {
-          const loadedSettings = await response.json();
-          // Merge with defaults to ensure all fields exist
-          this.settings = {
-            enableBookkeeping: loadedSettings.enableBookkeeping || false,
-            autoRenameChats: loadedSettings.autoRenameChats || false,
-            model: loadedSettings.model || 'openai/gpt-4o-mini',
-            strictMode: loadedSettings.strictMode || false,
-            autoNamingPrompt: loadedSettings.autoNamingPrompt || this.getDefaultAutoNamingPrompt(),
-            autoTaggingPromptStrict: loadedSettings.autoTaggingPromptStrict || this.getDefaultAutoTaggingPromptStrict(),
-            autoTaggingPromptNormal: loadedSettings.autoTaggingPromptNormal || this.getDefaultAutoTaggingPromptNormal()
-          };
-        }
+        const loadedSettings = await this.api.getBookkeepingSettings();
+        // Merge with defaults to ensure all fields exist
+        this.settings = {
+          enableBookkeeping: loadedSettings.enableBookkeeping || false,
+          autoRenameChats: loadedSettings.autoRenameChats || false,
+          model: loadedSettings.model || 'openai/gpt-4o-mini',
+          strictMode: loadedSettings.strictMode || false,
+          autoNamingPrompt: loadedSettings.autoNamingPrompt || this.getDefaultAutoNamingPrompt(),
+          autoTaggingPromptStrict: loadedSettings.autoTaggingPromptStrict || this.getDefaultAutoTaggingPromptStrict(),
+          autoTaggingPromptNormal: loadedSettings.autoTaggingPromptNormal || this.getDefaultAutoTaggingPromptNormal()
+        };
       } catch (error) {
         console.error('Failed to load bookkeeping settings:', error);
         this.$root.$notify('Failed to load settings', 'error');
@@ -320,16 +323,7 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
     },
     async saveSettings() {
       try {
-        const response = await fetch('/api/bookkeeping-settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.settings)
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to save settings');
-        }
-
+        await this.api.saveBookkeepingSettings(this.settings);
         this.$root.$notify('Settings saved successfully', 'success');
       } catch (error) {
         console.error('Failed to save settings:', error);
@@ -338,17 +332,14 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
     },
     async loadCoreTags() {
       try {
-        const response = await fetch('/api/core-tags');
-        if (response.ok) {
-          const tags = await response.json();
-          // Convert to format with name and color
-          this.coreTags = tags.map(tag => {
-            if (typeof tag === 'string') {
-              return { name: tag, color: '#6b7280' };
-            }
-            return tag;
-          });
-        }
+        const tags = await this.api.getCoreTags();
+        // Convert to format with name and color
+        this.coreTags = tags.map(tag => {
+          if (typeof tag === 'string') {
+            return { name: tag, color: '#6b7280' };
+          }
+          return tag;
+        });
       } catch (error) {
         console.error('Failed to load core tags:', error);
         this.$root.$notify('Failed to load core tags', 'error');
@@ -361,15 +352,7 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
           .filter(t => t.name.trim())
           .map(t => t.name.trim());
 
-        const response = await fetch('/api/core-tags', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(tags)
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to save core tags');
-        }
+        await this.api.saveCoreTags(tags);
 
         // Also update the tag colors in the global tags file
         const tagColors = {};
@@ -380,11 +363,7 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
           }
         });
 
-        await fetch('/api/tags', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...this.allTags, ...tagColors })
-        });
+        await this.api.saveTags({ ...this.allTags, ...tagColors });
 
         this.$root.$notify('Core tags saved successfully', 'success');
         await this.loadAllTags(); // Reload to get updated colors
@@ -395,10 +374,7 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
     },
     async loadAllTags() {
       try {
-        const response = await fetch('/api/tags');
-        if (response.ok) {
-          this.allTags = await response.json();
-        }
+        this.allTags = await this.api.getTags();
       } catch (error) {
         console.error('Failed to load all tags:', error);
       }
