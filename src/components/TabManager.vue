@@ -294,26 +294,10 @@ export default {
       // Update tab label
       tab.label = newLabel;
 
-      // If it's a chat tab with a chat file, rename the file on server
-      if ((tab.type === 'chat' || tab.type === 'group-chat') && tab.data.chatFilename) {
-        try {
-          const response = await fetch(`/api/chats/${tab.data.chatFilename}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: newLabel }),
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            // Update the chat filename in tab data
-            tab.data.chatFilename = result.filename;
-          } else {
-            console.error('Failed to rename chat on server');
-          }
-        } catch (error) {
-          console.error('Error renaming chat:', error);
-        }
-      }
+      // Note: Chat file renaming on server would require reading the chat,
+      // updating the name field, and saving it back. Currently just updates
+      // the tab label in localStorage.
+      // TODO: Implement proper chat file name updates via GET + POST pattern
 
       saveTabs();
     };
