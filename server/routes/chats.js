@@ -125,8 +125,15 @@ function createChatRouter(deps) {
       const content = await fs.readFile(filePath, 'utf-8');
       const chat = JSON.parse(content);
 
+      // Get messages from current branch or fallback to direct messages array
+      const messages = chat.branches?.['branch-main']?.messages || chat.messages || [];
+
+      if (messages.length === 0) {
+        return res.status(400).json({ error: 'No messages to generate name from' });
+      }
+
       // Build prompt for name generation
-      const messagePreview = chat.messages
+      const messagePreview = messages
         .slice(0, 10)
         .map(m => {
           if (typeof m.content === 'string') {

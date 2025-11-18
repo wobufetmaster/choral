@@ -3033,7 +3033,7 @@ export default {
     async loadLorebooks() {
       try {
         const lorebooks = await this.api.getLorebooks();
-        this.lorebooks = await response.json();
+        this.lorebooks = lorebooks;
 
         // Clean up selectedLorebookFilenames: remove any that don't exist anymore
         const validFilenames = this.lorebooks.map(l => l.filename);
