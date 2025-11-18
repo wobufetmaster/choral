@@ -120,11 +120,16 @@
 
 <script>
 import CharacterGridPicker from './CharacterGridPicker.vue';
+import { useApi } from '../composables/useApi';
 
 export default {
   name: 'ToolSettings',
   components: {
     CharacterGridPicker
+  },
+  setup() {
+    const api = useApi();
+    return { api };
   },
   data() {
     return {
@@ -159,10 +164,7 @@ export default {
   methods: {
     async loadSettings() {
       try {
-        const response = await fetch('/api/tool-settings');
-        if (response.ok) {
-          this.settings = await response.json();
-        }
+        this.settings = await this.api.getToolSettings();
       } catch (error) {
         console.error('Failed to load tool settings:', error);
         this.$root.$notify('Failed to load tool settings', 'error');
@@ -170,16 +172,14 @@ export default {
     },
     async loadCharacters() {
       try {
-        const response = await fetch('/api/characters');
-        if (response.ok) {
-          this.characters = await response.json();
-        }
+        this.characters = await this.api.getCharacters();
       } catch (error) {
         console.error('Failed to load characters:', error);
       }
     },
     async loadAvailableTools() {
       try {
+        // This endpoint doesn't exist in useApi yet, keep as fetch
         const response = await fetch('/api/tools/available');
         if (response.ok) {
           const data = await response.json();
@@ -272,17 +272,8 @@ export default {
     },
     async saveSettings() {
       try {
-        const response = await fetch('/api/tool-settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.settings)
-        });
-
-        if (response.ok) {
-          this.$root.$notify('Tool settings saved', 'success');
-        } else {
-          throw new Error('Failed to save settings');
-        }
+        await this.api.saveToolSettings(this.settings);
+        this.$root.$notify('Tool settings saved', 'success');
       } catch (error) {
         console.error('Failed to save tool settings:', error);
         this.$root.$notify('Failed to save tool settings', 'error');

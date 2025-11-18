@@ -108,8 +108,8 @@ export function useApi() {
     // Tags
     getTags: () => get('/api/tags'),
     saveTags: (tags) => post('/api/tags', tags),
-    getCoreTags: () => get('/api/tags/core'),
-    saveCoreTags: (tags) => post('/api/tags/core', { tags }),
+    getCoreTags: () => get('/api/core-tags'),
+    saveCoreTags: (tags) => post('/api/core-tags', { tags }),
 
     // Config
     getConfig: () => get('/api/config'),
