@@ -192,7 +192,16 @@ function createCharacterRouter(deps) {
 
         await fs.unlink(targetPath);
         await fs.rename(tempPath, targetPath);
+      } else if (req.body.card) {
+        // Parse card from FormData field
+        card = JSON.parse(req.body.card);
+        if (!validateCharacterCard(card)) {
+          return res.status(400).json({ error: 'Invalid character card' });
+        }
+
+        await writeCharacterCard(targetPath, card);
       } else if (req.body) {
+        // Direct JSON body
         if (!validateCharacterCard(req.body)) {
           return res.status(400).json({ error: 'Invalid character card' });
         }
