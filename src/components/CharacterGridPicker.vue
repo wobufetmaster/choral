@@ -55,8 +55,14 @@
 </template>
 
 <script>
+import { useApi } from '../composables/useApi';
+
 export default {
   name: 'CharacterGridPicker',
+  setup() {
+    const api = useApi();
+    return { api };
+  },
   props: {
     characters: {
       type: Array,
@@ -167,10 +173,7 @@ export default {
   methods: {
     async loadTagColors() {
       try {
-        const response = await fetch('/api/tags');
-        if (response.ok) {
-          this.tagColors = await response.json();
-        }
+        this.tagColors = await this.api.getTags();
       } catch (error) {
         console.error('Failed to load tag colors:', error);
       }
