@@ -148,8 +148,10 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useNotification } from '../composables/useNotification'
+import { useApi } from '../composables/useApi'
 
 const { notify } = useNotification()
+const api = useApi()
 
 const props = defineProps({
   isOpen: Boolean,
@@ -536,66 +538,53 @@ async function save() {
       }
       formData.append('card', JSON.stringify(editedCard.value))
 
-      let response
+      let result
       if (characterData.originalFilename) {
         // Update existing character
-        response = await fetch(`/api/characters/${characterData.originalFilename}`, {
-          method: 'PUT',
-          body: formData
-        })
+        result = await api.updateCharacter(characterData.originalFilename, formData)
       } else {
         // Create new character
-        response = await fetch('/api/characters', {
-          method: 'POST',
-          body: formData
-        })
+        result = await api.saveCharacter(formData)
       }
 
-      if (response.ok) {
-        const result = await response.json()
+      // Clear unsaved changes flag and update original state
+      hasUnsavedChanges.value = false
+      originalCardState.value = JSON.stringify({
+        card: editedCard.value,
+        imagePreview: imagePreview.value
+      })
 
-        // Clear unsaved changes flag and update original state
-        hasUnsavedChanges.value = false
-        originalCardState.value = JSON.stringify({
-          card: editedCard.value,
-          imagePreview: imagePreview.value
+      // Show success notification
+      notify(
+        characterData.originalFilename ? 'Character saved successfully' : 'Character created successfully',
+        'success'
+      )
+
+      // If it was a new character, update the tabData to have the filename and clear draft
+      if (!characterData.originalFilename && result.filename) {
+        emit('update-tab', {
+          label: editedCard.value.data.name,
+          data: {
+            character: { ...editedCard.value, filename: result.filename },
+            // Clear draft data since it's now saved
+            draftCard: null,
+            draftImagePreview: null,
+            draftImageFile: null
+          }
         })
-
-        // Show success notification
-        notify(
-          characterData.originalFilename ? 'Character saved successfully' : 'Character created successfully',
-          'success'
-        )
-
-        // If it was a new character, update the tabData to have the filename and clear draft
-        if (!characterData.originalFilename && result.filename) {
-          emit('update-tab', {
-            label: editedCard.value.data.name,
-            data: {
-              character: { ...editedCard.value, filename: result.filename },
-              // Clear draft data since it's now saved
-              draftCard: null,
-              draftImagePreview: null,
-              draftImageFile: null
-            }
-          })
-        } else {
-          // Just update the label and clear draft for existing characters
-          emit('update-tab', {
-            label: editedCard.value.data.name,
-            data: {
-              ...props.tabData,
-              character: { ...editedCard.value, filename: characterData.originalFilename },
-              // Clear draft data since it's now saved
-              draftCard: null,
-              draftImagePreview: null,
-              draftImageFile: null
-            }
-          })
-        }
       } else {
-        const error = await response.json()
-        notify(`Failed to save character: ${error.error}`, 'error')
+        // Just update the label and clear draft for existing characters
+        emit('update-tab', {
+          label: editedCard.value.data.name,
+          data: {
+            ...props.tabData,
+            character: { ...editedCard.value, filename: characterData.originalFilename },
+            // Clear draft data since it's now saved
+            draftCard: null,
+            draftImagePreview: null,
+            draftImageFile: null
+          }
+        })
       }
     } catch (error) {
       console.error('Failed to save character:', error)
@@ -650,8 +639,7 @@ watch([editedCard, imagePreview, imageFile], () => {
 // Load all character tags for autocomplete
 async function loadAllCharacterTags() {
   try {
-    const response = await fetch('/api/characters')
-    const characters = await response.json()
+    const characters = await api.getCharacters()
 
     const tags = new Set()
     characters.forEach(char => {
@@ -737,15 +725,10 @@ async function autoSaveTagChange() {
     }
     formData.append('card', JSON.stringify(editedCard.value))
 
-    const response = await fetch(`/api/characters/${props.tabData.character.filename}`, {
-      method: 'PUT',
-      body: formData
-    })
+    await api.updateCharacter(props.tabData.character.filename, formData)
 
-    if (response.ok) {
-      // Silently save - no notification for tag auto-save
-      console.log('Tags auto-saved')
-    }
+    // Silently save - no notification for tag auto-save
+    console.log('Tags auto-saved')
   } catch (error) {
     console.error('Failed to auto-save tags:', error)
   }
