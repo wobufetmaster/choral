@@ -160,13 +160,26 @@ async function writeCharacterCard(filePath, cardData, imageBuffer = null) {
         filterType: -1
       });
 
-      // Fill with a simple solid color
+      // Fill with magenta/black checkerboard (missing texture pattern)
+      const checkSize = 32; // Size of each checker square
       for (let y = 0; y < png.height; y++) {
         for (let x = 0; x < png.width; x++) {
           const idx = (png.width * y + x) << 2;
-          png.data[idx] = 60;     // R
-          png.data[idx + 1] = 60; // G
-          png.data[idx + 2] = 60; // B
+
+          // Determine if this pixel should be magenta or black
+          const checkerX = Math.floor(x / checkSize);
+          const checkerY = Math.floor(y / checkSize);
+          const isMagenta = (checkerX + checkerY) % 2 === 0;
+
+          if (isMagenta) {
+            png.data[idx] = 255;   // R
+            png.data[idx + 1] = 0;   // G
+            png.data[idx + 2] = 255; // B
+          } else {
+            png.data[idx] = 0;     // R
+            png.data[idx + 1] = 0;   // G
+            png.data[idx + 2] = 0;   // B
+          }
           png.data[idx + 3] = 255; // A
         }
       }
