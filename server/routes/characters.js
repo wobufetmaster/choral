@@ -180,20 +180,58 @@ function createCharacterRouter(deps) {
 
       let card;
 
-      if (req.file) {
+      // Priority order:
+      // 1. If both file and card are provided, use the card data with the new image
+      // 2. If only file is provided, read card from the PNG
+      // 3. If only card is provided, update card data with existing image
+
+      if (req.file && req.body.card) {
+        // New image + card data: embed card into the uploaded image
+        const tempPath = req.file.path;
+        card = JSON.parse(req.body.card);
+
+        console.log('[Character Update] Card validation:', {
+          hasSpec: !!card.spec,
+          spec: card.spec,
+          hasSpecVersion: !!card.spec_version,
+          hasData: !!card.data,
+          hasName: card.data?.name
+        });
+
+        if (!validateCharacterCard(card)) {
+          await fs.unlink(tempPath);
+          return res.status(400).json({
+            error: 'Invalid character card',
+            debug: {
+              hasSpec: !!card.spec,
+              spec: card.spec,
+              hasSpecVersion: !!card.spec_version,
+              hasData: !!card.data,
+              hasName: card.data?.name
+            }
+          });
+        }
+
+        // Read the uploaded image and embed the card data into it
+        const imageBuffer = await fs.readFile(tempPath);
+        await writeCharacterCard(targetPath, card, imageBuffer);
+
+        // Clean up the temp file
+        await fs.unlink(tempPath);
+      } else if (req.file) {
+        // Only file provided: read card from the uploaded PNG
         const tempPath = req.file.path;
         card = await readCharacterCard(tempPath);
 
-        const validation = validateCharacterCard(card);
-        if (!validation.valid) {
+        if (!validateCharacterCard(card)) {
           await fs.unlink(tempPath);
-          return res.status(400).json({ error: 'Invalid character card', details: validation.errors });
+          return res.status(400).json({ error: 'Invalid character card' });
         }
 
         await fs.unlink(targetPath);
         await fs.rename(tempPath, targetPath);
       } else if (req.body.card) {
-        // Parse card from FormData field
+        // Parse card from FormData field (no new image, just update card data)
         card = JSON.parse(req.body.card);
         if (!validateCharacterCard(card)) {
           return res.status(400).json({ error: 'Invalid character card' });
@@ -201,7 +239,7 @@ function createCharacterRouter(deps) {
 
         await writeCharacterCard(targetPath, card);
       } else if (req.body) {
-        // Direct JSON body
+        // Direct JSON body (no new image, just update card data)
         if (!validateCharacterCard(req.body)) {
           return res.status(400).json({ error: 'Invalid character card' });
         }

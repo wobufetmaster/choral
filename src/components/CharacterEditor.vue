@@ -536,6 +536,16 @@ async function save() {
       if (imageFile.value) {
         formData.append('file', imageFile.value)
       }
+
+      // Debug: Log the card being sent
+      console.log('[CharacterEditor] Saving card:', {
+        hasSpec: !!editedCard.value.spec,
+        spec: editedCard.value.spec,
+        hasSpecVersion: !!editedCard.value.spec_version,
+        hasData: !!editedCard.value.data,
+        hasName: editedCard.value.data?.name
+      });
+
       formData.append('card', JSON.stringify(editedCard.value))
 
       let result

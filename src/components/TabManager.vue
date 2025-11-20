@@ -141,10 +141,36 @@ export default {
     // Save tabs to localStorage
     const saveTabs = () => {
       try {
-        localStorage.setItem('choral-tabs', JSON.stringify(tabs.value));
+        // Filter out large data that shouldn't be persisted to localStorage
+        // (images as base64, File objects, etc.) to avoid quota errors
+        const tabsToSave = tabs.value.map(tab => {
+          // Clone the tab to avoid modifying the original
+          const cleanTab = { ...tab };
+
+          if (cleanTab.data) {
+            cleanTab.data = { ...cleanTab.data };
+
+            // Remove draft data that can be very large (base64 images, File objects)
+            // These are kept in memory but not persisted to localStorage
+            delete cleanTab.data.draftImagePreview;
+            delete cleanTab.data.draftImageFile;
+
+            // Also remove the full draftCard if it exists
+            // (users will lose unsaved changes on refresh, but that's better than crashes)
+            delete cleanTab.data.draftCard;
+          }
+
+          return cleanTab;
+        });
+
+        localStorage.setItem('choral-tabs', JSON.stringify(tabsToSave));
         localStorage.setItem('choral-active-tab', activeTabId.value);
       } catch (error) {
         console.error('Failed to save tabs:', error);
+        // If we still hit quota errors, log more details
+        if (error.name === 'QuotaExceededError') {
+          console.error('localStorage quota exceeded. Tab count:', tabs.value.length);
+        }
       }
     };
 
