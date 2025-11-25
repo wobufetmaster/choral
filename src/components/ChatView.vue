@@ -23,6 +23,7 @@
       :available-presets="availablePresets"
       @new-chat="newChat"
       @new-chat-from-summary="startNewChatFromSummary"
+      @add-memory="showMemoryModal = true"
       @convert-to-group="convertToGroupChat"
       @toggle-history="showChatHistory = !showChatHistory"
       @show-branch-tree="showBranchTree = true"
@@ -403,7 +404,6 @@
       <button @click="showSettings = false">Close</button>
     </div>
 
-    <!-- Image Attachment Modal -->
     <ImageAttachmentModal
       v-if="showImageModal"
       :initialImages="pendingUserImages"
@@ -411,6 +411,38 @@
       @update-pending="pendingUserImages = $event"
       @send="handleImageMessage"
     />
+
+    <!-- Memory Creation Modal -->
+    <div v-if="showMemoryModal" class="modal-overlay" @click="showMemoryModal = false">
+      <div class="modal-content memory-modal" @click.stop>
+        <div class="modal-header">
+          <h3>Add Memory</h3>
+          <button @click="showMemoryModal = false" class="close-button">×</button>
+        </div>
+        <div class="memory-options">
+          <p>Create a diary entry summary of this conversation for {{ isGroupChat ? 'all characters' : characterName }}?</p>
+          
+          <div class="memory-size-buttons">
+            <button @click="createMemory('small')" :disabled="isCreatingMemory" class="memory-size-btn">
+              <strong>Small</strong>
+              <span>2-4 sentences</span>
+            </button>
+            <button @click="createMemory('medium')" :disabled="isCreatingMemory" class="memory-size-btn">
+              <strong>Medium</strong>
+              <span>1-2 paragraphs</span>
+            </button>
+            <button @click="createMemory('large')" :disabled="isCreatingMemory" class="memory-size-btn">
+              <strong>Large</strong>
+              <span>2-4 paragraphs</span>
+            </button>
+          </div>
+          
+          <div v-if="isCreatingMemory" class="loading-indicator">
+            Generating memory...
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div>
 </template>
@@ -521,6 +553,7 @@ export default {
       handleScrollThrottle: null, // Throttle scroll handler
       scrollToBottomPending: false, // Flag to batch scroll calls
       currentDebugData: null, // Current debug data for this chat session
+      isUpdatingLorebooks: false, // Guard flag to prevent recursive watcher loops
       settings: {
         model: 'anthropic/claude-opus-4',
         temperature: 1.0,
@@ -545,7 +578,9 @@ export default {
       allCharacters: [],
       currentSpeaker: null, // Track who's currently generating
       nextSpeaker: null, // Track who should speak next
-      narratorInfo: null // Store narrator character info for avatar display
+      narratorInfo: null, // Store narrator character info for avatar display
+      showMemoryModal: false,
+      isCreatingMemory: false
     }
   },
   computed: {
@@ -616,11 +651,22 @@ export default {
     },
     selectedLorebookFilenames: {
       handler(newVal) {
-        // Save manually selected lorebooks to localStorage
-        const manuallySelected = newVal.filter(
-          filename => !this.autoSelectedLorebookFilenames.includes(filename)
-        );
-        localStorage.setItem('manuallySelectedLorebooks', JSON.stringify(manuallySelected));
+        // Guard against recursive watcher triggers
+        if (this.isUpdatingLorebooks) {
+          return;
+        }
+
+        try {
+          this.isUpdatingLorebooks = true;
+
+          // Save manually selected lorebooks to localStorage
+          const manuallySelected = newVal.filter(
+            filename => !this.autoSelectedLorebookFilenames.includes(filename)
+          );
+          localStorage.setItem('manuallySelectedLorebooks', JSON.stringify(manuallySelected));
+        } finally {
+          this.isUpdatingLorebooks = false;
+        }
       },
       deep: true
     }
@@ -699,7 +745,10 @@ export default {
     // Load manually selected lorebooks from localStorage
     try {
       const manuallySelected = JSON.parse(localStorage.getItem('manuallySelectedLorebooks') || '[]');
+      // Use guard flag during initialization to prevent watcher recursion
+      this.isUpdatingLorebooks = true;
       this.selectedLorebookFilenames = [...manuallySelected];
+      this.isUpdatingLorebooks = false;
     } catch (err) {
       console.error('Failed to load manually selected lorebooks:', err);
     }
@@ -717,6 +766,42 @@ export default {
     });
   },
   methods: {
+    async createMemory(size) {
+      this.isCreatingMemory = true;
+      try {
+        const messages = this.messages;
+        const model = this.settings.model;
+
+        if (this.isGroupChat) {
+          await this.api.createBatchMemories({
+            messages,
+            characters: this.groupChatCharacters.map(c => ({
+              filename: c.filename,
+              name: c.name
+            })),
+            size,
+            model
+          });
+          this.$root.$notify('Memories added to all characters', 'success');
+        } else {
+          await this.api.createMemory(this.characterFilename, {
+            messages,
+            characterName: this.characterName,
+            size,
+            model
+          });
+          this.$root.$notify(`Memory added to ${this.characterName}`, 'success');
+          // Reload character to get updated memories
+          await this.loadCharacter(this.characterFilename);
+        }
+        this.showMemoryModal = false;
+      } catch (error) {
+        console.error('Failed to create memory:', error);
+        this.$root.$notify('Failed to create memory: ' + error.message, 'error');
+      } finally {
+        this.isCreatingMemory = false;
+      }
+    },
     formatElapsedTime(ms) {
       if (!ms || ms < 0) return '0.0s';
       const seconds = Math.floor(ms / 1000);
@@ -2193,12 +2278,23 @@ export default {
         }
 
         const chatFileId = this.isGroupChat ? this.groupChatId : this.chatId;
-        const response = await fetch(`/api/chats/${chatFileId}/branches`, {
+
+        // Verify chat file ID exists before making API call
+        if (!chatFileId) {
+          throw new Error('Chat must be saved before creating a branch');
+        }
+
+        // Use the correct API endpoint based on chat type
+        const apiEndpoint = this.isGroupChat
+          ? `/api/group-chats/${chatFileId}/branches`
+          : `/api/chats/${chatFileId}/branches`;
+
+        const response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             parentBranchId: parentBranchId,
-            messageIndex: messageIndex,
+            parentMessageIndex: messageIndex,
             branchName: branchName
           })
         });
@@ -2232,7 +2328,12 @@ export default {
     async switchToBranch(branchId) {
       try {
         // Update current branch on server
-        const response = await fetch(`/api/chats/${this.chatId}/current-branch`, {
+        const chatFileId = this.isGroupChat ? this.groupChatId : this.chatId;
+        const apiEndpoint = this.isGroupChat
+          ? `/api/group-chats/${chatFileId}/current-branch`
+          : `/api/chats/${chatFileId}/current-branch`;
+
+        const response = await fetch(apiEndpoint, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ branchId })
@@ -2259,7 +2360,12 @@ export default {
     },
     async renameBranch(branchId, newName) {
       try {
-        const response = await fetch(`/api/chats/${this.chatId}/branches/${branchId}`, {
+        const chatFileId = this.isGroupChat ? this.groupChatId : this.chatId;
+        const apiEndpoint = this.isGroupChat
+          ? `/api/group-chats/${chatFileId}/branches/${branchId}`
+          : `/api/chats/${chatFileId}/branches/${branchId}`;
+
+        const response = await fetch(apiEndpoint, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: newName })
@@ -2280,7 +2386,12 @@ export default {
     },
     async deleteBranchFromTree(branchId, deleteChildren) {
       try {
-        const response = await fetch(`/api/chats/${this.chatId}/branches/${branchId}?deleteChildren=${deleteChildren}`, {
+        const chatFileId = this.isGroupChat ? this.groupChatId : this.chatId;
+        const apiEndpoint = this.isGroupChat
+          ? `/api/group-chats/${chatFileId}/branches/${branchId}?deleteChildren=${deleteChildren}`
+          : `/api/chats/${chatFileId}/branches/${branchId}?deleteChildren=${deleteChildren}`;
+
+        const response = await fetch(apiEndpoint, {
           method: 'DELETE'
         });
 
@@ -3038,11 +3149,15 @@ export default {
         // Clean up selectedLorebookFilenames: remove any that don't exist anymore
         const validFilenames = this.lorebooks.map(l => l.filename);
         const originalLength = this.selectedLorebookFilenames.length;
+
+        // Use guard flag to prevent watcher recursion
+        this.isUpdatingLorebooks = true;
         this.selectedLorebookFilenames = this.selectedLorebookFilenames.filter(filename =>
           validFilenames.includes(filename)
         );
+        this.isUpdatingLorebooks = false;
 
-        // If we removed any, update localStorage
+        // If we removed any, update localStorage (watcher is disabled, so do it manually)
         if (this.selectedLorebookFilenames.length < originalLength) {
           const manuallySelected = this.selectedLorebookFilenames.filter(
             filename => !this.autoSelectedLorebookFilenames.includes(filename)
@@ -3260,7 +3375,10 @@ export default {
             if (hasMatch) {
               this.autoSelectedLorebookFilenames.push(lorebook.filename);
               if (!this.selectedLorebookFilenames.includes(lorebook.filename)) {
+                // Use guard flag to prevent watcher recursion
+                this.isUpdatingLorebooks = true;
                 this.selectedLorebookFilenames.push(lorebook.filename);
+                this.isUpdatingLorebooks = false;
               }
             }
           }
@@ -3859,1037 +3977,4 @@ export default {
 }
 </script>
 
-<style scoped>
-.chat-view {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: transparent;
-  color: var(--text-primary);
-}
-
-button.active {
-  background-color: var(--accent-color);
-  color: white;
-  box-shadow: var(--shadow-sm);
-}
-
-.chat-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
-  background: var(--bg-overlay);
-  backdrop-filter: blur(var(--blur-amount, 12px));
-  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
-  border-bottom: 1px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
-  position: relative;
-  z-index: 100;
-}
-
-.back-button {
-  padding: 8px 12px;
-}
-
-.chat-header h2 {
-  flex: 1;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-}
-
-/* Avatar Menu */
-.avatar-menu {
-  position: fixed;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: var(--shadow-lg);
-  padding: 8px;
-  z-index: 1000;
-  min-width: 200px;
-}
-
-.avatar-menu-header {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-color);
-  margin-bottom: 8px;
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.avatar-menu-btn {
-  width: 100%;
-  text-align: left;
-  padding: 10px 12px;
-  margin-bottom: 4px;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 14px;
-}
-
-.avatar-menu-btn:hover {
-  background: var(--hover-color);
-}
-
-.avatar-menu-btn.cancel {
-  color: var(--text-secondary);
-  border-top: 1px solid var(--border-color);
-  margin-top: 4px;
-  padding-top: 10px;
-}
-
-.chat-container {
-  margin-left: 280px;
-  transition: margin-left 0.3s ease;
-}
-
-.chat-view:has(.chat-sidebar.collapsed) .chat-container {
-  margin-left: 40px;
-}
-
-.chat-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.message {
-  display: flex;
-  gap: 12px;
-  max-width: 85%;
-  animation: fadeIn 0.2s;
-  align-items: flex-start;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.message.user {
-  align-self: flex-end;
-  flex-direction: row-reverse;
-}
-
-.message.assistant {
-  align-self: flex-start;
-  flex-direction: row;
-}
-
-.message-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--bg-tertiary);
-  transition: all 0.2s;
-}
-
-.message-avatar.clickable {
-  cursor: pointer;
-}
-
-.message-avatar.clickable:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 0 3px var(--accent-color);
-}
-
-.user-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent-color);
-  color: white;
-  font-weight: 600;
-  font-size: 16px;
-}
-
-.message-bubble {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.message-content {
-  padding: 12px 16px;
-  border-radius: 18px;
-  line-height: 1.5;
-  word-wrap: break-word;
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(var(--blur-amount, 12px));
-  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
-}
-
-.message.user .message-content {
-  background: var(--user-bubble, var(--accent-color));
-  color: white;
-  border-radius: 18px 6px 18px 18px;
-}
-
-.message.assistant .message-content {
-  background: var(--assistant-bubble, var(--bg-secondary));
-  border: 1px solid var(--border-color);
-  border-radius: 6px 18px 18px 18px;
-}
-
-/* Terminal-style code blocks */
-.message-content :deep(pre) {
-  position: relative;
-  background: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: 8px;
-  padding: 0;
-  margin: 12px 0;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.message-content :deep(pre code) {
-  display: block;
-  padding: 16px;
-  overflow-x: auto;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #d4d4d4;
-  background: transparent;
-  border: none;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-/* Console-specific styling */
-.message-content :deep(pre code.language-console::before),
-.message-content :deep(pre code.language-bash::before),
-.message-content :deep(pre code.language-shell::before),
-.message-content :deep(pre code.language-terminal::before) {
-  content: '●●●';
-  position: absolute;
-  top: 8px;
-  left: 12px;
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: #666;
-}
-
-.message-content :deep(pre code.language-console),
-.message-content :deep(pre code.language-bash),
-.message-content :deep(pre code.language-shell),
-.message-content :deep(pre code.language-terminal) {
-  padding-top: 32px;
-  background: linear-gradient(to bottom, #2d2d2d 28px, #1e1e1e 28px);
-  color: #00ff00;
-  text-shadow: 0 0 2px rgba(0, 255, 0, 0.3);
-}
-
-/* Inline code styling */
-.message-content :deep(code) {
-  background: rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
-  font-size: 0.9em;
-}
-
-.message-content :deep(pre code) {
-  padding: 16px;
-  background: transparent;
-  border: none;
-}
-
-/* Special text styling - dialogue and actions */
-.message-content :deep(.dialogue) {
-  color: var(--accent-hover);
-  font-style: italic;
-  font-weight: 600;
-  text-shadow:
-    0 0 12px var(--accent-muted),
-    0 0 6px var(--accent-muted),
-    0 1px 2px rgba(0, 0, 0, 0.3);
-  filter: brightness(1.3) saturate(1.2);
-}
-
-.message-content :deep(.action) {
-  color: var(--text-primary);
-  font-style: italic;
-  font-weight: 500;
-  opacity: 0.75;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  filter: brightness(0.9);
-}
-
-/* Make dialogue stand out more in user messages (white background) */
-.message.user .message-content :deep(.dialogue) {
-  color: rgba(255, 255, 255, 1);
-  text-shadow:
-    0 0 15px rgba(255, 255, 255, 0.5),
-    0 0 8px rgba(255, 255, 255, 0.4),
-    0 2px 4px rgba(0, 0, 0, 0.4);
-  font-weight: 700;
-  filter: brightness(1.15);
-}
-
-.message.user .message-content :deep(.action) {
-  color: rgba(255, 255, 255, 0.85);
-  opacity: 1;
-  font-weight: 500;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.message-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.2s;
-  margin-bottom: 4px;
-}
-
-.message.user .message-actions {
-  flex-direction: row-reverse;
-}
-
-.message:hover .message-actions {
-  opacity: 1;
-}
-
-.message-actions button {
-  padding: 4px 8px;
-  font-size: 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.message-actions button:hover {
-  background: var(--hover-color);
-  border-color: var(--accent-color);
-}
-
-.message-actions .delete-below-button {
-  color: #ff6b6b;
-  font-weight: bold;
-}
-
-.message-actions .delete-below-button:hover {
-  background: rgba(255, 107, 107, 0.1);
-  border-color: #ff6b6b;
-  color: #ff4757;
-}
-
-.input-area {
-  display: flex;
-  gap: 8px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-overlay);
-  backdrop-filter: blur(var(--blur-amount, 12px));
-  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.input-area textarea {
-  flex: 1;
-  height: 60px;
-  min-height: 60px;
-  max-height: 200px;
-  resize: none !important;
-  overflow-y: auto;
-  overflow-x: hidden;
-  box-sizing: border-box;
-  line-height: 1.5;
-}
-
-/* Force hide resize handle on all browsers */
-.input-area textarea::-webkit-resizer {
-  display: none;
-}
-
-.input-area button {
-  align-self: flex-end;
-  padding: 12px 24px;
-  background: var(--accent-color);
-  color: white;
-  border: none;
-}
-
-.input-area button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.input-area .stop-btn {
-  background: #dc3545;
-  color: white;
-}
-
-.input-area .stop-btn:hover {
-  background: #c82333;
-  opacity: 1;
-}
-
-.attach-btn {
-  position: relative;
-}
-
-.attach-btn .badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background: var(--accent-color);
-  color: white;
-  border-radius: 10px;
-  padding: 2px 6px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  line-height: 1;
-  min-width: 18px;
-  text-align: center;
-}
-
-.settings-panel {
-  position: fixed;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 300px;
-  background: var(--bg-overlay);
-  backdrop-filter: blur(var(--blur-amount, 12px));
-  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
-  border-left: 1px solid var(--border-color);
-  padding: 20px;
-  overflow-y: auto;
-  box-shadow: var(--shadow-lg);
-}
-
-.settings-panel h3 {
-  margin-bottom: 16px;
-}
-
-.setting {
-  margin-bottom: 16px;
-}
-
-.setting label {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.setting input {
-  width: 100%;
-}
-
-.chat-history-sidebar {
-  position: fixed;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 350px;
-  background: var(--bg-overlay);
-  backdrop-filter: blur(var(--blur-amount, 12px));
-  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
-  border-left: 1px solid var(--border-color);
-  padding: 20px;
-  overflow-y: auto;
-  z-index: 999;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-lg);
-}
-
-.chat-history-sidebar h3 {
-  margin-bottom: 16px;
-}
-
-.history-list {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.history-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.history-item:hover {
-  background: var(--hover-color);
-}
-
-.history-item.active {
-  border-color: var(--accent-color);
-}
-
-.history-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.history-date {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.history-preview {
-  font-size: 13px;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.history-actions {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.history-rename,
-.history-delete {
-  padding: 4px 8px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  opacity: 0.6;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-
-.history-rename:hover,
-.history-delete:hover {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
-.close-history {
-  width: 100%;
-}
-
-/* Grouped conversation styles */
-.history-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.history-group-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.history-group-header:hover {
-  background: var(--hover-color);
-}
-
-.expand-icon {
-  font-size: 12px;
-  color: var(--text-secondary);
-  min-width: 12px;
-}
-
-.history-group-items {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-left: 20px;
-}
-
-.history-item.grouped {
-  background: var(--bg-secondary);
-}
-
-.message-edit-container {
-  position: relative;
-  border-radius: 18px;
-  background: var(--bg-secondary);
-  border: 2px solid var(--accent-color);
-  line-height: 1.5;
-  word-wrap: break-word;
-}
-
-.message.user .message-edit-container {
-  background: var(--accent-color);
-  border-radius: 18px 4px 18px 18px;
-}
-
-.message.assistant .message-edit-container {
-  background: var(--bg-secondary);
-  border-radius: 4px 18px 18px 18px;
-}
-
-.message-edit-textarea {
-  min-height: 40px;
-  padding: 12px 16px;
-  padding-right: 88px;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1.5;
-  outline: none;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
-.message.user .message-edit-textarea {
-  color: white;
-}
-
-.message-edit-textarea:focus {
-  outline: none;
-}
-
-.edit-inline-actions {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 4px;
-}
-
-.edit-confirm,
-.edit-cancel {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 4px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border-color);
-}
-
-.edit-confirm {
-  background: var(--accent-color);
-  color: white;
-  border-color: var(--accent-color);
-}
-
-.edit-confirm:hover {
-  opacity: 0.9;
-}
-
-.edit-cancel {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.edit-cancel:hover {
-  background: var(--bg-tertiary);
-}
-
-.swipe-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 8px;
-}
-
-.swipe-button {
-  padding: 4px 12px;
-  font-size: 16px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 32px;
-}
-
-.swipe-button:hover:not(:disabled) {
-  background: var(--hover-color);
-  border-color: var(--accent-color);
-}
-
-.swipe-button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.swipe-counter {
-  font-size: 12px;
-  color: var(--text-secondary);
-  min-width: 40px;
-  text-align: center;
-}
-
-.lorebook-selector-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background-color: var(--bg-overlay);
-  backdrop-filter: blur(var(--blur-amount, 12px));
-  -webkit-backdrop-filter: blur(var(--blur-amount, 12px));
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 1.5rem;
-  max-width: 500px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: var(--shadow-lg);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.modal-header h3 {
-  margin: 0;
-}
-
-.close-button {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.close-button:hover {
-  background-color: var(--hover-color);
-}
-
-.lorebook-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.lorebook-section {
-  margin-bottom: 1rem;
-}
-
-.lorebook-section-header {
-  padding: 0.5rem 1rem;
-  background: var(--bg-tertiary);
-  border-bottom: 2px solid var(--border-color);
-  margin-bottom: 0.5rem;
-  border-radius: 4px 4px 0 0;
-}
-
-.lorebook-section-header h4 {
-  margin: 0;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.lorebook-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
-  transition: all 0.2s;
-}
-
-.lorebook-option:hover {
-  background-color: var(--hover-color);
-}
-
-.lorebook-option.active {
-  background-color: rgba(90, 159, 212, 0.08);
-  border-left: 3px solid var(--accent-color);
-}
-
-.lorebook-option.auto-selected {
-  background-color: rgba(90, 159, 212, 0.15);
-  border-color: var(--accent-color);
-}
-
-.lorebook-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  cursor: pointer;
-  flex: 1;
-  margin: 0;
-}
-
-.lorebook-checkbox {
-  width: 20px;
-  height: 20px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.lorebook-info-wrapper {
-  flex: 1;
-}
-
-.lorebook-name {
-  font-weight: 500;
-  margin-bottom: 0.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.auto-tag {
-  background-color: var(--accent-color);
-  color: white;
-  padding: 0.125rem 0.375rem;
-  border-radius: 3px;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.lorebook-meta {
-  font-size: 0.875rem;
-  opacity: 0.7;
-}
-
-.edit-button {
-  padding: 0.25rem 0.5rem;
-  font-size: 1rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.edit-button:hover {
-  background: var(--hover-color);
-  border-color: var(--accent-color);
-}
-
-/* Typing indicator animation */
-.typing-indicator {
-  padding: 12px 16px;
-  font-size: 24px;
-}
-
-.typing-dots {
-  display: inline-block;
-}
-
-.typing-dots span {
-  animation: typing-dot 1.4s infinite;
-  opacity: 0;
-}
-
-.typing-dots span:nth-child(1) {
-  animation-delay: 0s;
-}
-
-.typing-dots span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typing-dots span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes typing-dot {
-  0%, 60%, 100% {
-    opacity: 0;
-  }
-  30% {
-    opacity: 1;
-  }
-}
-
-/* Tool Call Indicator */
-.tool-call-indicator {
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-style: italic;
-  color: var(--text-secondary);
-}
-
-.tool-call-icon {
-  font-size: 18px;
-  animation: tool-call-pulse 1.5s infinite;
-}
-
-.tool-call-text {
-  font-size: 14px;
-}
-
-@keyframes tool-call-pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.1);
-  }
-}
-
-/* Character Card Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-}
-
-.character-card-modal {
-  max-width: 600px;
-  max-height: 80vh;
-  overflow-y: auto;
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-}
-
-.character-card-content {
-  padding: 20px;
-}
-
-.card-avatar {
-  width: 200px;
-  height: 200px;
-  object-fit: cover;
-  border-radius: 12px;
-  margin: 0 auto 20px;
-  display: block;
-}
-
-.card-field {
-  margin-bottom: 20px;
-}
-
-.card-field strong {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.card-field p {
-  color: var(--text-secondary);
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-/* Image support styles */
-.content-part {
-  margin-bottom: 0.5rem;
-}
-
-.message-text {
-  /* Inherits all existing .message-content text styling */
-}
-
-.message-image {
-  margin-top: 0.5rem;
-}
-
-.inline-image {
-  max-width: 100%;
-  max-height: 600px;
-  border-radius: 8px;
-  display: block;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.ai-generated-images {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-@media (max-width: 768px) {
-  .chat-container {
-    margin-left: 0 !important;
-  }
-
-  /* Increase message width on mobile */
-  .message {
-    max-width: 95%;
-  }
-}
-</style>
+<style scoped src="./ChatView.styles.css"></style>
