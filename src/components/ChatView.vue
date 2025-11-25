@@ -238,6 +238,7 @@ import { useBranchOperations } from '../composables/useBranchOperations.js';
 import { useGroupChatOperations } from '../composables/useGroupChatOperations.js';
 import { useChatPersistence } from '../composables/useChatPersistence.js';
 import { useStreamHandlers } from '../composables/useStreamHandlers.js';
+import { useDebugData } from '../composables/useDebugData.js';
 import GroupChatManager from './GroupChatManager.vue';
 import LorebookEditor from './LorebookEditor.vue';
 import ChatSidebar from './ChatSidebar.vue';
@@ -251,9 +252,6 @@ import MessageList from './MessageList.vue';
 import CharacterCardModal from './CharacterCardModal.vue';
 import AvatarMenu from './AvatarMenu.vue';
 import MemoryModal from './MemoryModal.vue';
-
-// Non-reactive debug data cache (outside Vue's reactivity system)
-const debugDataCache = new Map();
 
 export default {
   name: 'ChatView',
@@ -283,7 +281,8 @@ export default {
     const groupChatOps = useGroupChatOperations();
     const chatPersistence = useChatPersistence();
     const streamHandlers = useStreamHandlers();
-    return { api, formatting, swipeHelpers, branchHelpers, historyHelpers, contextBuilder, branchOps, groupChatOps, chatPersistence, streamHandlers };
+    const debugData = useDebugData();
+    return { api, formatting, swipeHelpers, branchHelpers, historyHelpers, contextBuilder, branchOps, groupChatOps, chatPersistence, streamHandlers, debugData };
   },
   props: {
     tabData: {
@@ -772,41 +771,7 @@ export default {
       }
     },
     normalizeMessages(messages) {
-      // Convert old format messages to new swipe format
-      return messages.map(msg => {
-        if (msg.role === 'assistant') {
-          // If already has swipes, use as-is
-          if (msg.swipes) {
-            const normalized = {
-              ...msg,
-              swipeIndex: msg.swipeIndex ?? 0
-            };
-
-            // For group chat messages, ensure swipeCharacters array exists and matches swipes length
-            if (this.isGroupChat && !normalized.swipeCharacters && normalized.characterFilename) {
-              normalized.swipeCharacters = new Array(normalized.swipes.length).fill(normalized.characterFilename);
-            }
-
-            return normalized;
-          }
-          // Convert old format
-          const normalized = {
-            role: 'assistant',
-            swipes: [msg.content],
-            swipeIndex: 0
-          };
-
-          // For group chat messages, initialize swipeCharacters
-          if (this.isGroupChat && msg.characterFilename) {
-            normalized.characterFilename = msg.characterFilename;
-            normalized.swipeCharacters = [msg.characterFilename];
-          }
-
-          return normalized;
-        }
-        // User messages stay as-is
-        return msg;
-      });
+      return this.chatPersistence.normalizeMessages(messages, this.isGroupChat);
     },
     async loadMostRecentChat(characterFilename) {
       try {
@@ -2457,135 +2422,32 @@ export default {
       return this.lorebooks.find(l => l.filename === filename);
     },
     updateBasicDebugInfo(messages) {
-      // Count messages by type
-      this.debugInfo.messageCount = messages.length;
-      this.debugInfo.systemMessageCount = messages.filter(m => m.role === 'system').length;
-      this.debugInfo.userMessageCount = messages.filter(m => m.role === 'user').length;
-      this.debugInfo.assistantMessageCount = messages.filter(m => m.role === 'assistant').length;
-
-      // Estimate total tokens
-      const allText = messages.map(m => {
-        if (typeof m.content === 'string') return m.content;
-        if (Array.isArray(m.content)) {
-          return m.content
-            .filter(part => part.type === 'text')
-            .map(part => part.text)
-            .join(' ');
-        }
-        return '';
-      }).join(' ');
-      this.debugInfo.estimatedTokens = this.estimateTokens(allText);
-
-      // matched entries will be populated by the server response
+      const info = this.debugData.calculateBasicDebugInfo(messages);
+      Object.assign(this.debugInfo, info);
     },
     loadDebugDataFromStorage() {
       const chatKey = this.isGroupChat ? this.groupChatId : this.chatId;
-      if (!chatKey) {
-        return;
-      }
-
-      try {
-        const stored = localStorage.getItem(`debug_${chatKey}`);
-        if (stored) {
-          debugDataCache.set(chatKey, JSON.parse(stored));
-        }
-      } catch (err) {
-        console.error('Failed to load persisted debug data:', err);
-      }
+      this.debugData.loadFromStorage(chatKey);
     },
     saveDebugData(requestBody, debugInfoFromServer) {
-      // Use processed messages from server if available, otherwise use original request messages
-      const finalMessages = debugInfoFromServer?.processedMessages || requestBody.messages;
+      // Build character info using composable
+      const characterInfo = this.debugData.buildCharacterInfo({
+        isGroupChat: this.isGroupChat,
+        groupChatStrategy: this.groupChatStrategy,
+        currentSpeaker: this.currentSpeaker,
+        groupChatCharacters: this.groupChatCharacters,
+        character: this.character,
+        characterFilename: this.characterFilename
+      });
 
-      // Gather character info
-      let characterInfo = {};
-      if (this.isGroupChat) {
-        characterInfo.isGroupChat = true;
-        characterInfo.groupChatStrategy = this.groupChatStrategy;
-
-        if (this.currentSpeaker) {
-          const speakingChar = this.groupChatCharacters.find(c => c.filename === this.currentSpeaker);
-          if (speakingChar) {
-            characterInfo.characterName = speakingChar.name;
-            characterInfo.characterFilename = speakingChar.filename;
-          }
-        }
-
-        // Store character descriptions based on strategy
-        if (this.groupChatStrategy === 'swap') {
-          // For SWAP: Only store the speaking character's full description
-          if (this.currentSpeaker) {
-            const speakingChar = this.groupChatCharacters.find(c => c.filename === this.currentSpeaker);
-            if (speakingChar) {
-              const charData = speakingChar.data?.data || speakingChar.data || {};
-              characterInfo.characterDescriptions = [{
-                name: speakingChar.name,
-                filename: speakingChar.filename,
-                nickname: charData.nickname || '',
-                description: charData.description || '',
-                personality: charData.personality || '',
-                scenario: charData.scenario || '',
-                isSpeaking: true
-              }];
-            }
-          }
-        } else {
-          // For JOIN: Store all characters' full descriptions
-          characterInfo.characterDescriptions = this.groupChatCharacters.map(c => {
-            const charData = c.data?.data || c.data || {};
-            return {
-              name: c.name,
-              filename: c.filename,
-              nickname: charData.nickname || '',
-              description: charData.description || '',
-              personality: charData.personality || '',
-              scenario: charData.scenario || '',
-              isSpeaking: c.filename === this.currentSpeaker
-            };
-          });
-        }
-      } else if (this.character) {
-        characterInfo.isGroupChat = false;
-        characterInfo.characterName = this.character.data?.name || 'Character';
-        characterInfo.characterFilename = this.characterFilename;
-        // Store full description for 1-on-1 chats
-        characterInfo.characterDescriptions = [{
-          name: this.character.data?.name || 'Character',
-          filename: this.characterFilename,
-          nickname: this.character.data?.nickname || '',
-          description: this.character.data?.description || '',
-          personality: this.character.data?.personality || '',
-          scenario: this.character.data?.scenario || '',
-          isSpeaking: true
-        }];
-      }
-
-      // Simply store the debug data in memory for the current session
-      this.currentDebugData = {
-        timestamp: Date.now(),
-        // Request info
-        model: requestBody.model,
-        messages: finalMessages, // These are the FINAL messages sent to the API after processing
-        options: requestBody.options,
-        promptProcessing: requestBody.promptProcessing,
-        lorebookFilenames: requestBody.lorebookFilenames || [],
-        tools: requestBody.tools || [],
-        // Context info (persona)
-        context: requestBody.context || {},
-        personaName: this.persona?.name || 'User',
-        personaNickname: this.persona?.nickname || '',
-        personaDescription: this.persona?.description || '',
-        // Character info
-        ...characterInfo,
-        // Debug info from server
-        matchedEntriesByLorebook: debugInfoFromServer?.matchedEntriesByLorebook || {},
-        // Computed info
-        estimatedTokens: this.debugInfo.estimatedTokens,
-        messageCount: this.debugInfo.messageCount,
-        systemMessageCount: this.debugInfo.systemMessageCount,
-        userMessageCount: this.debugInfo.userMessageCount,
-        assistantMessageCount: this.debugInfo.assistantMessageCount
-      };
+      // Build and store debug data using composable
+      this.currentDebugData = this.debugData.buildDebugData({
+        requestBody,
+        debugInfoFromServer,
+        basicDebugInfo: this.debugInfo,
+        persona: this.persona,
+        characterInfo
+      });
     },
     editLorebook(lorebook) {
       // Set the lorebook to edit (LorebookEditor will handle cloning)
@@ -2963,7 +2825,7 @@ export default {
 
       // Convert hash to hex and format as UUID
       const hex = Math.abs(hash).toString(16).padStart(8, '0');
-      return `gc-${hex}-${sortedFilenames.length}-xxxx-xxxxxxxxxxxx`.replace(/[x]/g, function(c) {
+      return `gc-${hex}-${sortedFilenames.length}-xxxx-xxxxxxxxxxxx`.replace(/[x]/g, () => {
         const r = Math.random() * 16 | 0;
         return r.toString(16);
       });
