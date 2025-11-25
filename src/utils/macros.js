@@ -36,6 +36,13 @@ export const MACRO_DEFINITIONS = [
     isCharacterData: true,
     example: '{{dialogue_examples}}'
   },
+  {
+    pattern: '{{memories}}',
+    category: 'character_card',
+    description: 'Character memories (diary entries) from past conversations',
+    isCharacterData: true,
+    example: 'Memories: {{memories}}'
+  },
 
   // Names & Identifiers
   {

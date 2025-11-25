@@ -229,6 +229,155 @@ Generate a short title (3-6 words) that captures the essence of this conversatio
     }
   });
 
+  // POST /api/group-chats/:filename/branches - Create new branch
+  router.post('/:filename/branches', async (req, res, next) => {
+    try {
+      const filePath = path.join(GROUP_CHATS_DIR, req.params.filename);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const groupChat = JSON.parse(content);
+
+      const { parentBranchId, parentMessageIndex, branchName } = req.body;
+
+      if (typeof parentMessageIndex !== 'number') {
+        return res.status(400).json({ error: 'parentMessageIndex is required' });
+      }
+
+      // Get messages from the appropriate source
+      let sourceMessages;
+      if (groupChat.branches && typeof groupChat.branches === 'object') {
+        // New branch-based structure - get messages from parent branch or current branch
+        const sourceBranchId = parentBranchId || groupChat.currentBranch || groupChat.mainBranch;
+        const sourceBranch = groupChat.branches[sourceBranchId];
+        if (!sourceBranch || !sourceBranch.messages) {
+          return res.status(400).json({ error: 'Source branch not found or has no messages' });
+        }
+        sourceMessages = sourceBranch.messages;
+      } else {
+        // Old flat structure - use top-level messages array
+        sourceMessages = groupChat.messages || [];
+      }
+
+      // Create new branch
+      const branchId = `branch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newBranch = {
+        id: branchId,
+        name: branchName || `Branch ${Object.keys(groupChat.branches || {}).length + 1}`,
+        parentBranchId: parentBranchId || null,
+        branchPointMessageIndex: parentMessageIndex,
+        messages: sourceMessages.slice(0, parentMessageIndex + 1),
+        createdAt: new Date().toISOString()
+      };
+
+      // Initialize branches object if needed (for old chats)
+      if (!groupChat.branches || typeof groupChat.branches !== 'object') {
+        groupChat.branches = {};
+      }
+
+      groupChat.branches[branchId] = newBranch;
+      await fs.writeFile(filePath, JSON.stringify(groupChat, null, 2));
+
+      res.json({ branch: newBranch });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // PUT /api/group-chats/:filename/branches/:branchId - Update branch
+  router.put('/:filename/branches/:branchId', async (req, res, next) => {
+    try {
+      const filePath = path.join(GROUP_CHATS_DIR, req.params.filename);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const groupChat = JSON.parse(content);
+
+      if (!groupChat.branches || !groupChat.branches[req.params.branchId]) {
+        return res.status(404).json({ error: 'Branch not found' });
+      }
+
+      // Update branch data
+      groupChat.branches[req.params.branchId] = {
+        ...groupChat.branches[req.params.branchId],
+        ...req.body,
+        id: req.params.branchId // Preserve ID
+      };
+
+      await fs.writeFile(filePath, JSON.stringify(groupChat, null, 2));
+
+      res.json({ branch: groupChat.branches[req.params.branchId] });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // DELETE /api/group-chats/:filename/branches/:branchId - Delete branch
+  router.delete('/:filename/branches/:branchId', async (req, res, next) => {
+    try {
+      const filePath = path.join(GROUP_CHATS_DIR, req.params.filename);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const groupChat = JSON.parse(content);
+
+      if (!groupChat.branches || !groupChat.branches[req.params.branchId]) {
+        return res.status(404).json({ error: 'Branch not found' });
+      }
+
+      // Collect all branches to delete (this branch and all its children)
+      const branchesToDelete = [req.params.branchId];
+      const deleteChildren = req.query.deleteChildren === 'true';
+
+      if (deleteChildren) {
+        // Find all child branches recursively
+        const findChildren = (parentId) => {
+          Object.values(groupChat.branches).forEach(branch => {
+            if (branch.parentBranchId === parentId) {
+              branchesToDelete.push(branch.id);
+              findChildren(branch.id);
+            }
+          });
+        };
+        findChildren(req.params.branchId);
+      }
+
+      // Remove all identified branches
+      branchesToDelete.forEach(id => {
+        delete groupChat.branches[id];
+      });
+
+      await fs.writeFile(filePath, JSON.stringify(groupChat, null, 2));
+
+      res.json({ success: true, deletedBranches: branchesToDelete });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // PUT /api/group-chats/:filename/current-branch - Switch to different branch
+  router.put('/:filename/current-branch', async (req, res, next) => {
+    try {
+      const filePath = path.join(GROUP_CHATS_DIR, req.params.filename);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const groupChat = JSON.parse(content);
+
+      const { branchId } = req.body;
+
+      if (!branchId) {
+        return res.status(400).json({ error: 'branchId is required' });
+      }
+
+      const branch = groupChat.branches?.[branchId];
+      if (!branch) {
+        return res.status(404).json({ error: 'Branch not found' });
+      }
+
+      // Update current branch (frontend manages messages in memory)
+      groupChat.currentBranch = branchId;
+
+      await fs.writeFile(filePath, JSON.stringify(groupChat, null, 2));
+
+      res.json({ success: true, currentBranch: branchId });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // DELETE /api/group-chats/:filename - Delete group chat
   router.delete('/:filename', async (req, res, next) => {
     try {

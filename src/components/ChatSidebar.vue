@@ -66,6 +66,7 @@
       <div class="sidebar-actions">
         <button @click="$emit('new-chat')" class="sidebar-btn">📝 New Chat</button>
         <button @click="$emit('new-chat-from-summary')" v-if="hasMessages" class="sidebar-btn">📖 New Chat from Summary</button>
+        <button @click="$emit('add-memory')" v-if="hasMessages" class="sidebar-btn">🧠 Add Memory</button>
         <button v-if="showConvertToGroup" @click="$emit('convert-to-group')" class="sidebar-btn">👥 Convert to Group</button>
         <button @click="$emit('toggle-history')" :class="{ 'active': showHistory }" class="sidebar-btn">📜 History</button>
         <button @click="$emit('show-branch-tree')" class="sidebar-btn">🌿 Branch Timeline</button>
@@ -142,6 +143,7 @@ export default {
     'update:sidebarOpen',
     'new-chat',
     'new-chat-from-summary',
+    'add-memory',
     'convert-to-group',
     'toggle-history',
     'show-branch-tree',

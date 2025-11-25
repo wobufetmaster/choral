@@ -179,28 +179,44 @@ ${messagePreview}`;
       const content = await fs.readFile(filePath, 'utf-8');
       const chat = JSON.parse(content);
 
-      const { parentMessageIndex, branchName } = req.body;
+      const { parentBranchId, parentMessageIndex, branchName } = req.body;
 
       if (typeof parentMessageIndex !== 'number') {
         return res.status(400).json({ error: 'parentMessageIndex is required' });
       }
 
-      // Initialize branches if needed
-      if (!chat.branches) {
-        chat.branches = [];
+      // Get messages from the appropriate source
+      let sourceMessages;
+      if (chat.branches && typeof chat.branches === 'object') {
+        // New branch-based structure - get messages from parent branch or current branch
+        const sourceBranchId = parentBranchId || chat.currentBranch || chat.mainBranch;
+        const sourceBranch = chat.branches[sourceBranchId];
+        if (!sourceBranch || !sourceBranch.messages) {
+          return res.status(400).json({ error: 'Source branch not found or has no messages' });
+        }
+        sourceMessages = sourceBranch.messages;
+      } else {
+        // Old flat structure - use top-level messages array
+        sourceMessages = chat.messages || [];
       }
 
       // Create new branch
       const branchId = `branch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const newBranch = {
         id: branchId,
-        name: branchName || `Branch ${chat.branches.length + 1}`,
-        parentMessageIndex,
-        messages: chat.messages.slice(0, parentMessageIndex + 1),
+        name: branchName || `Branch ${Object.keys(chat.branches || {}).length + 1}`,
+        parentBranchId: parentBranchId || null,
+        branchPointMessageIndex: parentMessageIndex,
+        messages: sourceMessages.slice(0, parentMessageIndex + 1),
         createdAt: new Date().toISOString()
       };
 
-      chat.branches.push(newBranch);
+      // Initialize branches object if needed (for old chats)
+      if (!chat.branches || typeof chat.branches !== 'object') {
+        chat.branches = {};
+      }
+
+      chat.branches[branchId] = newBranch;
       await fs.writeFile(filePath, JSON.stringify(chat, null, 2));
 
       res.json({ branch: newBranch });
@@ -216,21 +232,20 @@ ${messagePreview}`;
       const content = await fs.readFile(filePath, 'utf-8');
       const chat = JSON.parse(content);
 
-      const branchIndex = chat.branches?.findIndex(b => b.id === req.params.branchId);
-      if (branchIndex === -1 || branchIndex === undefined) {
+      if (!chat.branches || !chat.branches[req.params.branchId]) {
         return res.status(404).json({ error: 'Branch not found' });
       }
 
       // Update branch data
-      chat.branches[branchIndex] = {
-        ...chat.branches[branchIndex],
+      chat.branches[req.params.branchId] = {
+        ...chat.branches[req.params.branchId],
         ...req.body,
         id: req.params.branchId // Preserve ID
       };
 
       await fs.writeFile(filePath, JSON.stringify(chat, null, 2));
 
-      res.json({ branch: chat.branches[branchIndex] });
+      res.json({ branch: chat.branches[req.params.branchId] });
     } catch (error) {
       next(error);
     }
@@ -243,16 +258,35 @@ ${messagePreview}`;
       const content = await fs.readFile(filePath, 'utf-8');
       const chat = JSON.parse(content);
 
-      const branchIndex = chat.branches?.findIndex(b => b.id === req.params.branchId);
-      if (branchIndex === -1 || branchIndex === undefined) {
+      if (!chat.branches || !chat.branches[req.params.branchId]) {
         return res.status(404).json({ error: 'Branch not found' });
       }
 
-      // Remove branch
-      chat.branches.splice(branchIndex, 1);
+      // Collect all branches to delete (this branch and all its children)
+      const branchesToDelete = [req.params.branchId];
+      const deleteChildren = req.query.deleteChildren === 'true';
+
+      if (deleteChildren) {
+        // Find all child branches recursively
+        const findChildren = (parentId) => {
+          Object.values(chat.branches).forEach(branch => {
+            if (branch.parentBranchId === parentId) {
+              branchesToDelete.push(branch.id);
+              findChildren(branch.id);
+            }
+          });
+        };
+        findChildren(req.params.branchId);
+      }
+
+      // Remove all identified branches
+      branchesToDelete.forEach(id => {
+        delete chat.branches[id];
+      });
+
       await fs.writeFile(filePath, JSON.stringify(chat, null, 2));
 
-      res.json({ success: true });
+      res.json({ success: true, deletedBranches: branchesToDelete });
     } catch (error) {
       next(error);
     }
@@ -271,13 +305,12 @@ ${messagePreview}`;
         return res.status(400).json({ error: 'branchId is required' });
       }
 
-      const branch = chat.branches?.find(b => b.id === branchId);
+      const branch = chat.branches?.[branchId];
       if (!branch) {
         return res.status(404).json({ error: 'Branch not found' });
       }
 
-      // Switch to branch by replacing main messages
-      chat.messages = branch.messages;
+      // Update current branch (frontend manages messages in memory)
       chat.currentBranch = branchId;
 
       await fs.writeFile(filePath, JSON.stringify(chat, null, 2));

@@ -74,6 +74,12 @@ export function useApi() {
     updateCharacterTags: (filename, tags) => put(`/api/characters/${filename}/tags`, { tags }),
     autoGenerateCharacterTags: (filename) => post(`/api/characters/${filename}/auto-tag`),
 
+    // Memories
+    createMemory: (filename, data) => post(`/api/characters/${filename}/memories`, data),
+    createBatchMemories: (data) => post('/api/characters/memories/batch', data),
+    updateMemory: (filename, memoryId, data) => request(`/api/characters/${filename}/memories/${memoryId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deleteMemory: (filename, memoryId) => del(`/api/characters/${filename}/memories/${memoryId}`),
+
     // Chats
     getChats: () => get('/api/chats'),
     getChat: (filename) => get(`/api/chats/${filename}`),

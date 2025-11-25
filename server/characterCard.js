@@ -117,8 +117,25 @@ function addTextChunk(pngBuffer, keyword, text) {
       // Then add IEND
       chunks.push(pngBuffer.slice(offset, chunkEnd));
       break;
-    } else if (type !== 'tEXt' || !keyword) {
-      // Copy other chunks as-is (skip existing tEXt with same keyword)
+    } else if (type === 'tEXt') {
+      // Check if this is the same keyword we're adding
+      const dataStart = offset + 8;
+      const chunkData = pngBuffer.slice(dataStart, dataStart + length);
+      const nullIndex = chunkData.indexOf(0);
+
+      let shouldCopy = true;
+      if (nullIndex !== -1) {
+        const chunkKeyword = chunkData.toString('latin1', 0, nullIndex);
+        if (chunkKeyword === keyword) {
+          shouldCopy = false; // Replace this chunk
+        }
+      }
+
+      if (shouldCopy) {
+        chunks.push(pngBuffer.slice(offset, chunkEnd));
+      }
+    } else {
+      // Copy other chunks as-is
       chunks.push(pngBuffer.slice(offset, chunkEnd));
     }
 
@@ -250,5 +267,7 @@ module.exports = {
   readCharacterCard,
   writeCharacterCard,
   validateCharacterCard,
-  convertV2ToV3
+  convertV2ToV3,
+  addTextChunk, // Exported for testing
+  extractTextChunks // Exported for testing
 };

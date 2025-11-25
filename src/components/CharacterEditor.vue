@@ -133,6 +133,41 @@
             </div>
           </div>
         </div>
+
+        <!-- Memories Section -->
+        <div class="memories-section" v-if="isEditMode">
+          <div class="memories-header">
+            <h3>Character Memories</h3>
+            <p class="help-text">These memories are automatically injected into the context when using the <code v-pre>{{memories}}</code> macro.</p>
+          </div>
+
+          <div v-if="memories.length === 0" class="no-memories">
+            <p>No memories recorded yet. Start a chat and use the "Add Memory" button to create one.</p>
+          </div>
+
+          <div v-else class="memories-list">
+            <div v-for="memory in memories" :key="memory.uuid" class="memory-item">
+              <div class="memory-header">
+                <span class="memory-date" :title="new Date(memory.created_at).toLocaleString()">
+                  {{ formatRelativeDate(memory.created_at) }}
+                </span>
+                <div class="memory-actions">
+                  <button @click="deleteMemory(memory.uuid)" class="delete-memory-btn" title="Delete Memory">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+              <div class="memory-content">
+                <textarea 
+                  v-model="memory.content" 
+                  @change="updateMemory(memory)"
+                  rows="3"
+                  class="memory-textarea"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div v-if="!tabData" class="modal-footer">
@@ -149,6 +184,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useNotification } from '../composables/useNotification'
 import { useApi } from '../composables/useApi'
+import { formatRelativeDate } from '../utils/dateFormat'
 
 const { notify } = useNotification()
 const api = useApi()
@@ -161,6 +197,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'save', 'update-tab', 'open-tab'])
 
+const activeTab = ref('general')
 const imageInput = ref(null)
 const imagePreview = ref('')
 const imageFile = ref(null)
@@ -744,6 +781,89 @@ async function autoSaveTagChange() {
   }
 }
 
+const memories = computed(() => {
+  return editedCard.value.data.extensions?.choral_memories || []
+})
+
+async function updateMemory(memory) {
+  if (!props.character?.filename && !props.tabData?.character?.filename) return
+
+  const filename = props.character?.filename || props.tabData?.character?.filename
+  try {
+    await api.updateMemory(filename, memory.uuid, { content: memory.content })
+    notify('Memory updated', 'success')
+    
+    // Auto-save if in tab mode
+    if (props.tabData) {
+      // Update the draft state to reflect the change
+      emit('update-tab', {
+        label: props.tabData.label,
+        data: {
+          ...props.tabData,
+          character: {
+            ...props.tabData.character,
+            data: {
+              ...props.tabData.character.data,
+              extensions: {
+                ...props.tabData.character.data.extensions,
+                choral_memories: memories.value
+              }
+            }
+          }
+        }
+      })
+    }
+  } catch (error) {
+    console.error('Failed to update memory:', error)
+    notify('Failed to update memory', 'error')
+  }
+}
+
+async function deleteMemory(memoryId) {
+  if (!confirm('Are you sure you want to delete this memory?')) return
+  
+  if (!props.character?.filename && !props.tabData?.character?.filename) return
+
+  const filename = props.character?.filename || props.tabData?.character?.filename
+  try {
+    await api.deleteMemory(filename, memoryId)
+    
+    // Remove from local state
+    if (editedCard.value.data.extensions && editedCard.value.data.extensions.choral_memories) {
+      const index = editedCard.value.data.extensions.choral_memories.findIndex(m => m.uuid === memoryId)
+      if (index !== -1) {
+        editedCard.value.data.extensions.choral_memories.splice(index, 1)
+      }
+    }
+    
+    notify('Memory deleted', 'success')
+
+    // Auto-save if in tab mode
+    if (props.tabData) {
+      // Update the draft state
+      emit('update-tab', {
+        label: props.tabData.label,
+        data: {
+          ...props.tabData,
+          character: {
+            ...props.tabData.character,
+            data: {
+              ...props.tabData.character.data,
+              extensions: {
+                ...props.tabData.character.data.extensions,
+                choral_memories: memories.value
+              }
+            }
+          }
+        }
+      })
+    }
+  } catch (error) {
+    console.error('Failed to delete memory:', error)
+    notify('Failed to delete memory', 'error')
+  }
+}
+
 // Load character tags on mount
 onMounted(() => {
   loadAllCharacterTags()
@@ -1153,5 +1273,106 @@ onMounted(() => {
 .filename-warning strong {
   color: #fbbf24;
   font-weight: 600;
+}
+
+/* Memories Section */
+.memories-section {
+  margin-top: 2rem;
+  padding: 20px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.memories-header {
+  margin-bottom: 20px;
+}
+
+.memories-header h3 {
+  margin: 0 0 8px 0;
+}
+
+.help-text {
+  color: var(--text-secondary);
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.no-memories {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px dashed var(--border-color);
+}
+
+.memories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.memory-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.memory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.memory-date {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.memory-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.delete-memory-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.delete-memory-btn:hover {
+  opacity: 1;
+}
+
+.memory-content {
+  padding: 12px;
+}
+
+.memory-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.memory-textarea:focus {
+  background: var(--bg-primary);
+  border-radius: 4px;
+  padding: 4px;
+  margin: -4px;
 }
 </style>

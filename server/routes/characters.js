@@ -12,6 +12,7 @@
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
+const crypto = require('crypto');
 const { readCharacterCard, writeCharacterCard, validateCharacterCard } = require('../characterCard');
 
 /**
@@ -462,6 +463,126 @@ Return ONLY a comma-separated list of lowercase tags, nothing else.`;
     }
   });
 
+  // POST /api/characters/:filename/memories - Create memory
+  router.post('/:filename/memories', async (req, res, next) => {
+    try {
+      const { messages, characterName, size } = req.body;
+      const filePath = path.join(CHARACTERS_DIR, req.params.filename);
+      const card = await readCharacterCard(filePath);
+
+      const memory = await generateMemory(card, messages, characterName, size, req.body.model);
+
+      // Add to card
+      if (!card.data.extensions) card.data.extensions = {};
+      if (!card.data.extensions.choral_memories) card.data.extensions.choral_memories = [];
+
+      card.data.extensions.choral_memories.unshift(memory);
+
+      // Read existing image to preserve it
+      const imageBuffer = await fs.readFile(filePath);
+      await writeCharacterCard(filePath, card, imageBuffer);
+
+      res.json({ success: true, memory });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // POST /api/characters/memories/batch - Batch create memories
+  router.post('/memories/batch', async (req, res, next) => {
+    try {
+      const { messages, characters, size, model } = req.body;
+      const results = [];
+
+      for (const char of characters) {
+        try {
+          const filePath = path.join(CHARACTERS_DIR, char.filename);
+          const card = await readCharacterCard(filePath);
+
+          const memory = await generateMemory(card, messages, char.name, size, model);
+
+          if (!card.data.extensions) card.data.extensions = {};
+          if (!card.data.extensions.choral_memories) card.data.extensions.choral_memories = [];
+
+          card.data.extensions.choral_memories.unshift(memory);
+
+          // Read existing image to preserve it
+          const imageBuffer = await fs.readFile(filePath);
+          await writeCharacterCard(filePath, card, imageBuffer);
+
+          results.push({
+            characterName: char.name,
+            memory
+          });
+        } catch (err) {
+          console.error(`Failed to generate memory for ${char.name}:`, err);
+          // Continue with other characters
+        }
+      }
+
+      res.json({ success: true, memories: results });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // PATCH /api/characters/:filename/memories/:memoryId - Update memory
+  router.patch('/:filename/memories/:memoryId', async (req, res, next) => {
+    try {
+      const { content } = req.body;
+      const filePath = path.join(CHARACTERS_DIR, req.params.filename);
+      const card = await readCharacterCard(filePath);
+
+      if (!card.data.extensions?.choral_memories) {
+        return res.status(404).json({ error: 'No memories found' });
+      }
+
+      const memory = card.data.extensions.choral_memories.find(m => m.id === req.params.memoryId);
+      if (!memory) {
+        return res.status(404).json({ error: 'Memory not found' });
+      }
+
+      memory.content = content;
+
+      // Read existing image to preserve it
+      const imageBuffer = await fs.readFile(filePath);
+      await writeCharacterCard(filePath, card, imageBuffer);
+
+      res.json({ success: true, memory });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // DELETE /api/characters/:filename/memories/:memoryId - Delete memory
+  router.delete('/:filename/memories/:memoryId', async (req, res, next) => {
+    try {
+      const filePath = path.join(CHARACTERS_DIR, req.params.filename);
+      const card = await readCharacterCard(filePath);
+
+      if (!card.data.extensions?.choral_memories) {
+        return res.status(404).json({ error: 'No memories found' });
+      }
+
+      const initialLength = card.data.extensions.choral_memories.length;
+      card.data.extensions.choral_memories = card.data.extensions.choral_memories.filter(
+        m => m.id !== req.params.memoryId
+      );
+
+      if (card.data.extensions.choral_memories.length === initialLength) {
+        return res.status(404).json({ error: 'Memory not found' });
+      }
+
+      // Read existing image to preserve it
+      const imageBuffer = await fs.readFile(filePath);
+      await writeCharacterCard(filePath, card, imageBuffer);
+
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // DELETE /api/characters/:filename - Delete character
   router.delete('/:filename', async (req, res, next) => {
     try {
@@ -488,6 +609,49 @@ Return ONLY a comma-separated list of lowercase tags, nothing else.`;
   });
 
   return router;
+}
+
+/**
+ * Generate a memory summary for a character
+ */
+async function generateMemory(card, messages, characterName, size, model) {
+  const { chatCompletion } = require('../openrouter');
+
+  // Format conversation
+  const conversationText = messages
+    .map(m => {
+      const charName = m.character || m.role;
+      if (typeof m.content === 'string') {
+        return `${charName}: ${m.content}`;
+      } else if (Array.isArray(m.content)) {
+        const textParts = m.content.filter(p => p.type === 'text');
+        return `${charName}: ${textParts.map(p => p.text).join(' ')}`;
+      }
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n\n');
+
+  let prompt;
+  if (size === 'small') {
+    prompt = `You are ${characterName}, writing a brief entry in your personal diary about this conversation. In 2-4 sentences, reflect on what happened as the character in first person.\n\nConversation:\n${conversationText}`;
+  } else if (size === 'medium') {
+    prompt = `You are ${characterName}, writing an entry in your personal diary about this conversation. In 1-2 paragraphs, reflect on what happened, what you learned, and how you feel about it. Write in first person as the character.\n\nConversation:\n${conversationText}`;
+  } else {
+    prompt = `You are ${characterName}, writing a detailed entry in your personal diary about this conversation. In 2-4 paragraphs, thoroughly reflect on what happened, what you learned, how you feel about it, and any important revelations or character development. Write in first person as the character.\n\nConversation:\n${conversationText}`;
+  }
+
+  const response = await chatCompletion({
+    messages: [{ role: 'user', content: prompt }],
+    model: model || 'anthropic/claude-3.5-sonnet',
+    temperature: 0.7
+  });
+
+  return {
+    id: crypto.randomUUID(),
+    content: response,
+    created_at: new Date().toISOString()
+  };
 }
 
 module.exports = createCharacterRouter;

@@ -84,6 +84,27 @@ function processMacros(text, context, removeComments = true) {
     return '(no characters available)';
   });
 
+  // {{memories}} - Character memories
+  result = result.replace(/\{\{memories\}\}/gi, () => {
+    // Check context.character (single char) or context.characters (group chat?)
+    // The design says context.character is passed.
+    // For group chats, we might need to handle multiple characters, but the macro usually applies to the "active" character or we list all?
+    // The design says: "Expands to (if character has memories)"
+
+    // If we are in a group chat, context.character might be the character currently replying?
+    // Or maybe we just look at context.character which is sent by the frontend.
+
+    const memories = context.character?.extensions?.choral_memories;
+
+    if (memories && Array.isArray(memories) && memories.length > 0) {
+      return memories.map(m => {
+        const dateStr = formatRelativeDate(m.created_at);
+        return `- ${dateStr}: ${m.content}`;
+      }).join('\n');
+    }
+    return '[None]';
+  });
+
   // {{// A}} - Comment (remove completely)
   if (removeComments) {
     result = result.replace(/\{\{\/\/[^}]*\}\}/gi, '');
@@ -100,6 +121,25 @@ function processMacros(text, context, removeComments = true) {
   }
 
   return result;
+}
+
+function formatRelativeDate(isoTimestamp) {
+  const now = new Date();
+  const then = new Date(isoTimestamp);
+  const diffMs = now - then;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+  }
+  const months = Math.floor(diffDays / 30);
+  if (months < 12) return months === 1 ? '1 month ago' : `${months} months ago`;
+  const years = Math.floor(months / 12);
+  return years === 1 ? '1 year ago' : `${years} years ago`;
 }
 
 /**
@@ -181,6 +221,13 @@ const MACRO_DEFINITIONS = [
     description: 'Example conversations showing character voice from card',
     isCharacterData: true,
     example: '{{dialogue_examples}}'
+  },
+  {
+    pattern: '{{memories}}',
+    category: 'character_card',
+    description: 'Character memories/diary entries',
+    isCharacterData: true,
+    example: '{{memories}}'
   },
 
   // Names & Identifiers
