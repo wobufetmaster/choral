@@ -241,6 +241,11 @@ export default {
           name: 'Example Dialogue',
           content: 'Here are some examples of dialogue: {{dialogue_examples}}',
           injection_order: 400
+        },
+        '{{memories}}': {
+          name: 'Character Memories',
+          content: 'Memories: {{memories}}',
+          injection_order: 450
         }
       };
 
@@ -249,7 +254,7 @@ export default {
 
       for (let i = this.selectedPreset.prompts.length - 1; i >= 0; i--) {
         const content = this.selectedPreset.prompts[i].content || '';
-        const hasCharMacro = ['{{description}}', '{{personality}}', '{{scenario}}', '{{dialogue_examples}}']
+        const hasCharMacro = ['{{description}}', '{{personality}}', '{{scenario}}', '{{dialogue_examples}}', '{{memories}}']
           .some(macro => content.includes(macro));
 
         if (hasCharMacro) {

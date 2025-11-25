@@ -453,7 +453,8 @@ import { useMessageFormatting } from '../composables/useMessageFormatting.js';
 import { useSwipes } from '../composables/useSwipes.js';
 import { useBranches } from '../composables/useBranches.js';
 import { useChatHistory } from '../composables/useChatHistory.js';
-import { processMacrosForDisplay } from '../utils/macros.js';
+import { useContextBuilder } from '../composables/useContextBuilder.js';
+import { useBranchOperations } from '../composables/useBranchOperations.js';
 import GroupChatManager from './GroupChatManager.vue';
 import LorebookEditor from './LorebookEditor.vue';
 import ChatSidebar from './ChatSidebar.vue';
@@ -482,7 +483,9 @@ export default {
     const swipeHelpers = useSwipes();
     const branchHelpers = useBranches();
     const historyHelpers = useChatHistory(api);
-    return { api, formatting, swipeHelpers, branchHelpers, historyHelpers };
+    const contextBuilder = useContextBuilder();
+    const branchOps = useBranchOperations();
+    return { api, formatting, swipeHelpers, branchHelpers, historyHelpers, contextBuilder, branchOps };
   },
   props: {
     tabData: {
@@ -793,7 +796,6 @@ export default {
       if (this.toolCallTimerInterval) {
         clearInterval(this.toolCallTimerInterval);
       }
-
       // Update elapsed time every 100ms
       this.toolCallTimerInterval = setInterval(() => {
         if (this.toolCallStartTime) {
@@ -1306,119 +1308,14 @@ export default {
         return this.buildGroupChatContext(upToMessageIndex);
       }
 
-      const context = [];
-
-      // If we have system prompts from preset, use those
-      if (this.settings.systemPrompts && this.settings.systemPrompts.length > 0) {
-        // Sort prompts by injection order
-        const sortedPrompts = [...this.settings.systemPrompts]
-          .filter(p => p.enabled)
-          .sort((a, b) => (a.injection_order || 0) - (b.injection_order || 0));
-
-        // Track if any placeholder was used
-        let hasCharacterInfo = false;
-
-        // Process each prompt and replace placeholders
-        for (const prompt of sortedPrompts) {
-          let content = prompt.content || '';
-          const originalContent = content;
-
-          // Replace template placeholders
-          content = content.replace(/\{\{description\}\}/g, this.character?.data.description || '');
-          content = content.replace(/\{\{personality\}\}/g, this.character?.data.personality || '');
-          content = content.replace(/\{\{scenario\}\}/g, this.character?.data.scenario || '');
-          content = content.replace(/\{\{system_prompt\}\}/g, this.character?.data.system_prompt || '');
-          content = content.replace(/\{\{dialogue_examples\}\}/g, this.character?.data.mes_example || '');
-
-          // Check if any placeholders were replaced
-          if (content !== originalContent) {
-            hasCharacterInfo = true;
-          }
-
-          // Only add if there's actual content
-          if (content.trim()) {
-            context.push({
-              role: prompt.role || 'system',
-              content: content.trim()
-            });
-          }
-        }
-
-        // If no placeholders were used, add character info separately
-        if (!hasCharacterInfo) {
-          const systemPrompt = this.character?.data.system_prompt || '';
-          const description = this.character?.data.description || '';
-          const personality = this.character?.data.personality || '';
-          const scenario = this.character?.data.scenario || '';
-          const dialogueExamples = this.character?.data.mes_example || '';
-
-          if (systemPrompt || description || personality || scenario || dialogueExamples) {
-            let systemContent = '';
-            if (systemPrompt) systemContent += systemPrompt + '\n\n';
-            if (description) systemContent += `Character: ${description}\n\n`;
-            if (personality) systemContent += `Personality: ${personality}\n\n`;
-            if (scenario) systemContent += `Scenario: ${scenario}\n\n`;
-            if (dialogueExamples) systemContent += `Example Dialogue:\n${dialogueExamples}\n\n`;
-
-            context.push({
-              role: 'system',
-              content: systemContent.trim()
-            });
-          }
-        }
-      } else {
-        // Fallback: Build from character card directly
-        const systemPrompt = this.character?.data.system_prompt || '';
-        const description = this.character?.data.description || '';
-        const personality = this.character?.data.personality || '';
-        const scenario = this.character?.data.scenario || '';
-        const dialogueExamples = this.character?.data.mes_example || '';
-
-        if (systemPrompt || description || personality || scenario || dialogueExamples) {
-          let systemContent = '';
-          if (systemPrompt) systemContent += systemPrompt + '\n\n';
-          if (description) systemContent += `Character: ${description}\n\n`;
-          if (personality) systemContent += `Personality: ${personality}\n\n`;
-          if (scenario) systemContent += `Scenario: ${scenario}\n\n`;
-          if (dialogueExamples) systemContent += `Example Dialogue:\n${dialogueExamples}\n\n`;
-
-          context.push({
-            role: 'system',
-            content: systemContent.trim()
-          });
-        }
-      }
-
-      // Add persona description if present
-      if (this.persona?.description?.trim()) {
-        context.push({
-          role: 'system',
-          content: `User persona: ${this.persona.description.trim()}`
-        });
-      }
-
-      // Add conversation history (optionally up to a certain index)
-      const messagesToInclude = upToMessageIndex !== null
-        ? this.messages.slice(0, upToMessageIndex)
-        : this.messages;
-
-      // Convert messages to context format (handling swipes)
-      for (const msg of messagesToInclude) {
-        if (msg.role === 'user') {
-          context.push({
-            role: 'user',
-            content: msg.content
-          });
-        } else {
-          // For assistant messages, use current swipe
-          context.push({
-            role: 'assistant',
-            content: msg.swipes?.[msg.swipeIndex] || msg.content || ''
-          });
-        }
-      }
-
-      return context;
+      // Delegate to composable
+      return this.contextBuilder.buildSingleChatContext({
+        settings: this.settings,
+        character: this.character,
+        persona: this.persona,
+        messages: this.messages,
+        upToMessageIndex
+      });
     },
     async streamResponse(messages) {
       // Create AbortController for this request
@@ -2154,101 +2051,31 @@ export default {
           }
         }
 
-        // Initialize branch structure if needed
-        if (!this.branches || Object.keys(this.branches).length === 0) {
-          const mainBranchId = 'branch-main';
-          this.branches = {
-            [mainBranchId]: {
-              id: mainBranchId,
-              name: 'Main',
-              createdAt: new Date().toISOString(),
-              parentBranchId: null,
-              branchPointMessageIndex: null,
-              messages: [...this.messages]
-            }
-          };
-          this.mainBranch = mainBranchId;
-          this.currentBranch = mainBranchId;
-          // Save the chat with branch structure
-          if (this.isGroupChat) {
-            await this.saveGroupChat(false);
-          } else {
-            await this.saveChat();
-          }
-        }
+        const saveFn = this.isGroupChat
+          ? () => this.saveGroupChat(false)
+          : () => this.saveChat();
 
-        // Determine the correct parent branch for this message index
-        // If we're in a child branch and the message is before the branch point,
-        // we should branch from the ancestor that actually contains that message
-        let parentBranchId = this.currentBranch;
-        const currentBranchObj = this.branches[this.currentBranch];
-
-        if (currentBranchObj.parentBranchId !== null) {
-          const currentBranchPoint = currentBranchObj.branchPointMessageIndex ?? 0;
-
-          // If message index is at or before the current branch's split point,
-          // it belongs to an ancestor branch
-          if (messageIndex <= currentBranchPoint) {
-            // Walk up the tree to find which ancestor contains this message
-            let ancestorId = currentBranchObj.parentBranchId;
-            while (ancestorId) {
-              const ancestor = this.branches[ancestorId];
-              const ancestorBranchPoint = ancestor.branchPointMessageIndex ?? 0;
-
-              // If this is the main branch or the message is after this ancestor's branch point,
-              // this is the correct parent
-              if (ancestor.parentBranchId === null || messageIndex > ancestorBranchPoint) {
-                parentBranchId = ancestorId;
-                break;
-              }
-
-              // Keep walking up
-              ancestorId = ancestor.parentBranchId;
-            }
-          }
-        }
-
-        const chatFileId = this.isGroupChat ? this.groupChatId : this.chatId;
-
-        // Verify chat file ID exists before making API call
-        if (!chatFileId) {
-          throw new Error('Chat must be saved before creating a branch');
-        }
-
-        // Use the correct API endpoint based on chat type
-        const apiEndpoint = this.isGroupChat
-          ? `/api/group-chats/${chatFileId}/branches`
-          : `/api/chats/${chatFileId}/branches`;
-
-        const response = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            parentBranchId: parentBranchId,
-            parentMessageIndex: messageIndex,
-            branchName: branchName
-          })
+        const result = await this.branchOps.createBranch({
+          branchName,
+          messageIndex,
+          branches: this.branches,
+          currentBranch: this.currentBranch,
+          messages: this.messages,
+          mainBranch: this.mainBranch,
+          chatId: this.chatId,
+          groupChatId: this.groupChatId,
+          isGroupChat: this.isGroupChat,
+          saveFn
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create branch');
-        }
-
-        const data = await response.json();
-        const newBranch = data.branch;
-
-        // Update local state
-        this.branches[newBranch.id] = newBranch;
-        this.currentBranch = newBranch.id;
-        this.messages = [...newBranch.messages];
+        // Update local state from result
+        this.branches = result.branches;
+        this.mainBranch = result.mainBranch;
+        this.currentBranch = result.currentBranch;
+        this.messages = result.messages;
 
         // Save the chat to persist the new branch
-        if (this.isGroupChat) {
-          await this.saveGroupChat(false);
-        } else {
-          await this.saveChat();
-        }
+        await saveFn();
 
         this.$root.$notify(`Branch "${branchName}" created`, 'success');
       } catch (error) {
@@ -2258,31 +2085,19 @@ export default {
     },
     async switchToBranch(branchId) {
       try {
-        // Update current branch on server
-        const chatFileId = this.isGroupChat ? this.groupChatId : this.chatId;
-        const apiEndpoint = this.isGroupChat
-          ? `/api/group-chats/${chatFileId}/current-branch`
-          : `/api/chats/${chatFileId}/current-branch`;
-
-        const response = await fetch(apiEndpoint, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ branchId })
+        const result = await this.branchOps.switchToBranch({
+          branchId,
+          branches: this.branches,
+          chatId: this.chatId,
+          groupChatId: this.groupChatId,
+          isGroupChat: this.isGroupChat,
+          normalizeMessages: this.normalizeMessages
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to switch branch');
-        }
-
-        // Update local state
-        this.currentBranch = branchId;
-        const branch = this.branches[branchId];
-        this.messages = this.normalizeMessages([...branch.messages]);
-
+        this.currentBranch = result.currentBranch;
+        this.messages = result.messages;
         this.showBranchTree = false;
-        this.$root.$notify(`Switched to branch "${branch.name}"`, 'success');
-
-        // Scroll to bottom after switching
+        this.$root.$notify(`Switched to branch "${result.branchName}"`, 'success');
         this.$nextTick(() => this.scrollToBottom());
       } catch (error) {
         console.error('Failed to switch branch:', error);
@@ -2291,24 +2106,16 @@ export default {
     },
     async renameBranch(branchId, newName) {
       try {
-        const chatFileId = this.isGroupChat ? this.groupChatId : this.chatId;
-        const apiEndpoint = this.isGroupChat
-          ? `/api/group-chats/${chatFileId}/branches/${branchId}`
-          : `/api/chats/${chatFileId}/branches/${branchId}`;
-
-        const response = await fetch(apiEndpoint, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: newName })
+        const result = await this.branchOps.renameBranch({
+          branchId,
+          newName,
+          branches: this.branches,
+          chatId: this.chatId,
+          groupChatId: this.groupChatId,
+          isGroupChat: this.isGroupChat
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to rename branch');
-        }
-
-        // Update local state
-        this.branches[branchId].name = newName;
-
+        this.branches = result.branches;
         this.$root.$notify(`Branch renamed to "${newName}"`, 'success');
       } catch (error) {
         console.error('Failed to rename branch:', error);
@@ -2317,32 +2124,22 @@ export default {
     },
     async deleteBranchFromTree(branchId, deleteChildren) {
       try {
-        const chatFileId = this.isGroupChat ? this.groupChatId : this.chatId;
-        const apiEndpoint = this.isGroupChat
-          ? `/api/group-chats/${chatFileId}/branches/${branchId}?deleteChildren=${deleteChildren}`
-          : `/api/chats/${chatFileId}/branches/${branchId}?deleteChildren=${deleteChildren}`;
-
-        const response = await fetch(apiEndpoint, {
-          method: 'DELETE'
+        const result = await this.branchOps.deleteBranch({
+          branchId,
+          deleteChildren,
+          branches: this.branches,
+          currentBranch: this.currentBranch,
+          mainBranch: this.mainBranch,
+          chatId: this.chatId,
+          groupChatId: this.groupChatId,
+          isGroupChat: this.isGroupChat,
+          normalizeMessages: this.normalizeMessages
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to delete branch');
-        }
-
-        const data = await response.json();
-
-        // Remove deleted branches from local state
-        data.deletedBranches.forEach(id => {
-          delete this.branches[id];
-        });
-
-        // If we deleted the current branch, switch to main
-        if (data.deletedBranches.includes(this.currentBranch)) {
-          this.currentBranch = this.mainBranch;
-          const mainBranch = this.branches[this.mainBranch];
-          this.messages = this.normalizeMessages([...mainBranch.messages]);
+        this.branches = result.branches;
+        if (result.messages) {
+          this.currentBranch = result.currentBranch;
+          this.messages = result.messages;
           this.$nextTick(() => this.scrollToBottom());
         }
 
@@ -3590,221 +3387,17 @@ export default {
     },
 
     buildGroupChatContext(upToMessageIndex = null) {
-      const context = [];
-
-      // Determine which character will be speaking (for swap strategy)
+      // Delegate to composable
       const speakerFilename = this.nextSpeaker || this.currentSpeaker;
-      const speakingCharacter = speakerFilename
-        ? this.groupChatCharacters.find(c => c.filename === speakerFilename)
-        : null;
-
-      // Track if character info was injected via placeholders
-      let hasCharacterInfo = false;
-
-      // Add system prompts from preset
-      if (this.settings.systemPrompts && this.settings.systemPrompts.length > 0) {
-        const sortedPrompts = [...this.settings.systemPrompts]
-          .filter(p => p.enabled)
-          .sort((a, b) => (a.injection_order || 0) - (b.injection_order || 0));
-
-        for (const prompt of sortedPrompts) {
-          let content = prompt.content || '';
-          const originalContent = content;
-
-          // For group chats, handle character info differently based on strategy
-          if (this.groupChatStrategy === 'join') {
-            // Check if any character placeholders exist
-            const hasCharPlaceholders = /\{\{(description|personality|scenario|system_prompt|dialogue_examples)\}\}/g.test(content);
-
-            if (hasCharPlaceholders) {
-              // Build complete info for each character, then join them
-              const allCharacterInfo = this.groupChatCharacters.map(c => {
-                const charData = c.data?.data || c.data || {};
-
-                // Create macro context for THIS specific character
-                const charMacroContext = {
-                  charName: c.name,
-                  charNickname: charData.nickname || '',
-                  userName: this.persona?.name || 'User'
-                };
-
-                let info = `=== Character: ${c.name} ===\n`;
-
-                // Process macros in each field for this character
-                if (charData.description) {
-                  info += `Description: ${processMacrosForDisplay(charData.description, charMacroContext)}\n`;
-                }
-                if (charData.personality) {
-                  info += `Personality: ${processMacrosForDisplay(charData.personality, charMacroContext)}\n`;
-                }
-                if (charData.scenario) {
-                  info += `Scenario: ${processMacrosForDisplay(charData.scenario, charMacroContext)}\n`;
-                }
-                if (charData.system_prompt) {
-                  info += `${processMacrosForDisplay(charData.system_prompt, charMacroContext)}\n`;
-                }
-                if (charData.mes_example) {
-                  info += `Example Dialogue:\n${processMacrosForDisplay(charData.mes_example, charMacroContext)}\n`;
-                }
-
-                return info.trim();
-              }).join('\n');
-
-              // Replace the FIRST placeholder with all character info, remove the rest
-              let replacedFirst = false;
-              content = content.replace(/\{\{(description|personality|scenario|system_prompt|dialogue_examples)\}\}/g, (match) => {
-                if (!replacedFirst) {
-                  replacedFirst = true;
-                  return allCharacterInfo;
-                }
-                return ''; // Remove subsequent placeholders
-              });
-            }
-          } else if (this.groupChatStrategy === 'swap' && speakingCharacter) {
-            // Replace with only the speaking character's info
-            const charData = speakingCharacter.data?.data || speakingCharacter.data || {};
-
-            // Create macro context for the speaking character
-            const charMacroContext = {
-              charName: speakingCharacter.name,
-              charNickname: charData.nickname || '',
-              userName: this.persona?.name || 'User'
-            };
-
-            // Process macros in each field before replacing placeholders
-            content = content.replace(/\{\{description\}\}/g,
-              charData.description ? processMacrosForDisplay(charData.description, charMacroContext) : '');
-            content = content.replace(/\{\{personality\}\}/g,
-              charData.personality ? processMacrosForDisplay(charData.personality, charMacroContext) : '');
-            content = content.replace(/\{\{scenario\}\}/g,
-              charData.scenario ? processMacrosForDisplay(charData.scenario, charMacroContext) : '');
-            content = content.replace(/\{\{system_prompt\}\}/g,
-              charData.system_prompt ? processMacrosForDisplay(charData.system_prompt, charMacroContext) : '');
-            content = content.replace(/\{\{dialogue_examples\}\}/g,
-              charData.mes_example ? processMacrosForDisplay(charData.mes_example, charMacroContext) : '');
-          }
-
-          // Check if any placeholders were replaced
-          if (content !== originalContent) {
-            hasCharacterInfo = true;
-          }
-
-          if (content.trim()) {
-            context.push({
-              role: prompt.role || 'system',
-              content: content.trim()
-            });
-          }
-        }
-      }
-
-      // If no placeholders were used, add character info as fallback
-      if (!hasCharacterInfo) {
-        if (this.groupChatStrategy === 'join') {
-          // Add all character info
-          const characterInfos = this.groupChatCharacters.map(c => {
-            const charData = c.data?.data || c.data || {};
-
-            // Create macro context for THIS specific character
-            const charMacroContext = {
-              charName: c.name,
-              charNickname: charData.nickname || '',
-              userName: this.persona?.name || 'User'
-            };
-
-            let info = `${c.name}:\n`;
-            // Process macros in each field for this character
-            if (charData.description) {
-              info += `Description: ${processMacrosForDisplay(charData.description, charMacroContext)}\n`;
-            }
-            if (charData.personality) {
-              info += `Personality: ${processMacrosForDisplay(charData.personality, charMacroContext)}\n`;
-            }
-            if (charData.scenario) {
-              info += `Scenario: ${processMacrosForDisplay(charData.scenario, charMacroContext)}\n`;
-            }
-            if (charData.system_prompt) {
-              info += `${processMacrosForDisplay(charData.system_prompt, charMacroContext)}\n`;
-            }
-            if (charData.mes_example) {
-              info += `Example Dialogue:\n${processMacrosForDisplay(charData.mes_example, charMacroContext)}\n`;
-            }
-            return info;
-          }).join('\n\n');
-
-          if (characterInfos.trim()) {
-            context.push({
-              role: 'system',
-              content: characterInfos.trim()
-            });
-          }
-        } else if (this.groupChatStrategy === 'swap' && speakingCharacter) {
-          // Add only the speaking character's info
-          const charData = speakingCharacter.data?.data || speakingCharacter.data || {};
-
-          // Create macro context for the speaking character
-          const charMacroContext = {
-            charName: speakingCharacter.name,
-            charNickname: charData.nickname || '',
-            userName: this.persona?.name || 'User'
-          };
-
-          let characterInfo = `${speakingCharacter.name}:\n`;
-          // Process macros in each field for this character
-          if (charData.description) {
-            characterInfo += `Description: ${processMacrosForDisplay(charData.description, charMacroContext)}\n`;
-          }
-          if (charData.personality) {
-            characterInfo += `Personality: ${processMacrosForDisplay(charData.personality, charMacroContext)}\n`;
-          }
-          if (charData.scenario) {
-            characterInfo += `Scenario: ${processMacrosForDisplay(charData.scenario, charMacroContext)}\n`;
-          }
-          if (charData.system_prompt) {
-            characterInfo += `${processMacrosForDisplay(charData.system_prompt, charMacroContext)}\n`;
-          }
-          if (charData.mes_example) {
-            characterInfo += `Example Dialogue:\n${processMacrosForDisplay(charData.mes_example, charMacroContext)}\n`;
-          }
-
-          if (characterInfo.trim() !== `${speakingCharacter.name}:\n`) {
-            context.push({
-              role: 'system',
-              content: characterInfo.trim()
-            });
-          }
-        }
-      }
-
-      // Add persona description if present
-      if (this.persona?.description?.trim()) {
-        context.push({
-          role: 'system',
-          content: `User persona: ${this.persona.description.trim()}`
-        });
-      }
-
-      // Add conversation history
-      const messagesToInclude = upToMessageIndex !== null
-        ? this.messages.slice(0, upToMessageIndex)
-        : this.messages;
-
-      for (const msg of messagesToInclude) {
-        if (msg.role === 'user') {
-          context.push({
-            role: 'user',
-            content: msg.content
-          });
-        } else {
-          // For assistant messages in group chat
-          context.push({
-            role: 'assistant',
-            content: msg.swipes?.[msg.swipeIndex] || msg.content || ''
-          });
-        }
-      }
-
-      return context;
+      return this.contextBuilder.buildGroupChatContext({
+        settings: this.settings,
+        groupChatCharacters: this.groupChatCharacters,
+        strategy: this.groupChatStrategy,
+        speakerFilename,
+        persona: this.persona,
+        messages: this.messages,
+        upToMessageIndex
+      });
     },
 
     getMessageAvatar(message) {

@@ -227,32 +227,96 @@ export const backgroundPatterns = {
       background-position: 40px 0, 40px 0, 0 0, 0 0;
     `
   },
-  waves: {
-    name: 'Waves',
+  cubes: {
+    name: 'Cubes',
     css: `
       background-image:
-        radial-gradient(100% 100% at 100% 0, transparent 24%, rgba(255,255,255,0.02) 26% 34%, rgba(255,255,255,0.04) 36% 44%, rgba(255,255,255,0.02) 46% 54%, rgba(255,255,255,0.04) 56% 64%, rgba(255,255,255,0.02) 66% 74%, transparent 76%),
-        radial-gradient(100% 100% at 0 100%, transparent 24%, rgba(255,255,255,0.02) 26% 34%, rgba(255,255,255,0.04) 36% 44%, rgba(255,255,255,0.02) 46% 54%, rgba(255,255,255,0.04) 56% 64%, rgba(255,255,255,0.02) 66% 74%, transparent 76%),
-        radial-gradient(rgba(255,255,255,0.02) 14%, rgba(255,255,255,0.04) 16%);
-      background-size: 60px 60px;
-      background-position: 0 0, 0 0, 30px 30px;
+        linear-gradient(30deg, rgba(255,255,255,0.05) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.05) 87.5%, rgba(255,255,255,0.05)),
+        linear-gradient(150deg, rgba(255,255,255,0.05) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.05) 87.5%, rgba(255,255,255,0.05)),
+        linear-gradient(30deg, rgba(255,255,255,0.05) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.05) 87.5%, rgba(255,255,255,0.05)),
+        linear-gradient(150deg, rgba(255,255,255,0.05) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.05) 87.5%, rgba(255,255,255,0.05)),
+        linear-gradient(60deg, rgba(255,255,255,0.05) 25%, transparent 25.5%, transparent 75%, rgba(255,255,255,0.05) 75%, rgba(255,255,255,0.05)),
+        linear-gradient(60deg, rgba(255,255,255,0.05) 25%, transparent 25.5%, transparent 75%, rgba(255,255,255,0.05) 75%, rgba(255,255,255,0.05));
+      background-size: 40px 70px;
+      background-position: 0 0, 0 0, 20px 35px, 20px 35px, 0 0, 20px 35px;
     `
   },
-  dots: {
-    name: 'Dots',
+  rhombus: {
+    name: 'Rhombus',
     css: `
       background-image:
-        radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
-      background-size: 20px 20px;
+        linear-gradient(135deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+        linear-gradient(225deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+        linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%),
+        linear-gradient(315deg, rgba(255,255,255,0.05) 25%, transparent 25%);
+      background-position: 20px 0, 20px 0, 0 0, 0 0;
+      background-size: 40px 40px;
     `
   },
-  grid: {
-    name: 'Grid',
+  intersect: {
+    name: 'Intersect',
     css: `
       background-image:
-        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-      background-size: 30px 30px;
+        radial-gradient(circle, transparent 20%, rgba(255,255,255,0.04) 20%, rgba(255,255,255,0.04) 80%, transparent 80%, transparent),
+        radial-gradient(circle, transparent 20%, rgba(255,255,255,0.04) 20%, rgba(255,255,255,0.04) 80%, transparent 80%, transparent);
+      background-size: 50px 50px;
+      background-position: 0 0, 25px 25px;
+    `
+  },
+  'overlapping-cubes': {
+    name: 'Overlapping Cubes',
+    css: `
+      --s: 70px;
+      --c: rgba(255,255,255,0.05);
+      --s-sqrt3: calc(var(--s)*1.732);
+      --s-2: calc(var(--s)/2);
+
+      background-image:
+        conic-gradient(from -30deg at 50% calc(var(--s-sqrt3)/3),
+          #0000,var(--c) 1deg 60deg,#0000 61deg),
+        conic-gradient(from -30deg at 50% calc(var(--s-sqrt3)/3),
+          #0000,var(--c) 1deg 60deg,#0000 61deg),
+        conic-gradient(from 90deg at var(--s-2) 0,
+          #0000,var(--c) 1deg 60deg,#0000 61deg),
+        conic-gradient(from 90deg at var(--s-2) 0,
+          #0000,var(--c) 1deg 60deg,#0000 61deg),
+        conic-gradient(from -150deg at 50% calc(var(--s-sqrt3)/1.5),
+          #0000,var(--c) 1deg 60deg,#0000 61deg),
+        conic-gradient(from -150deg at 50% calc(var(--s-sqrt3)/1.5),
+          #0000,var(--c) 1deg 60deg,#0000 61deg);
+      background-position: 
+        0             calc(var(--s-sqrt3)/1.5),
+        var(--s-2)    calc(var(--s-sqrt3)/3),
+        var(--s-2)    0,
+        0             calc(var(--s-sqrt3)/1.5),
+        var(--s-2)    calc(var(--s-sqrt3)/3),
+        0             0;
+      background-size: var(--s) var(--s-sqrt3);
+    `
+  },
+  '3d-triangles': {
+    name: '3D Triangles',
+    css: `
+      --s: 80px;
+      --c1: rgba(255,255,255,0.08);
+      --c2: rgba(255,255,255,0.05);
+      --c3: rgba(255,255,255,0.02);
+      --s-sqrt3: calc(var(--s)*0.866);
+
+      background-image:
+        conic-gradient(from -60deg at 50% calc(var(--s)/3),
+          var(--c3) 0 120deg,#0000 0),
+        conic-gradient(from 60deg at 50% calc(var(--s)/3),
+          var(--c2) 0 120deg,#0000 0),
+        conic-gradient(from 180deg at 50% calc(var(--s)/3),
+          var(--c1) 0 120deg,#0000 0),
+        conic-gradient(from 60deg at 50% calc(var(--s)*2/3),
+          var(--c1) 0 120deg,#0000 0),
+        conic-gradient(from 180deg at 50% calc(var(--s)*2/3),
+          var(--c3) 0 120deg,#0000 0),
+        conic-gradient(from -60deg at 50% calc(var(--s)*2/3),
+          var(--c2) 0 120deg,#0000 0);
+      background-size: var(--s-sqrt3) var(--s);
     `
   }
 };

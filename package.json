@@ -19,7 +19,8 @@
     "test:e2e:headed": "start-server-and-test 'node server/index.js' http://localhost:3000 'playwright test --headed'",
     "test:all": "npm test && npm run test:e2e",
     "test:coverage": "vitest run --coverage",
-    "prepare": "husky"
+    "prepare": "husky",
+    "clean": "rm -rf dist coverage test-results playwright-report .vitest data-test* backups-test* && rm -f *.log"
   },
   "keywords": [],
   "author": "",
