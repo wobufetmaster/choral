@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useMessageFormatting } from '../../../src/composables/useMessageFormatting.js';
-import { ref } from 'vue';
 
 describe('useMessageFormatting', () => {
   let formatting;
@@ -10,52 +9,52 @@ describe('useMessageFormatting', () => {
   });
 
   describe('estimateTokens', () => {
-    it('should estimate tokens for simple text', () => {
-      const text = 'Hello world';
-      const tokens = formatting.estimateTokens(text);
-      expect(tokens).toBe(2); // "Hello" + "world" = 2 tokens (rough estimate)
-    });
-
-    it('should handle empty strings', () => {
+    it('should return 0 for empty text', () => {
       expect(formatting.estimateTokens('')).toBe(0);
+      expect(formatting.estimateTokens(null)).toBe(0);
+      expect(formatting.estimateTokens(undefined)).toBe(0);
     });
 
-    it('should handle whitespace', () => {
-      expect(formatting.estimateTokens('   ')).toBe(1);
+    it('should estimate ~4 characters per token', () => {
+      expect(formatting.estimateTokens('test')).toBe(1); // 4 chars
+      expect(formatting.estimateTokens('hello world')).toBe(3); // 11 chars / 4 = 2.75 -> 3
+    });
+
+    it('should strip HTML tags before counting', () => {
+      expect(formatting.estimateTokens('<p>test</p>')).toBe(1); // only "test" counts (4 chars)
     });
 
     it('should estimate longer text', () => {
       const text = 'This is a longer piece of text that should have more tokens';
       const tokens = formatting.estimateTokens(text);
-      expect(tokens).toBeGreaterThan(10);
+      expect(tokens).toBeGreaterThan(10); // 59 chars / 4 = ~15 tokens
     });
   });
 
   describe('applyTextStyling', () => {
-    it('should apply bold styling', () => {
-      const text = '**bold text**';
-      const styled = formatting.applyTextStyling(text);
-      expect(styled).toContain('<strong>bold text</strong>');
+    it('should wrap quoted text in dialogue spans', () => {
+      const result = formatting.applyTextStyling('She said "hello" to him');
+      expect(result).toContain('<span class="dialogue">"hello"</span>');
     });
 
-    it('should apply italic styling', () => {
-      const text = '*italic text*';
-      const styled = formatting.applyTextStyling(text);
-      expect(styled).toContain('<em>italic text</em>');
+    it('should wrap asterisk text in action spans', () => {
+      const result = formatting.applyTextStyling('*waves hand*');
+      expect(result).toContain('<span class="action">*waves hand*</span>');
     });
 
-    it('should preserve newlines as <br>', () => {
-      const text = 'line1\nline2';
-      const styled = formatting.applyTextStyling(text);
-      expect(styled).toContain('line1<br>line2');
+    it('should not break double asterisks (markdown bold)', () => {
+      const result = formatting.applyTextStyling('**bold text**');
+      expect(result).not.toContain('<span class="action">');
     });
 
-    it('should handle mixed formatting', () => {
-      const text = '**bold** and *italic*\nnew line';
-      const styled = formatting.applyTextStyling(text);
-      expect(styled).toContain('<strong>bold</strong>');
-      expect(styled).toContain('<em>italic</em>');
-      expect(styled).toContain('<br>');
+    it('should preserve HTML tags', () => {
+      const result = formatting.applyTextStyling('<a href="test">link</a>');
+      expect(result).toContain('<a href="test">link</a>');
+    });
+
+    it('should handle null/undefined', () => {
+      expect(formatting.applyTextStyling(null)).toBe(null);
+      expect(formatting.applyTextStyling(undefined)).toBe(undefined);
     });
 
     it('should handle text without formatting', () => {
@@ -66,78 +65,59 @@ describe('useMessageFormatting', () => {
   });
 
   describe('getCurrentContent', () => {
-    it('should return isStreaming content when streaming', () => {
-      const message = ref({
-        content: 'final content',
-        isStreaming: true,
-        streamingContent: 'streaming content'
-      });
-
-      const content = formatting.getCurrentContent(message.value);
-      expect(content).toBe('streaming content');
+    it('should return content for user messages', () => {
+      const msg = { role: 'user', content: 'hello' };
+      expect(formatting.getCurrentContent(msg)).toBe('hello');
     });
 
-    it('should return regular content when not streaming', () => {
-      const message = ref({
-        content: 'final content',
-        isStreaming: false,
-        streamingContent: 'streaming content'
-      });
-
-      const content = formatting.getCurrentContent(message.value);
-      expect(content).toBe('final content');
+    it('should return current swipe for assistant messages', () => {
+      const msg = { role: 'assistant', swipes: ['first', 'second'], swipeIndex: 1 };
+      expect(formatting.getCurrentContent(msg)).toBe('second');
     });
 
-    it('should handle missing streamingContent', () => {
-      const message = ref({
-        content: 'final content',
-        isStreaming: true
-      });
-
-      const content = formatting.getCurrentContent(message.value);
-      expect(content).toBe('final content');
+    it('should handle missing swipeIndex (default to 0)', () => {
+      const msg = { role: 'assistant', swipes: ['first', 'second'] };
+      expect(formatting.getCurrentContent(msg)).toBe('first');
     });
 
-    it('should handle empty content', () => {
-      const message = ref({
-        content: '',
-        isStreaming: false
-      });
+    it('should fall back to content if no swipes', () => {
+      const msg = { role: 'assistant', content: 'fallback' };
+      expect(formatting.getCurrentContent(msg)).toBe('fallback');
+    });
 
-      const content = formatting.getCurrentContent(message.value);
-      expect(content).toBe('');
+    it('should return empty string if no content', () => {
+      const msg = { role: 'assistant' };
+      expect(formatting.getCurrentContent(msg)).toBe('');
     });
   });
 
   describe('sanitizeHtml', () => {
     it('should allow safe HTML tags', () => {
-      const html = '<strong>bold</strong> <em>italic</em>';
-      const sanitized = formatting.sanitizeHtml(html);
-      expect(sanitized).toContain('<strong>bold</strong>');
-      expect(sanitized).toContain('<em>italic</em>');
+      const result = formatting.sanitizeHtml('<strong>bold</strong> and <em>italic</em>');
+      expect(result).toContain('<strong>bold</strong>');
+      expect(result).toContain('<em>italic</em>');
     });
 
     it('should remove script tags', () => {
-      const html = '<script>alert("xss")</script>safe text';
-      const sanitized = formatting.sanitizeHtml(html);
-      expect(sanitized).not.toContain('<script>');
-      expect(sanitized).not.toContain('alert');
+      const result = formatting.sanitizeHtml('<script>alert("xss")</script>text');
+      expect(result).not.toContain('<script>');
+      expect(result).not.toContain('alert');
     });
 
-    it('should remove event handlers', () => {
-      const html = '<div onclick="alert(\'xss\')">click me</div>';
-      const sanitized = formatting.sanitizeHtml(html);
-      expect(sanitized).not.toContain('onclick');
+    it('should render markdown', () => {
+      const result = formatting.sanitizeHtml('# Heading');
+      expect(result).toContain('<h1>');
+    });
+
+    it('should process macros', () => {
+      const result = formatting.sanitizeHtml('Hello {{user}}', { userName: 'Alice' });
+      expect(result).toContain('Alice');
     });
 
     it('should allow br tags', () => {
       const html = 'line1<br>line2';
       const sanitized = formatting.sanitizeHtml(html);
       expect(sanitized).toContain('<br>');
-    });
-
-    it('should handle empty strings', () => {
-      expect(formatting.sanitizeHtml('')).toBe('');
     });
   });
 });

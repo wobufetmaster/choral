@@ -448,10 +448,8 @@
 </template>
 
 <script>
-import DOMPurify from 'dompurify';
-import MarkdownIt from 'markdown-it';
-import { processMacrosForDisplay } from '../utils/macros';
 import { useApi } from '../composables/useApi.js';
+import { useMessageFormatting } from '../composables/useMessageFormatting.js';
 import GroupChatManager from './GroupChatManager.vue';
 import LorebookEditor from './LorebookEditor.vue';
 import ChatSidebar from './ChatSidebar.vue';
@@ -476,7 +474,8 @@ export default {
   },
   setup() {
     const api = useApi();
-    return { api };
+    const formatting = useMessageFormatting();
+    return { api, formatting };
   },
   props: {
     tabData: {
@@ -487,7 +486,6 @@ export default {
   emits: ['open-tab', 'update-tab'],
   data() {
     return {
-      md: null, // Markdown renderer (initialized in mounted)
       character: null,
       characterName: 'Chat',
       persona: { name: 'User', avatar: null, _filename: 'default.json' },
@@ -676,31 +674,6 @@ export default {
     this.stopToolCallTimer();
   },
   async mounted() {
-    // Initialize markdown renderer
-    this.md = new MarkdownIt({
-      html: true, // Allow HTML (DOMPurify sanitizes it afterward)
-      linkify: true, // Auto-convert URLs to links
-      breaks: true, // Convert line breaks to <br>
-      typographer: true, // Enable smart quotes and other typography
-    });
-
-    // Custom renderer for code blocks to add language classes
-    const defaultRender = this.md.renderer.rules.fence || function(tokens, idx, options, env, self) {
-      return self.renderToken(tokens, idx, options);
-    };
-
-    this.md.renderer.rules.fence = function(tokens, idx, options, env, self) {
-      const token = tokens[idx];
-      const info = token.info ? token.info.trim() : '';
-      const langName = info ? info.split(/\s+/g)[0] : '';
-
-      if (langName) {
-        token.attrSet('class', `language-${langName}`);
-      }
-
-      return defaultRender(tokens, idx, options, env, self);
-    };
-
     // Support both tab data and route query params (for backward compatibility)
     const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
     const groupChatId = this.tabData?.groupChatId || this.$route?.query?.groupChat;
@@ -1831,44 +1804,16 @@ export default {
       this.$root.$notify('Response cancelled', 'info');
     },
     estimateTokens(text) {
-      if (!text) return 0;
-      // Rough estimate: ~4 characters per token
-      // Strip HTML tags for more accurate count
-      const stripped = text.replace(/<[^>]*>/g, '');
-      return Math.ceil(stripped.length / 4);
+      return this.formatting.estimateTokens(text);
     },
     applyTextStyling(text) {
-      // Apply special styling for quoted text and asterisk text
-      // Protect HTML tags and their attributes first to avoid breaking URLs and attributes
-
-      // Temporarily store HTML tags to protect them
-      const htmlTagPattern = /<[^>]+>/g;
-      const protectedTags = [];
-      let protectedText = text.replace(htmlTagPattern, (match) => {
-        protectedTags.push(match);
-        return `__HTML_TAG_${protectedTags.length - 1}__`;
-      });
-
-      // Style text in double quotes as dialogue (now safe from HTML attributes)
-      protectedText = protectedText.replace(/"([^"]+)"/g, '<span class="dialogue">"$1"</span>');
-
-      // Style text in asterisks as action/narration (avoid markdown bold **)
-      // Only match single asterisks, not double
-      protectedText = protectedText.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<span class="action">*$1*</span>');
-
-      // Restore HTML tags
-      protectedText = protectedText.replace(/__HTML_TAG_(\d+)__/g, (match, index) => {
-        return protectedTags[parseInt(index)];
-      });
-
-      return protectedText;
+      return this.formatting.applyTextStyling(text);
     },
     sanitizeHtml(html, message = null) {
-      // Process macros first - use the specific character for group chats
+      // Build macro context - use the specific character for group chats
       let charName = this.character?.data?.name || 'Character';
       let charNickname = this.character?.data?.nickname || '';
 
-      // For group chats, use the message's specific character
       if (this.isGroupChat && message?.characterFilename) {
         const char = this.groupChatCharacters.find(c => c.filename === message.characterFilename);
         if (char) {
@@ -1878,30 +1823,15 @@ export default {
       }
 
       const macroContext = {
-        charName: charName,
-        charNickname: charNickname,
+        charName,
+        charNickname,
         userName: this.persona?.name || 'User'
       };
-      const processed = processMacrosForDisplay(html, macroContext);
 
-      // Apply text styling (quotes and asterisks) before markdown
-      const styled = this.applyTextStyling(processed);
-
-      // Render markdown (if markdown renderer is initialized)
-      const rendered = this.md ? this.md.render(styled) : styled;
-
-      // Then sanitize
-      return DOMPurify.sanitize(rendered, {
-        ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'div', 'span', 'img', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
-        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target', 'rel']
-      });
+      return this.formatting.sanitizeHtml(html, macroContext);
     },
     getCurrentContent(message) {
-      if (message.role === 'user') {
-        return message.content;
-      }
-      // Assistant message with swipes
-      return message.swipes?.[message.swipeIndex] || message.content || '';
+      return this.formatting.getCurrentContent(message);
     },
     hasMultipleSwipes(message) {
       return message.swipes && message.swipes.length > 1;

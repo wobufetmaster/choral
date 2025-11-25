@@ -1,82 +1,114 @@
 import DOMPurify from 'dompurify';
+import MarkdownIt from 'markdown-it';
+import { processMacrosForDisplay } from '../utils/macros.js';
 
 /**
- * Composable for message formatting and sanitization
+ * Message formatting composable
  * Extracted from ChatView.vue for reusability
  */
 export function useMessageFormatting() {
+  // Initialize markdown renderer
+  const md = new MarkdownIt({
+    html: true,
+    linkify: true,
+    breaks: true,
+    typographer: true,
+  });
+
+  // Custom renderer for code blocks
+  const defaultRender = md.renderer.rules.fence || function(tokens, idx, options, env, self) {
+    return self.renderToken(tokens, idx, options);
+  };
+
+  md.renderer.rules.fence = function(tokens, idx, options, env, self) {
+    const token = tokens[idx];
+    const info = token.info ? token.info.trim() : '';
+    const langName = info ? info.split(/\s+/g)[0] : '';
+
+    if (langName) {
+      token.attrSet('class', `language-${langName}`);
+    }
+
+    return defaultRender(tokens, idx, options, env, self);
+  };
+
   /**
    * Estimate token count for text (rough approximation)
-   * Uses simple whitespace-based splitting
    * @param {string} text - Text to estimate tokens for
    * @returns {number} Estimated token count
    */
   function estimateTokens(text) {
-    if (!text || text.trim().length === 0) {
-      return text && text.length > 0 ? 1 : 0; // Whitespace counts as 1 token
-    }
-    // Simple approximation: split on whitespace and punctuation
-    // This is a rough estimate - real tokenization is more complex
-    const tokens = text
-      .trim()
-      .split(/\s+/)
-      .filter(t => t.length > 0);
-    return tokens.length;
+    if (!text) return 0;
+    // Rough estimate: ~4 characters per token
+    // Strip HTML tags for more accurate count
+    const stripped = text.replace(/<[^>]*>/g, '');
+    return Math.ceil(stripped.length / 4);
   }
 
   /**
-   * Apply basic text styling (bold, italic, line breaks)
-   * Converts markdown-style formatting to HTML
+   * Apply special styling for quoted text and asterisk text
    * @param {string} text - Text to style
-   * @returns {string} Styled text with HTML tags
+   * @returns {string} Styled text with span wrappers
    */
   function applyTextStyling(text) {
     if (!text) return text;
 
-    let styled = text;
+    // Protect HTML tags and their attributes first to avoid breaking URLs and attributes
+    const htmlTagPattern = /<[^>]+>/g;
+    const protectedTags = [];
+    let protectedText = text.replace(htmlTagPattern, (match) => {
+      protectedTags.push(match);
+      return `__HTML_TAG_${protectedTags.length - 1}__`;
+    });
 
-    // Convert **bold** to <strong>bold</strong>
-    styled = styled.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Style text in double quotes as dialogue (now safe from HTML attributes)
+    protectedText = protectedText.replace(/"([^"]+)"/g, '<span class="dialogue">"$1"</span>');
 
-    // Convert *italic* to <em>italic</em> (but not ** which was already processed)
-    // Use negative lookbehind/lookahead to avoid matching **
-    styled = styled.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+    // Style text in asterisks as action/narration (avoid markdown bold **)
+    // Only match single asterisks, not double
+    protectedText = protectedText.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<span class="action">*$1*</span>');
 
-    // Convert newlines to <br>
-    styled = styled.replace(/\n/g, '<br>');
+    // Restore HTML tags
+    protectedText = protectedText.replace(/__HTML_TAG_(\d+)__/g, (match, index) => {
+      return protectedTags[parseInt(index)];
+    });
 
-    return styled;
+    return protectedText;
   }
 
   /**
-   * Get current content from message (handles streaming vs final)
-   * @param {Object} message - Message object
-   * @returns {string} Current message content
+   * Get the current content from a message (handles swipes)
+   * @param {object} message - Message object
+   * @returns {string|Array} Current content
    */
   function getCurrentContent(message) {
-    if (!message) return '';
-
-    // If streaming, use streamingContent if available
-    if (message.isStreaming && message.streamingContent) {
-      return message.streamingContent;
+    if (message.role === 'user') {
+      return message.content;
     }
-
-    // Otherwise use regular content
-    return message.content || '';
+    // Assistant message with swipes
+    return message.swipes?.[message.swipeIndex ?? 0] || message.content || '';
   }
 
   /**
-   * Sanitize HTML to prevent XSS attacks
-   * Allows safe formatting tags but removes scripts and event handlers
-   * @param {string} html - HTML to sanitize
+   * Sanitize and render HTML with markdown and macros
+   * @param {string} html - Raw HTML/markdown content
+   * @param {object} macroContext - Context for macro replacement (charName, charNickname, userName)
    * @returns {string} Sanitized HTML
    */
-  function sanitizeHtml(html) {
-    if (!html) return html;
+  function sanitizeHtml(html, macroContext = {}) {
+    // Process macros first
+    const processed = processMacrosForDisplay(html, macroContext);
 
-    return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: ['strong', 'em', 'br', 'p', 'span', 'div', 'code', 'pre'],
-      ALLOWED_ATTR: []
+    // Apply text styling (quotes and asterisks) before markdown
+    const styled = applyTextStyling(processed);
+
+    // Render markdown
+    const rendered = md.render(styled);
+
+    // Sanitize
+    return DOMPurify.sanitize(rendered, {
+      ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'div', 'span', 'img', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target', 'rel']
     });
   }
 
@@ -84,6 +116,7 @@ export function useMessageFormatting() {
     estimateTokens,
     applyTextStyling,
     getCurrentContent,
-    sanitizeHtml
+    sanitizeHtml,
+    processMacrosForDisplay
   };
 }
