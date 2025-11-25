@@ -455,6 +455,8 @@ import { useBranches } from '../composables/useBranches.js';
 import { useChatHistory } from '../composables/useChatHistory.js';
 import { useContextBuilder } from '../composables/useContextBuilder.js';
 import { useBranchOperations } from '../composables/useBranchOperations.js';
+import { useGroupChatOperations } from '../composables/useGroupChatOperations.js';
+import { useChatPersistence } from '../composables/useChatPersistence.js';
 import GroupChatManager from './GroupChatManager.vue';
 import LorebookEditor from './LorebookEditor.vue';
 import ChatSidebar from './ChatSidebar.vue';
@@ -485,7 +487,9 @@ export default {
     const historyHelpers = useChatHistory(api);
     const contextBuilder = useContextBuilder();
     const branchOps = useBranchOperations();
-    return { api, formatting, swipeHelpers, branchHelpers, historyHelpers, contextBuilder, branchOps };
+    const groupChatOps = useGroupChatOperations();
+    const chatPersistence = useChatPersistence();
+    return { api, formatting, swipeHelpers, branchHelpers, historyHelpers, contextBuilder, branchOps, groupChatOps, chatPersistence };
   },
   props: {
     tabData: {
@@ -931,36 +935,27 @@ export default {
     },
     async loadChat(chatId) {
       try {
-        const chat = await this.api.getChat(chatId);
+        const result = await this.chatPersistence.loadChat({
+          chatId,
+          api: this.api,
+          normalizeMessages: this.normalizeMessages
+        });
 
-        // Handle branch-based structure
-        if (chat.branches && chat.mainBranch) {
-          this.branches = chat.branches;
-          this.mainBranch = chat.mainBranch;
-          this.currentBranch = chat.currentBranch || chat.mainBranch;
+        this.chatId = result.chatId;
+        this.messages = result.messages;
+        this.chatDisplayTitle = result.displayTitle;
 
-          // Load messages from current branch
-          const branch = this.branches[this.currentBranch];
-          this.messages = this.normalizeMessages(branch?.messages || []);
-        } else {
-          // Old format (will be migrated on server)
-          this.messages = this.normalizeMessages(chat.messages || []);
+        if (result.branches) {
+          this.branches = result.branches;
+          this.mainBranch = result.mainBranch;
+          this.currentBranch = result.currentBranch;
         }
 
-        this.chatId = chatId;
-
-        // Capture the custom title if it exists
-        this.chatDisplayTitle = chat.title || null;
-
-        // Load persona if saved in chat
-        if (chat.personaFilename) {
-          await this.handlePersonaChange(chat.personaFilename);
+        if (result.personaFilename) {
+          await this.handlePersonaChange(result.personaFilename);
         }
 
-        // Trigger auto-naming if chat has messages and hasn't been named yet
-        await this.autoNameChat(chatId, chat);
-
-        // Load debug data for this chat
+        await this.autoNameChat(chatId, result.chat);
         this.loadDebugDataFromStorage();
       } catch (error) {
         console.error('Failed to load chat:', error);
@@ -968,49 +963,17 @@ export default {
     },
     async autoNameChat(chatId, chat) {
       try {
-        // Only auto-name if:
-        // 1. Chat has messages
-        // 2. Chat hasn't been auto-named before
-        // 3. Title is still the default (character name or filename-based)
-
-        // Check for messages in both branch-based and flat structure
-        let hasMessages = false;
-        if (chat.branches && chat.currentBranch && chat.branches[chat.currentBranch]) {
-          hasMessages = chat.branches[chat.currentBranch].messages?.length > 0;
-        } else if (chat.messages) {
-          hasMessages = chat.messages.length > 0;
-        }
-
-        if (!chat || !hasMessages) {
-          return;
-        }
-
-        if (chat.autoNamed) {
-          return; // Already auto-named
-        }
-
-        // Call auto-naming endpoint (runs in background)
-        const endpoint = this.isGroupChat
-          ? `/api/group-chats/${chatId}/auto-name`
-          : `/api/chats/${chatId}/auto-name`;
-
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
+        const result = await this.chatPersistence.autoNameChat({
+          chatId,
+          chat,
+          isGroupChat: this.isGroupChat
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          if (!result.skipped && result.title) {
-            console.log('Auto-named chat:', result.title);
-            // Update display title
-            this.chatDisplayTitle = result.title;
-            // Don't update tab title - keep it constant
-          }
+        if (!result.skipped && result.title) {
+          console.log('Auto-named chat:', result.title);
+          this.chatDisplayTitle = result.title;
         }
       } catch (error) {
-        // Fail silently - auto-naming is not critical
         console.debug('Auto-naming skipped:', error.message);
       }
     },
@@ -1053,49 +1016,36 @@ export default {
     },
     async loadMostRecentChat(characterFilename) {
       try {
-        const response = await fetch(`/api/chats/character/${characterFilename}`);
-        if (response.ok) {
-          const chat = await response.json();
-          this.messages = this.normalizeMessages(chat.messages || []);
-          this.chatId = chat.filename;
+        const result = await this.chatPersistence.loadMostRecentChat({
+          characterFilename,
+          normalizeMessages: this.normalizeMessages
+        });
 
-          // Trigger auto-naming if needed
-          await this.autoNameChat(chat.filename, chat);
+        if (result) {
+          this.messages = result.messages;
+          this.chatId = result.chatId;
+          await this.autoNameChat(result.chatId, result.chat);
         } else {
-          // No existing chat, initialize new one
           this.initializeChat();
         }
       } catch (error) {
-        // No existing chat, initialize new one
         this.initializeChat();
       }
     },
     async saveChat(showNotification = false) {
       try {
-        // Update current branch messages
-        if (this.currentBranch && this.branches[this.currentBranch]) {
-          this.branches[this.currentBranch].messages = this.messages;
-        }
-
-        const chat = {
-          filename: this.chatId || `chat_${Date.now()}.json`,
-          character: this.character?.data.name || 'Unknown',
+        const result = await this.chatPersistence.saveChat({
+          chatId: this.chatId,
+          character: this.character,
           characterFilename: this.tabData?.characterId || this.$route?.query?.character,
-          timestamp: Date.now(),
-          personaFilename: this.persona?._filename || null
-        };
+          persona: this.persona,
+          messages: this.messages,
+          branches: this.branches,
+          mainBranch: this.mainBranch,
+          currentBranch: this.currentBranch,
+          api: this.api
+        });
 
-        // Include branch structure if it exists
-        if (this.branches && Object.keys(this.branches).length > 0) {
-          chat.branches = this.branches;
-          chat.mainBranch = this.mainBranch;
-          chat.currentBranch = this.currentBranch;
-        } else {
-          // Old format for compatibility
-          chat.messages = this.messages;
-        }
-
-        const result = await this.api.saveChat(chat);
         this.chatId = result.filename;
         if (showNotification) {
           this.$root.$notify('Chat saved successfully', 'success');
@@ -3128,140 +3078,65 @@ export default {
 
     async loadGroupChat(groupChatId) {
       try {
-        const groupChat = await this.api.getGroupChat(groupChatId);
+        const result = await this.groupChatOps.loadGroupChat({
+          groupChatId,
+          api: this.api,
+          normalizeMessages: this.normalizeMessages
+        });
 
-        // Refresh character data from actual PNG files to get latest edits
-        const refreshedCharacters = [];
-        for (const cachedChar of groupChat.characters || []) {
-          try {
-            const freshCharData = await this.api.getCharacter(cachedChar.filename);
-            refreshedCharacters.push({
-              filename: cachedChar.filename,
-              name: freshCharData.data.name,
-              data: freshCharData.data  // Store just the data object, not the whole character
-            });
-          } catch (error) {
-            // If character file is missing, keep the cached version
-            console.warn(`Character ${cachedChar.filename} not found, using cached data`);
-            refreshedCharacters.push(cachedChar);
-          }
+        this.groupChatCharacters = result.characters;
+        this.groupChatStrategy = result.strategy;
+        this.groupChatExplicitMode = result.explicitMode;
+        this.groupChatName = result.name;
+        this.groupChatTags = result.tags;
+        this.conversationGroup = result.conversationGroup;
+        this.messages = result.messages;
+
+        if (result.branches) {
+          this.branches = result.branches;
+          this.mainBranch = result.mainBranch;
+          this.currentBranch = result.currentBranch;
         }
 
-        this.groupChatCharacters = refreshedCharacters;
-        this.groupChatStrategy = groupChat.strategy || 'join';
-        this.groupChatExplicitMode = groupChat.explicitMode || false;
-        this.groupChatName = groupChat.name || '';
-        this.groupChatTags = groupChat.tags || [];
-        this.conversationGroup = groupChat.conversationGroup || null; // Load conversation group
-
-        // Load branch structure if it exists
-        if (groupChat.branches && groupChat.mainBranch) {
-          this.branches = groupChat.branches;
-          this.mainBranch = groupChat.mainBranch;
-          this.currentBranch = groupChat.currentBranch || groupChat.mainBranch;
-
-          // Load messages from current branch
-          const branch = this.branches[this.currentBranch];
-          this.messages = this.normalizeMessages(branch?.messages || []);
-        } else {
-          // Old format without branches
-          this.messages = this.normalizeMessages(groupChat.messages || []);
-        }
-
-        // If no messages, initialize with swipeable greetings
-        if (this.messages.length === 0) {
+        if (result.needsInitialization) {
           await this.initializeGroupChat();
         }
 
-        // Load debug data for this chat
         this.loadDebugDataFromStorage();
       } catch (error) {
         console.error('Failed to load group chat:', error);
-        // If group chat doesn't exist, initialize new one
         await this.initializeGroupChat();
       }
     },
 
     async initializeGroupChat() {
-      if (this.groupChatCharacters.length === 0) return;
-
-      console.log('Initializing group chat with characters:', this.groupChatCharacters);
-
-      // Create separate messages for each character with their greetings as swipes
-      const messages = [];
-
-      for (const char of this.groupChatCharacters) {
-        try {
-          const charData = await this.api.getCharacter(char.filename);
-
-          console.log(`Loaded character data for ${char.filename}:`, charData);
-
-          const firstMessage = charData.data.first_mes || 'Hello!';
-          const alternateGreetings = charData.data.alternate_greetings || [];
-
-          // Create all greetings for this character (first message + alternates)
-          const characterGreetings = [firstMessage, ...alternateGreetings];
-
-          // Create a message for this character with all their greetings as swipes
-          messages.push({
-            role: 'assistant',
-            swipes: characterGreetings,
-            swipeCharacters: new Array(characterGreetings.length).fill(char.filename),
-            swipeIndex: 0,
-            isFirstMessage: true,
-            characterFilename: char.filename
-          });
-
-          console.log(`Added message for ${char.name} with ${characterGreetings.length} greetings`);
-        } catch (err) {
-          console.error(`Failed to load greetings for ${char.filename}:`, err);
-        }
-      }
-
-      this.messages = messages;
-      console.log('Initialized messages:', this.messages);
+      this.messages = await this.groupChatOps.initializeGroupChat({
+        characters: this.groupChatCharacters,
+        api: this.api
+      });
     },
 
     async saveGroupChat(showNotification = true) {
       try {
-        // Update current branch messages
-        if (this.currentBranch && this.branches[this.currentBranch]) {
-          this.branches[this.currentBranch].messages = this.messages;
-        }
-
-        // Generate conversationGroup ID if it doesn't exist
-        // Use deterministic ID based on character filenames so all chats with same characters are grouped
-        if (!this.conversationGroup) {
-          const characterFilenames = this.groupChatCharacters.map(c => c.filename);
-          this.conversationGroup = this.getConversationGroupId(characterFilenames);
-        }
-
-        const groupChat = {
-          filename: this.groupChatId || `group_chat_${Date.now()}.json`,
-          isGroupChat: true,
+        const result = await this.groupChatOps.saveGroupChat({
+          groupChatId: this.groupChatId,
           characters: this.groupChatCharacters,
-          characterFilenames: this.groupChatCharacters.map(c => c.filename), // Add for compatibility
-          conversationGroup: this.conversationGroup, // Link related chats together
           strategy: this.groupChatStrategy,
           explicitMode: this.groupChatExplicitMode,
           name: this.groupChatName,
           tags: this.groupChatTags,
-          timestamp: Date.now(),
-          title: this.chatDisplayTitle // Include title for chat history
-        };
+          conversationGroup: this.conversationGroup,
+          displayTitle: this.chatDisplayTitle,
+          messages: this.messages,
+          branches: this.branches,
+          mainBranch: this.mainBranch,
+          currentBranch: this.currentBranch,
+          api: this.api,
+          getConversationGroupId: this.getConversationGroupId
+        });
 
-        // Include branch structure if it exists
-        if (this.branches && Object.keys(this.branches).length > 0) {
-          groupChat.branches = this.branches;
-          groupChat.mainBranch = this.mainBranch;
-          groupChat.currentBranch = this.currentBranch;
-        } else {
-          // Old format for compatibility
-          groupChat.messages = this.messages;
-        }
-
-        const result = await this.api.saveGroupChat(groupChat);
         this.groupChatId = result.filename;
+        this.conversationGroup = result.conversationGroup;
 
         if (showNotification) {
           this.$root.$notify('Group chat saved', 'success');
@@ -3277,25 +3152,18 @@ export default {
     async convertToGroupChat() {
       if (!this.character) return;
 
-      // Convert current character chat to group chat
       const characterFilename = this.tabData?.characterId || this.$route?.query?.character;
-      const characterData = this.character.data || this.character;
-      this.isGroupChat = true;
-      this.groupChatCharacters = [{
-        filename: characterFilename,
-        name: characterData.name,
-        data: characterData
-      }];
-      this.groupChatStrategy = 'join';
-
-      // Mark all existing messages with character
-      this.messages.forEach(msg => {
-        if (msg.role === 'assistant' && !msg.characterFilename) {
-          msg.characterFilename = characterFilename;
-        }
+      const result = this.groupChatOps.convertToGroupChat({
+        character: this.character,
+        characterFilename,
+        messages: this.messages
       });
 
-      // Save as new group chat
+      this.isGroupChat = result.isGroupChat;
+      this.groupChatCharacters = result.characters;
+      this.groupChatStrategy = result.strategy;
+      this.messages = result.messages;
+
       await this.saveGroupChat();
 
       // Update URL (only in router mode)
@@ -3344,46 +3212,50 @@ export default {
     },
 
     moveCharacterUp(index) {
-      if (index > 0) {
-        const temp = this.groupChatCharacters[index];
-        this.groupChatCharacters[index] = this.groupChatCharacters[index - 1];
-        this.groupChatCharacters[index - 1] = temp;
+      const result = this.groupChatOps.moveCharacterUp(index, this.groupChatCharacters);
+      if (result) {
+        this.groupChatCharacters = result;
         this.saveGroupChat();
       }
     },
 
     moveCharacterDown(index) {
-      if (index < this.groupChatCharacters.length - 1) {
-        const temp = this.groupChatCharacters[index];
-        this.groupChatCharacters[index] = this.groupChatCharacters[index + 1];
-        this.groupChatCharacters[index + 1] = temp;
+      const result = this.groupChatOps.moveCharacterDown(index, this.groupChatCharacters);
+      if (result) {
+        this.groupChatCharacters = result;
         this.saveGroupChat();
       }
     },
 
     async removeCharacterFromGroup(index) {
-      if (confirm('Remove this character from the group chat?')) {
-        this.groupChatCharacters.splice(index, 1);
-        if (this.groupChatCharacters.length === 0) {
-          this.$root.$notify('Cannot have empty group chat', 'error');
-          return;
-        }
-        await this.saveGroupChat();
+      if (!confirm('Remove this character from the group chat?')) return;
+
+      const result = this.groupChatOps.removeCharacterFromGroup({
+        index,
+        characters: this.groupChatCharacters
+      });
+
+      if (!result.success) {
+        this.$root.$notify(result.error, 'error');
+        return;
       }
+
+      this.groupChatCharacters = result.characters;
+      await this.saveGroupChat();
     },
 
     async addCharacterToGroup(characterFilename) {
-      const char = this.allCharacters.find(c => c.filename === characterFilename);
-      if (!char) return;
-
-      this.groupChatCharacters.push({
-        filename: char.filename,
-        name: char.name,
-        data: char.data
+      const newChar = this.groupChatOps.addCharacterToGroup({
+        characterFilename,
+        allCharacters: this.allCharacters,
+        currentCharacters: this.groupChatCharacters
       });
 
+      if (!newChar) return;
+
+      this.groupChatCharacters.push(newChar);
       await this.saveGroupChat();
-      this.$root.$notify(`Added ${char.name} to group`, 'success');
+      this.$root.$notify(`Added ${newChar.name} to group`, 'success');
     },
 
     buildGroupChatContext(upToMessageIndex = null) {
