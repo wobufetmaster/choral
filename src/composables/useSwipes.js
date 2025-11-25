@@ -1,11 +1,14 @@
 /**
  * Swipe navigation composable
  *
- * Manages swipe navigation for assistant messages (response alternatives).
+ * Provides helper functions for swipe navigation on assistant messages.
+ * Extracted from ChatView.vue for reusability.
  */
-export function useSwipes(messages, { onSave }) {
+export function useSwipes() {
   /**
    * Get total number of swipes for a message
+   * @param {object} message - Message object
+   * @returns {number} Total swipe count
    */
   function getTotalSwipes(message) {
     return message.swipes?.length || 1;
@@ -13,23 +16,39 @@ export function useSwipes(messages, { onSave }) {
 
   /**
    * Get current swipe index
+   * @param {object} message - Message object
+   * @returns {number} Current swipe index
    */
   function getCurrentSwipeIndex(message) {
     return message.swipeIndex ?? 0;
   }
 
   /**
-   * Check if can swipe left
+   * Check if message has multiple swipes
+   * @param {object} message - Message object
+   * @returns {boolean} True if message has multiple swipes
+   */
+  function hasMultipleSwipes(message) {
+    return message.swipes && message.swipes.length > 1;
+  }
+
+  /**
+   * Check if can swipe left (to previous response)
+   * @param {object} message - Message object
+   * @returns {boolean} True if can swipe left
    */
   function canSwipeLeft(message) {
+    // For first messages (greetings), always allow swiping to cycle
     if (message.isFirstMessage) {
-      return true; // First messages cycle
+      return true;
     }
     return (message.swipeIndex ?? 0) > 0;
   }
 
   /**
-   * Check if can swipe right (to existing swipe)
+   * Check if can swipe right to existing response (not generate new)
+   * @param {object} message - Message object
+   * @returns {boolean} True if can navigate to next existing swipe
    */
   function canSwipeRight(message) {
     const currentIndex = message.swipeIndex ?? 0;
@@ -38,88 +57,35 @@ export function useSwipes(messages, { onSave }) {
   }
 
   /**
-   * Swipe left to previous response
-   * @param {number} index - Message index in messages array
-   * @param {object} options - Options for group chat handling
+   * Check if at last swipe (would generate new on swipe right)
+   * @param {object} message - Message object
+   * @returns {boolean} True if at the last swipe
    */
-  async function swipeLeft(index, options = {}) {
-    const message = messages.value[index];
+  function isAtLastSwipe(message) {
     const currentIndex = message.swipeIndex ?? 0;
     const totalSwipes = message.swipes?.length || 1;
-
-    if (message.isFirstMessage) {
-      // Cycle back to last
-      if (currentIndex > 0) {
-        message.swipeIndex--;
-      } else {
-        message.swipeIndex = totalSwipes - 1;
-      }
-    } else if (canSwipeLeft(message)) {
-      message.swipeIndex--;
-    } else {
-      return; // Can't swipe
-    }
-
-    // Update character filename for group chats
-    if (options.isGroupChat && message.swipeCharacters?.[message.swipeIndex]) {
-      message.characterFilename = message.swipeCharacters[message.swipeIndex];
-    }
-
-    // Save if chat has content
-    if (messages.value.length > 1 || options.chatId) {
-      await onSave?.();
-    }
+    return currentIndex === totalSwipes - 1;
   }
 
   /**
-   * Swipe right to next response or generate new
-   * @param {number} index - Message index
-   * @param {function} generateFn - Function to call when generating new swipe
-   * @param {object} options - Options for group chat handling
+   * Get the content for the current swipe
+   * @param {object} message - Message object
+   * @returns {string} Current swipe content
    */
-  async function swipeRight(index, generateFn, options = {}) {
-    const message = messages.value[index];
-    const currentIndex = message.swipeIndex ?? 0;
-    const totalSwipes = message.swipes?.length || 1;
-
-    if (message.isFirstMessage) {
-      // Cycle back to first
-      if (currentIndex < totalSwipes - 1) {
-        message.swipeIndex++;
-      } else {
-        message.swipeIndex = 0;
-      }
-
-      // Update character filename for group chats
-      if (options.isGroupChat && message.swipeCharacters?.[message.swipeIndex]) {
-        message.characterFilename = message.swipeCharacters[message.swipeIndex];
-      }
-
-      if (messages.value.length > 1 || options.chatId) {
-        await onSave?.();
-      }
-    } else if (currentIndex < totalSwipes - 1) {
-      // Navigate to existing swipe
-      message.swipeIndex++;
-
-      // Update character filename for group chats
-      if (options.isGroupChat && message.swipeCharacters?.[message.swipeIndex]) {
-        message.characterFilename = message.swipeCharacters[message.swipeIndex];
-      }
-
-      await onSave?.();
-    } else if (generateFn) {
-      // At last swipe, generate new one
-      await generateFn(index);
+  function getCurrentSwipeContent(message) {
+    if (message.role === 'user') {
+      return message.content;
     }
+    return message.swipes?.[message.swipeIndex ?? 0] || message.content || '';
   }
 
   return {
     getTotalSwipes,
     getCurrentSwipeIndex,
+    hasMultipleSwipes,
     canSwipeLeft,
     canSwipeRight,
-    swipeLeft,
-    swipeRight
+    isAtLastSwipe,
+    getCurrentSwipeContent
   };
 }

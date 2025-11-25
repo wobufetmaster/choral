@@ -450,6 +450,9 @@
 <script>
 import { useApi } from '../composables/useApi.js';
 import { useMessageFormatting } from '../composables/useMessageFormatting.js';
+import { useSwipes } from '../composables/useSwipes.js';
+import { useBranches } from '../composables/useBranches.js';
+import { useChatHistory } from '../composables/useChatHistory.js';
 import { processMacrosForDisplay } from '../utils/macros.js';
 import GroupChatManager from './GroupChatManager.vue';
 import LorebookEditor from './LorebookEditor.vue';
@@ -476,7 +479,10 @@ export default {
   setup() {
     const api = useApi();
     const formatting = useMessageFormatting();
-    return { api, formatting };
+    const swipeHelpers = useSwipes();
+    const branchHelpers = useBranches();
+    const historyHelpers = useChatHistory(api);
+    return { api, formatting, swipeHelpers, branchHelpers, historyHelpers };
   },
   props: {
     tabData: {
@@ -1835,25 +1841,19 @@ export default {
       return this.formatting.getCurrentContent(message);
     },
     hasMultipleSwipes(message) {
-      return message.swipes && message.swipes.length > 1;
+      return this.swipeHelpers.hasMultipleSwipes(message);
     },
     getCurrentSwipeIndex(message) {
-      return message.swipeIndex ?? 0;
+      return this.swipeHelpers.getCurrentSwipeIndex(message);
     },
     getTotalSwipes(message) {
-      return message.swipes?.length || 1;
+      return this.swipeHelpers.getTotalSwipes(message);
     },
     canSwipeLeft(message) {
-      // For first messages (greetings), always allow swiping left to loop
-      if (message.isFirstMessage) {
-        return true;
-      }
-      return (message.swipeIndex ?? 0) > 0;
+      return this.swipeHelpers.canSwipeLeft(message);
     },
     canSwipeRight(message) {
-      const currentIndex = message.swipeIndex ?? 0;
-      const totalSwipes = message.swipes?.length || 1;
-      return currentIndex < totalSwipes - 1;
+      return this.swipeHelpers.canSwipeRight(message);
     },
     async swipeLeft(index) {
       const message = this.messages[index];

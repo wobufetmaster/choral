@@ -1,192 +1,153 @@
-import { ref } from 'vue';
-
 /**
- * Branch management composable
+ * Branch management helper composable
  *
- * Manages conversation branching - creating alternate conversation paths
- * from any point in the chat history.
+ * Provides pure helper functions for working with branch data structures.
+ * The actual branch operations (create, switch, delete) remain in ChatView
+ * as they require API calls and Vue-specific context.
  */
-export function useBranches(messages, { onSave }) {
-  const branches = ref({});
-  const mainBranch = ref(null);
-  const currentBranch = ref(null);
+export function useBranches() {
+  /**
+   * Check if branch data exists and has been initialized
+   * @param {object} branches - Branch structure object
+   * @returns {boolean} True if branches are initialized
+   */
+  function hasBranches(branches) {
+    return branches && Object.keys(branches).length > 0;
+  }
 
   /**
-   * Initialize branch structure with main branch
+   * Get count of branches
+   * @param {object} branches - Branch structure object
+   * @returns {number} Number of branches
    */
-  function initializeBranches() {
-    if (Object.keys(branches.value).length > 0) return;
+  function getBranchCount(branches) {
+    return branches ? Object.keys(branches).length : 0;
+  }
 
-    const mainBranchId = 'branch-main';
-    branches.value = {
-      [mainBranchId]: {
-        id: mainBranchId,
-        name: 'Main',
-        createdAt: new Date().toISOString(),
-        parentBranchId: null,
-        branchPointMessageIndex: null,
-        messages: [...messages.value]
+  /**
+   * Get branch by ID
+   * @param {object} branches - Branch structure object
+   * @param {string} branchId - Branch ID
+   * @returns {object|null} Branch object or null
+   */
+  function getBranch(branches, branchId) {
+    return branches?.[branchId] || null;
+  }
+
+  /**
+   * Get children of a branch
+   * @param {object} branches - Branch structure object
+   * @param {string} branchId - Parent branch ID
+   * @returns {array} Array of child branch objects
+   */
+  function getChildBranches(branches, branchId) {
+    if (!branches) return [];
+    return Object.values(branches).filter(b => b.parentBranchId === branchId);
+  }
+
+  /**
+   * Check if a branch has children
+   * @param {object} branches - Branch structure object
+   * @param {string} branchId - Branch ID
+   * @returns {boolean} True if branch has children
+   */
+  function hasChildBranches(branches, branchId) {
+    return getChildBranches(branches, branchId).length > 0;
+  }
+
+  /**
+   * Get ancestor chain of a branch (from root to branch)
+   * @param {object} branches - Branch structure object
+   * @param {string} branchId - Branch ID
+   * @returns {array} Array of branch IDs from root to given branch
+   */
+  function getAncestorChain(branches, branchId) {
+    if (!branches) return [];
+    const chain = [];
+    let current = branchId;
+
+    while (current && branches[current]) {
+      chain.unshift(current);
+      current = branches[current].parentBranchId;
+    }
+
+    return chain;
+  }
+
+  /**
+   * Find the branch that should be the parent for a new branch at a given message index
+   * @param {object} branches - Branch structure object
+   * @param {string} currentBranchId - Current branch ID
+   * @param {number} messageIndex - Message index where branch would be created
+   * @returns {string} ID of the branch that should be the parent
+   */
+  function findParentBranchForIndex(branches, currentBranchId, messageIndex) {
+    if (!branches || !currentBranchId) return currentBranchId;
+
+    const currentBranch = branches[currentBranchId];
+    if (!currentBranch) return currentBranchId;
+
+    // If current branch has no parent, it's the root
+    if (currentBranch.parentBranchId === null) {
+      return currentBranchId;
+    }
+
+    const currentBranchPoint = currentBranch.branchPointMessageIndex ?? 0;
+
+    // If message is after the current branch point, parent is current branch
+    if (messageIndex > currentBranchPoint) {
+      return currentBranchId;
+    }
+
+    // Walk up to find the correct ancestor
+    let ancestorId = currentBranch.parentBranchId;
+    while (ancestorId) {
+      const ancestor = branches[ancestorId];
+      if (!ancestor) break;
+
+      const ancestorBranchPoint = ancestor.branchPointMessageIndex ?? 0;
+
+      // If this is the main branch or message is after this ancestor's branch point
+      if (ancestor.parentBranchId === null || messageIndex > ancestorBranchPoint) {
+        return ancestorId;
       }
+
+      ancestorId = ancestor.parentBranchId;
+    }
+
+    return currentBranchId;
+  }
+
+  /**
+   * Build a tree structure from flat branches for display
+   * @param {object} branches - Branch structure object
+   * @param {string} mainBranchId - ID of the main branch
+   * @returns {object} Tree structure with children arrays
+   */
+  function buildBranchTree(branches, mainBranchId) {
+    if (!branches || !mainBranchId) return null;
+
+    const buildNode = (branchId) => {
+      const branch = branches[branchId];
+      if (!branch) return null;
+
+      return {
+        ...branch,
+        children: getChildBranches(branches, branchId).map(child => buildNode(child.id))
+      };
     };
-    mainBranch.value = mainBranchId;
-    currentBranch.value = mainBranchId;
-  }
 
-  /**
-   * Create a new branch from a message index
-   * @param {number} messageIndex - Index to branch from
-   * @param {string} branchName - Name for the new branch
-   * @returns {string} New branch ID
-   */
-  async function createBranch(messageIndex, branchName) {
-    // Ensure branches are initialized
-    if (Object.keys(branches.value).length === 0) {
-      initializeBranches();
-    }
-
-    // Save current branch state
-    if (currentBranch.value && branches.value[currentBranch.value]) {
-      branches.value[currentBranch.value].messages = [...messages.value];
-    }
-
-    // Generate unique branch ID
-    const branchId = `branch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Create new branch with messages up to branch point
-    branches.value[branchId] = {
-      id: branchId,
-      name: branchName,
-      createdAt: new Date().toISOString(),
-      parentBranchId: currentBranch.value,
-      branchPointMessageIndex: messageIndex,
-      messages: messages.value.slice(0, messageIndex + 1)
-    };
-
-    // Switch to new branch
-    currentBranch.value = branchId;
-    messages.value = [...branches.value[branchId].messages];
-
-    await onSave?.();
-    return branchId;
-  }
-
-  /**
-   * Switch to an existing branch
-   * @param {string} branchId - Branch to switch to
-   */
-  async function switchToBranch(branchId) {
-    if (!branches.value[branchId]) {
-      throw new Error(`Branch ${branchId} not found`);
-    }
-
-    // Save current branch state
-    if (currentBranch.value && branches.value[currentBranch.value]) {
-      branches.value[currentBranch.value].messages = [...messages.value];
-    }
-
-    // Load target branch
-    currentBranch.value = branchId;
-    messages.value.splice(0, messages.value.length, ...branches.value[branchId].messages);
-
-    await onSave?.();
-  }
-
-  /**
-   * Rename a branch
-   */
-  async function renameBranch(branchId, newName) {
-    if (!branches.value[branchId]) {
-      throw new Error(`Branch ${branchId} not found`);
-    }
-
-    branches.value[branchId].name = newName;
-    await onSave?.();
-  }
-
-  /**
-   * Delete a branch
-   * @param {string} branchId - Branch to delete
-   * @param {boolean} deleteChildren - Also delete child branches
-   */
-  async function deleteBranch(branchId, deleteChildren = false) {
-    if (branchId === mainBranch.value) {
-      throw new Error('Cannot delete main branch');
-    }
-
-    if (!branches.value[branchId]) {
-      throw new Error(`Branch ${branchId} not found`);
-    }
-
-    // Find children
-    const children = Object.keys(branches.value).filter(
-      id => branches.value[id].parentBranchId === branchId
-    );
-
-    if (deleteChildren) {
-      // Recursively delete children
-      for (const childId of children) {
-        await deleteBranch(childId, true);
-      }
-    } else {
-      // Re-parent children to deleted branch's parent
-      const newParent = branches.value[branchId].parentBranchId;
-      for (const childId of children) {
-        branches.value[childId].parentBranchId = newParent;
-      }
-    }
-
-    // If deleting current branch, switch to parent
-    if (currentBranch.value === branchId) {
-      const parentId = branches.value[branchId].parentBranchId || mainBranch.value;
-      await switchToBranch(parentId);
-    }
-
-    delete branches.value[branchId];
-    await onSave?.();
-  }
-
-  /**
-   * Load branch structure from saved chat data
-   */
-  function loadBranches(chatData) {
-    if (chatData.branches) {
-      branches.value = chatData.branches;
-      mainBranch.value = chatData.mainBranch;
-      currentBranch.value = chatData.currentBranch || chatData.mainBranch;
-
-      // Load current branch messages
-      if (branches.value[currentBranch.value]) {
-        messages.value.splice(0, messages.value.length, ...branches.value[currentBranch.value].messages);
-      }
-    }
-  }
-
-  /**
-   * Get branch data for saving
-   */
-  function getBranchDataForSave() {
-    // Update current branch messages before saving
-    if (currentBranch.value && branches.value[currentBranch.value]) {
-      branches.value[currentBranch.value].messages = [...messages.value];
-    }
-
-    return {
-      branches: branches.value,
-      mainBranch: mainBranch.value,
-      currentBranch: currentBranch.value
-    };
+    return buildNode(mainBranchId);
   }
 
   return {
-    branches,
-    mainBranch,
-    currentBranch,
-    initializeBranches,
-    createBranch,
-    switchToBranch,
-    renameBranch,
-    deleteBranch,
-    loadBranches,
-    getBranchDataForSave
+    hasBranches,
+    getBranchCount,
+    getBranch,
+    getChildBranches,
+    hasChildBranches,
+    getAncestorChain,
+    findParentBranchForIndex,
+    buildBranchTree
   };
 }
