@@ -763,8 +763,7 @@ export default {
         });
 
         if (!result.skipped && result.title) {
-          console.log('Auto-named chat:', result.title);
-          this.chatDisplayTitle = result.title;
+            this.chatDisplayTitle = result.title;
         }
       } catch (error) {
         console.debug('Auto-naming skipped:', error.message);
@@ -841,7 +840,6 @@ export default {
         if (this.isGroupChat && this.groupChatCharacters.length > 0) {
           const randomIndex = Math.floor(Math.random() * this.groupChatCharacters.length);
           this.currentSpeaker = this.groupChatCharacters[randomIndex].filename;
-          console.log('Random character selected:', this.currentSpeaker);
         }
 
         // Build context for API
@@ -900,7 +898,6 @@ export default {
       if (this.isGroupChat && this.groupChatCharacters.length > 0) {
         const randomIndex = Math.floor(Math.random() * this.groupChatCharacters.length);
         this.currentSpeaker = this.groupChatCharacters[randomIndex].filename;
-        console.log('Random character selected:', this.currentSpeaker);
       }
 
       // Build context for API
@@ -988,7 +985,6 @@ export default {
       if (this.isGroupChat && this.groupChatCharacters.length > 0) {
         const randomIndex = Math.floor(Math.random() * this.groupChatCharacters.length);
         this.currentSpeaker = this.groupChatCharacters[randomIndex].filename;
-        console.log('Random character selected:', this.currentSpeaker);
       }
 
       // Build context for API
@@ -1164,36 +1160,16 @@ export default {
               }
 
               if (parsed.type === 'debug') {
-                // Handle debug information from server
-                console.log('Received debug info:', parsed.debug);
                 this.debugInfo.matchedEntries = parsed.debug.matchedEntriesByLorebook || {};
-                console.log('Updated debugInfo.matchedEntries:', this.debugInfo.matchedEntries);
-
-                // Save complete debug data to localStorage
                 this.saveDebugData(requestBody, parsed.debug);
               } else if (parsed.type === 'tool_call_start') {
-                // Handle early tool call notification (as soon as streaming detects it)
-                console.log('Tool call starting:', parsed.toolName);
-                console.log('Setting currentToolCall to:', parsed.toolName);
                 this.currentToolCall = parsed.toolName;
                 this.toolCallStartTime = Date.now();
                 this.startToolCallTimer();
-                console.log('currentToolCall is now:', this.currentToolCall);
-                console.log('isStreaming:', this.isStreaming);
-                this.$nextTick(() => {
-                  console.log('After nextTick, currentToolCall:', this.currentToolCall);
-                  this.scrollToBottom();
-                });
+                this.$nextTick(() => this.scrollToBottom());
               } else if (parsed.type === 'tool_call') {
-                // Handle full tool call notification (complete with arguments)
-                console.log('Tool called:', parsed.toolCall);
-                // currentToolCall should already be set from tool_call_start
-                // Don't add to streamingContent yet - let the indicator show
-                // The tool result will add the execution message
                 this.$nextTick(() => this.scrollToBottom());
               } else if (parsed.type === 'tool_result') {
-                // Handle tool execution result
-                console.log('Tool result:', parsed.result);
 
                 // Ensure indicator is visible for at least 500ms
                 const elapsedTime = Date.now() - (this.toolCallStartTime || 0);
@@ -1218,7 +1194,6 @@ export default {
                 this.$nextTick(() => this.scrollToBottom());
               } else if (parsed.type === 'images') {
                 // Handle AI-generated images
-                console.log('AI-generated images received:', parsed.images);
                 // Find the last assistant message (could be streaming or the one we're about to create)
                 // We'll store the images temporarily and add them when [DONE] is received
                 this.pendingImages = parsed.images;
@@ -1522,57 +1497,29 @@ export default {
       this.editedContent = event.target.textContent;
     },
     async copyMessage(content) {
+      // Handle array content (multimodal messages)
+      const htmlContent = Array.isArray(content)
+        ? content.map(part => {
+            if (part.type === 'text') return part.text;
+            if (part.type === 'image_url') return `<img src="${part.image_url.url}" alt="Attached image">`;
+            return '';
+          }).join('\n')
+        : content;
+
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      const textContent = tempDiv.textContent || tempDiv.innerText || '';
+
       try {
-        let htmlContent = content;
-
-        // Handle array content (multimodal messages)
-        if (Array.isArray(content)) {
-          htmlContent = content
-            .map(part => {
-              if (part.type === 'text') return part.text;
-              if (part.type === 'image_url') {
-                return `<img src="${part.image_url.url}" alt="Attached image" style="max-width: 100%; border-radius: 8px;">`;
-              }
-              return '';
-            })
-            .join('\n');
-        }
-
-        // Copy both HTML and plain text
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = htmlContent;
-        const textContent = tempDiv.textContent || tempDiv.innerText || '';
-
-        // Use the modern Clipboard API with both formats
         await navigator.clipboard.write([
           new ClipboardItem({
             'text/html': new Blob([htmlContent], { type: 'text/html' }),
             'text/plain': new Blob([textContent], { type: 'text/plain' })
           })
         ]);
-
         this.$root.$notify('Message copied to clipboard', 'success');
-      } catch (err) {
-        // Fallback to plain text if HTML copy fails
+      } catch {
         try {
-          let htmlContent = content;
-
-          // Handle array content (multimodal messages)
-          if (Array.isArray(content)) {
-            htmlContent = content
-              .map(part => {
-                if (part.type === 'text') return part.text;
-                if (part.type === 'image_url') {
-                  return `<img src="${part.image_url.url}" alt="Attached image" style="max-width: 100%; border-radius: 8px;">`;
-                }
-                return '';
-              })
-              .join('\n');
-          }
-
-          const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = htmlContent;
-          const textContent = tempDiv.textContent || tempDiv.innerText || '';
           await navigator.clipboard.writeText(textContent);
           this.$root.$notify('Message copied (plain text)', 'success');
         } catch (fallbackErr) {
