@@ -36,67 +36,36 @@
     />
 
     <!-- Avatar Menu -->
-    <div v-if="avatarMenu.show" class="avatar-menu" :style="{ top: avatarMenu.y + 'px', left: avatarMenu.x + 'px' }" @click.stop>
-      <div class="avatar-menu-header">
-        <strong>{{ avatarMenu.characterName }}</strong>
-      </div>
-      <button @click="viewCharacterCard" class="avatar-menu-btn">📄 View Card</button>
-      <button v-if="avatarMenu.message?.role === 'assistant' && avatarMenu.characterFilename" @click="editCharacter" class="avatar-menu-btn">✏️ Edit Character</button>
-      <button v-if="isGroupChat" @click="setNextSpeaker" class="avatar-menu-btn">🎤 Set as Next Speaker</button>
-      <button @click="closeAvatarMenu" class="avatar-menu-btn cancel">✕ Close</button>
-    </div>
+    <AvatarMenu
+      :show="avatarMenu.show"
+      :x="avatarMenu.x"
+      :y="avatarMenu.y"
+      :characterName="avatarMenu.characterName"
+      :canEdit="avatarMenu.message?.role === 'assistant' && !!avatarMenu.characterFilename"
+      :isGroupChat="isGroupChat"
+      @close="closeAvatarMenu"
+      @view-card="viewCharacterCard"
+      @edit-character="editCharacter"
+      @set-next-speaker="setNextSpeaker"
+    />
 
     <!-- Character Card Modal -->
-    <div v-if="showCharacterCard" class="modal-overlay" @click="showCharacterCard = false">
-      <div class="modal-content character-card-modal" @click.stop>
-        <div class="modal-header">
-          <h3>{{ viewingCharacter?.data?.name || 'Character Card' }}</h3>
-          <button @click="showCharacterCard = false" class="close-button">×</button>
-        </div>
-        <div class="character-card-content" v-if="viewingCharacter">
-          <img v-if="viewingCharacter.avatar" :src="viewingCharacter.avatar" :alt="viewingCharacter.data.name" class="card-avatar" @error="setFallbackAvatar($event)" />
-          <div class="card-field" v-if="viewingCharacter.data.description">
-            <strong>Description:</strong>
-            <p>{{ viewingCharacter.data.description }}</p>
-          </div>
-          <div class="card-field" v-if="viewingCharacter.data.personality">
-            <strong>Personality:</strong>
-            <p>{{ viewingCharacter.data.personality }}</p>
-          </div>
-          <div class="card-field" v-if="viewingCharacter.data.scenario">
-            <strong>Scenario:</strong>
-            <p>{{ viewingCharacter.data.scenario }}</p>
-          </div>
-          <div class="card-field" v-if="viewingCharacter.data.first_mes">
-            <strong>First Message:</strong>
-            <p>{{ viewingCharacter.data.first_mes }}</p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <CharacterCardModal
+      :show="showCharacterCard"
+      :character="viewingCharacter"
+      @close="showCharacterCard = false"
+    />
 
     <!-- Chat History Sidebar -->
-    <div v-if="showChatHistory" class="chat-history-sidebar">
-      <h3>Chat History</h3>
-      <div class="history-list">
-        <div
-          v-for="item in chatHistory"
-          :key="item.filename"
-          :class="['history-item', { active: item.filename === chatId || item.filename === groupChatId }]"
-          @click="loadChatFromHistory(item)"
-        >
-          <div class="history-info">
-            <span class="history-date">{{ formatDate(item.timestamp) }}</span>
-            <span class="history-preview">{{ getPreview(item) }}</span>
-          </div>
-          <div class="history-actions">
-            <button @click.stop="renameChatFromHistory(item)" class="history-rename" title="Rename chat">✏️</button>
-            <button @click.stop="deleteChat(item.filename)" class="history-delete" title="Delete chat">🗑️</button>
-          </div>
-        </div>
-      </div>
-      <button @click="showChatHistory = false" class="close-history">Close</button>
-    </div>
+    <ChatHistorySidebar
+      :show="showChatHistory"
+      :chatHistory="chatHistory"
+      :activeChatId="isGroupChat ? groupChatId : chatId"
+      @close="showChatHistory = false"
+      @load-chat="loadChatFromHistory"
+      @rename-chat="renameChatFromHistory"
+      @delete-chat="deleteChat"
+    />
 
     <GroupChatManager
       v-if="showGroupManager && isGroupChat"
@@ -114,75 +83,16 @@
       @add-character="addCharacterToGroup"
     />
 
-    <div v-if="showLorebooks" class="lorebook-selector-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Lorebooks</h3>
-          <button @click="showLorebooks = false" class="close-button">×</button>
-        </div>
-        <div class="lorebook-list">
-          <!-- Active Lorebooks Section -->
-          <div v-if="activeLorebooksForDisplay.length > 0" class="lorebook-section">
-            <div class="lorebook-section-header">
-              <h4>Active ({{ activeLorebooksForDisplay.length }})</h4>
-            </div>
-            <div
-              v-for="lorebook in activeLorebooksForDisplay"
-              :key="lorebook.filename"
-              class="lorebook-option active"
-              :class="{ 'auto-selected': isAutoSelected(lorebook.filename) }"
-            >
-              <input
-                type="checkbox"
-                :id="'lorebook-' + lorebook.filename"
-                :value="lorebook.filename"
-                v-model="selectedLorebookFilenames"
-                class="lorebook-checkbox"
-              />
-              <label :for="'lorebook-' + lorebook.filename" class="lorebook-checkbox-label">
-                <div class="lorebook-info-wrapper">
-                  <div class="lorebook-name">
-                    {{ lorebook.name }}
-                    <span v-if="isAutoSelected(lorebook.filename)" class="auto-tag">AUTO</span>
-                  </div>
-                  <div class="lorebook-meta">{{ lorebook.entries?.length || 0 }} entries</div>
-                </div>
-              </label>
-              <button @click="editLorebook(lorebook)" class="edit-button" title="Edit">✏️</button>
-            </div>
-          </div>
-
-          <!-- Inactive Lorebooks Section -->
-          <div v-if="inactiveLorebooksForDisplay.length > 0" class="lorebook-section">
-            <div class="lorebook-section-header">
-              <h4>Available ({{ inactiveLorebooksForDisplay.length }})</h4>
-            </div>
-            <div
-              v-for="lorebook in inactiveLorebooksForDisplay"
-              :key="lorebook.filename"
-              class="lorebook-option"
-            >
-              <input
-                type="checkbox"
-                :id="'lorebook-' + lorebook.filename"
-                :value="lorebook.filename"
-                v-model="selectedLorebookFilenames"
-                class="lorebook-checkbox"
-              />
-              <label :for="'lorebook-' + lorebook.filename" class="lorebook-checkbox-label">
-                <div class="lorebook-info-wrapper">
-                  <div class="lorebook-name">
-                    {{ lorebook.name }}
-                  </div>
-                  <div class="lorebook-meta">{{ lorebook.entries?.length || 0 }} entries</div>
-                </div>
-              </label>
-              <button @click="editLorebook(lorebook)" class="edit-button" title="Edit">✏️</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <LorebookSelectorModal
+      :show="showLorebooks"
+      :activeLorebooksForDisplay="activeLorebooksForDisplay"
+      :inactiveLorebooksForDisplay="inactiveLorebooksForDisplay"
+      :selectedLorebookFilenames="selectedLorebookFilenames"
+      :autoSelectedLorebookFilenames="autoSelectedLorebookFilenames"
+      @close="showLorebooks = false"
+      @update:selectedLorebookFilenames="selectedLorebookFilenames = $event"
+      @edit-lorebook="editLorebook"
+    />
 
     <!-- Lorebook Editor -->
     <LorebookEditor
@@ -221,149 +131,42 @@
     />
 
     <div class="chat-container">
-      <div class="messages" ref="messagesContainer" @scroll="handleScroll">
-        <div
-          v-for="(message, index) in messages"
-          :key="message._id || index"
-          :class="['message', message.role]"
-        >
-          <img
-            v-if="message.role === 'assistant'"
-            :src="getMessageAvatar(message)"
-            :alt="getMessageCharacterName(message)"
-            class="message-avatar clickable"
-            @click="showAvatarMenu($event, message, index)"
-            @error="setFallbackAvatar($event)"
-            :title="'Click for options'"
-          />
-          <img
-            v-else-if="persona.avatar"
-            :src="persona.avatar"
-            :alt="persona.name"
-            class="message-avatar clickable"
-            @click="showAvatarMenu($event, message, index)"
-            @error="setFallbackAvatar($event)"
-            :title="'Click for options'"
-          />
-          <div v-else class="message-avatar user-avatar clickable" @click="showAvatarMenu($event, message, index)" :title="'Click for options'">
-            {{ (persona.nickname || persona.name)[0] }}
-          </div>
-          <div class="message-bubble">
-            <div class="message-actions">
-              <button @click="editMessage(index)" title="Edit">✏️</button>
-              <button @click="copyMessage(getCurrentContent(message))" title="Copy">📋</button>
-              <button @click="openBranchModal(index)" title="Create Branch" class="branch-button">🌿</button>
-              <button @click="deleteMessage(index)" title="Delete">🗑️</button>
-              <button
-                v-if="index < messages.length - 1"
-                @click="deleteMessagesBelow(index)"
-                title="Delete all messages below this one"
-                class="delete-below-button"
-              >🗑️↓</button>
-            </div>
-            <div v-if="editingMessage === index" class="message-edit-container">
-              <div
-                :ref="'editTextarea' + index"
-                class="message-edit-textarea"
-                contenteditable="true"
-                @keydown.escape="cancelEdit"
-                @input="updateEditedContent"
-              ></div>
-              <div class="edit-inline-actions">
-                <button @click="saveEdit" class="edit-confirm" title="Save">✓</button>
-                <button @click="cancelEdit" class="edit-cancel" title="Cancel">✕</button>
-              </div>
-            </div>
-            <!-- Only show content when: not generating swipe for this message, or there's streaming content -->
-            <div v-else-if="!isGeneratingSwipe || generatingSwipeIndex !== index || streamingContent" class="message-content">
-              <!-- Handle string content (legacy text-only messages) -->
-              <div
-                v-if="typeof getCurrentContent(message) === 'string'"
-                class="message-text"
-                v-html="sanitizeHtml(isGeneratingSwipe && generatingSwipeIndex === index ? streamingContent : getCurrentContent(message), message)"
-                :title="`~${estimateTokens(getCurrentContent(message))} tokens`"
-              ></div>
-
-              <!-- Handle array content (multimodal messages) -->
-              <template v-else-if="Array.isArray(getCurrentContent(message))">
-                <div
-                  v-for="(part, partIndex) in getCurrentContent(message)"
-                  :key="partIndex"
-                  class="content-part"
-                >
-                  <!-- Text part -->
-                  <div
-                    v-if="part.type === 'text'"
-                    class="message-text"
-                    v-html="sanitizeHtml(part.text, message)"
-                  ></div>
-
-                  <!-- Image part -->
-                  <div v-else-if="part.type === 'image_url'" class="message-image">
-                    <img
-                      :src="part.image_url.url"
-                      alt="Attached image"
-                      class="inline-image"
-                    />
-                  </div>
-                </div>
-              </template>
-
-              <!-- Handle AI-generated images (separate images field) -->
-              <div v-if="message.images && message.images.length > 0" class="ai-generated-images">
-                <div
-                  v-for="(img, imgIndex) in message.images"
-                  :key="imgIndex"
-                  class="message-image"
-                >
-                  <img
-                    :src="img.image_url.url"
-                    alt="AI-generated image"
-                    class="inline-image"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- Tool call indicator for swipe generation -->
-            <div v-else-if="isGeneratingSwipe && generatingSwipeIndex === index && currentToolCall" class="message-content tool-call-indicator">
-              <span class="tool-call-icon">🔧</span>
-              <span class="tool-call-text">Calling {{ currentToolCall }}... ({{ formatElapsedTime(toolCallElapsedTime) }})</span>
-            </div>
-
-            <!-- Swipe navigation for assistant messages -->
-            <div v-if="message.role === 'assistant' && getTotalSwipes(message) > 0" class="swipe-controls">
-              <button @click="swipeLeft(index)" :disabled="!canSwipeLeft(message) || isStreaming" class="swipe-button">←</button>
-              <span class="swipe-counter">{{ getCurrentSwipeIndex(message) + 1 }}/{{ getTotalSwipes(message) }}</span>
-              <button @click="swipeRight(index)" :disabled="isStreaming" class="swipe-button">→</button>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="isStreaming && !isGeneratingSwipe" class="message assistant">
-          <img
-            :src="getStreamingAvatar()"
-            :alt="getStreamingCharacterName()"
-            class="message-avatar"
-            @error="setFallbackAvatar($event)"
-          />
-          <div class="message-bubble">
-            <!-- Show streaming content if it exists -->
-            <div v-if="streamingContent" class="message-content" v-html="sanitizeHtml(streamingContent, { characterFilename: currentSpeaker })"></div>
-
-            <!-- Show tool call indicator (can appear alongside content or alone) -->
-            <div v-if="currentToolCall" class="message-content tool-call-indicator">
-              <span class="tool-call-icon">🔧</span>
-              <span class="tool-call-text">Calling {{ currentToolCall }}... ({{ formatElapsedTime(toolCallElapsedTime) }})</span>
-            </div>
-
-            <!-- Show typing indicator only if no content and no tool call -->
-            <div v-if="!streamingContent && !currentToolCall" class="message-content typing-indicator">
-              <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <MessageList
+        ref="messageList"
+        :messages="messages"
+        :persona="persona"
+        :editingMessage="editingMessage"
+        :isGeneratingSwipe="isGeneratingSwipe"
+        :generatingSwipeIndex="generatingSwipeIndex"
+        :streamingContent="streamingContent"
+        :isStreaming="isStreaming"
+        :currentToolCall="currentToolCall"
+        :toolCallElapsedTime="toolCallElapsedTime"
+        :currentSpeaker="currentSpeaker"
+        :getMessageAvatar="getMessageAvatar"
+        :getMessageCharacterName="getMessageCharacterName"
+        :getCurrentContent="getCurrentContent"
+        :sanitizeHtml="sanitizeHtml"
+        :estimateTokens="estimateTokens"
+        :canSwipeLeft="canSwipeLeft"
+        :getCurrentSwipeIndex="getCurrentSwipeIndex"
+        :getTotalSwipes="getTotalSwipes"
+        :getStreamingAvatar="getStreamingAvatar"
+        :getStreamingCharacterName="getStreamingCharacterName"
+        :formatElapsedTime="formatElapsedTime"
+        @scroll="handleScroll"
+        @show-avatar-menu="showAvatarMenu"
+        @edit-message="editMessage"
+        @copy-message="copyMessage"
+        @open-branch-modal="openBranchModal"
+        @delete-message="deleteMessage"
+        @delete-messages-below="deleteMessagesBelow"
+        @cancel-edit="cancelEdit"
+        @update-edited-content="updateEditedContent"
+        @save-edit="saveEdit"
+        @swipe-left="swipeLeft"
+        @swipe-right="swipeRight"
+      />
 
       <div class="input-area">
         <textarea
@@ -413,36 +216,13 @@
     />
 
     <!-- Memory Creation Modal -->
-    <div v-if="showMemoryModal" class="modal-overlay" @click="showMemoryModal = false">
-      <div class="modal-content memory-modal" @click.stop>
-        <div class="modal-header">
-          <h3>Add Memory</h3>
-          <button @click="showMemoryModal = false" class="close-button">×</button>
-        </div>
-        <div class="memory-options">
-          <p>Create a diary entry summary of this conversation for {{ isGroupChat ? 'all characters' : characterName }}?</p>
-          
-          <div class="memory-size-buttons">
-            <button @click="createMemory('small')" :disabled="isCreatingMemory" class="memory-size-btn">
-              <strong>Small</strong>
-              <span>2-4 sentences</span>
-            </button>
-            <button @click="createMemory('medium')" :disabled="isCreatingMemory" class="memory-size-btn">
-              <strong>Medium</strong>
-              <span>1-2 paragraphs</span>
-            </button>
-            <button @click="createMemory('large')" :disabled="isCreatingMemory" class="memory-size-btn">
-              <strong>Large</strong>
-              <span>2-4 paragraphs</span>
-            </button>
-          </div>
-          
-          <div v-if="isCreatingMemory" class="loading-indicator">
-            Generating memory...
-          </div>
-        </div>
-      </div>
-    </div>
+    <MemoryModal
+      :show="showMemoryModal"
+      :targetName="isGroupChat ? 'all characters' : characterName"
+      :isCreating="isCreatingMemory"
+      @close="showMemoryModal = false"
+      @create="createMemory"
+    />
 
   </div>
 </template>
@@ -464,6 +244,12 @@ import DebugModal from './DebugModal.vue';
 import BranchNameInput from './BranchNameInput.vue';
 import BranchTreeModal from './BranchTreeModal.vue';
 import ImageAttachmentModal from './ImageAttachmentModal.vue';
+import ChatHistorySidebar from './ChatHistorySidebar.vue';
+import LorebookSelectorModal from './LorebookSelectorModal.vue';
+import MessageList from './MessageList.vue';
+import CharacterCardModal from './CharacterCardModal.vue';
+import AvatarMenu from './AvatarMenu.vue';
+import MemoryModal from './MemoryModal.vue';
 
 // Non-reactive debug data cache (outside Vue's reactivity system)
 const debugDataCache = new Map();
@@ -477,7 +263,13 @@ export default {
     DebugModal,
     BranchNameInput,
     BranchTreeModal,
-    ImageAttachmentModal
+    ImageAttachmentModal,
+    ChatHistorySidebar,
+    LorebookSelectorModal,
+    MessageList,
+    CharacterCardModal,
+    AvatarMenu,
+    MemoryModal
   },
   setup() {
     const api = useApi();
@@ -1849,9 +1641,8 @@ export default {
       this.editingMessage = index;
       this.editedContent = this.getCurrentContent(this.messages[index]);
       this.$nextTick(() => {
-        const editDiv = this.$refs['editTextarea' + index];
-        if (editDiv && editDiv[0]) {
-          const el = editDiv[0];
+        const el = this.$refs.messageList?.getEditTextareaRef(index);
+        if (el) {
           el.textContent = this.editedContent;
           el.focus();
 
@@ -2715,64 +2506,6 @@ export default {
         this.$root.$notify('Failed to delete chat', 'error');
       }
     },
-    formatDate(timestamp) {
-      if (!timestamp) return 'Unknown';
-      const date = new Date(timestamp);
-      const now = new Date();
-      const isToday = date.toDateString() === now.toDateString();
-
-      if (isToday) {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      } else {
-        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-      }
-    },
-    getPreview(chat) {
-      // Priority 1: Show chat title if it exists
-      if (chat.title && chat.title.trim()) {
-        return chat.title;
-      }
-
-      // Priority 2: For group chats, show character names
-      if (chat.isGroupChat) {
-        const names = chat.characters?.map(c => c.name).join(', ') || 'Group';
-        // Get message count from branches if available
-        let messageCount = 0;
-        if (chat.branches && chat.currentBranch && chat.branches[chat.currentBranch]) {
-          messageCount = chat.branches[chat.currentBranch].messages?.length || 0;
-        } else {
-          messageCount = chat.messages?.length || 0;
-        }
-        return `${names} (${messageCount} messages)`;
-      }
-
-      // Priority 3: Show preview of last message
-      // Handle both branch-based structure and old flat structure
-      let messages = null;
-      if (chat.branches && chat.currentBranch && chat.branches[chat.currentBranch]) {
-        messages = chat.branches[chat.currentBranch].messages;
-      } else {
-        messages = chat.messages;
-      }
-
-      const lastMessage = messages?.[messages.length - 1];
-      if (!lastMessage) return 'Empty chat';
-
-      // Handle both old format (content) and new format (swipes)
-      let content = '';
-      if (lastMessage.role === 'user') {
-        content = lastMessage.content || '';
-      } else {
-        // Assistant message - get current swipe or fall back to content
-        const swipeIndex = lastMessage.swipeIndex ?? 0;
-        content = lastMessage.swipes?.[swipeIndex] || lastMessage.content || '';
-      }
-
-      // Strip HTML tags for cleaner preview
-      const strippedContent = content.replace(/<[^>]*>/g, '').trim();
-      const preview = strippedContent.substring(0, 50);
-      return preview + (strippedContent.length > 50 ? '...' : '');
-    },
     scrollToBottom(force = false) {
       // Batch scroll calls to prevent excessive updates
       if (this.scrollToBottomPending && !force) {
@@ -2783,7 +2516,7 @@ export default {
       this.$nextTick(() => {
         this.scrollToBottomPending = false;
 
-        const container = this.$refs.messagesContainer;
+        const container = this.$refs.messageList?.getMessagesContainer();
         if (!container) return;
 
         // If user has scrolled up and we're not forcing, don't auto-scroll
@@ -2807,7 +2540,7 @@ export default {
       }
       this.handleScrollThrottle = now;
 
-      const container = this.$refs.messagesContainer;
+      const container = this.$refs.messageList?.getMessagesContainer();
       if (!container) return;
 
       // Check if user is near the bottom (within 100px)
@@ -2846,9 +2579,6 @@ export default {
       } catch (error) {
         console.error('Failed to load lorebooks:', error);
       }
-    },
-    isAutoSelected(filename) {
-      return this.autoSelectedLorebookFilenames.includes(filename);
     },
     getLorebook(filename) {
       return this.lorebooks.find(l => l.filename === filename);
