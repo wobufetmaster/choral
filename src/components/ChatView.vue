@@ -450,6 +450,7 @@
 <script>
 import { useApi } from '../composables/useApi.js';
 import { useMessageFormatting } from '../composables/useMessageFormatting.js';
+import { processMacrosForDisplay } from '../utils/macros.js';
 import GroupChatManager from './GroupChatManager.vue';
 import LorebookEditor from './LorebookEditor.vue';
 import ChatSidebar from './ChatSidebar.vue';
