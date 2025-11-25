@@ -237,6 +237,7 @@ import { useContextBuilder } from '../composables/useContextBuilder.js';
 import { useBranchOperations } from '../composables/useBranchOperations.js';
 import { useGroupChatOperations } from '../composables/useGroupChatOperations.js';
 import { useChatPersistence } from '../composables/useChatPersistence.js';
+import { useStreamHandlers } from '../composables/useStreamHandlers.js';
 import GroupChatManager from './GroupChatManager.vue';
 import LorebookEditor from './LorebookEditor.vue';
 import ChatSidebar from './ChatSidebar.vue';
@@ -281,7 +282,8 @@ export default {
     const branchOps = useBranchOperations();
     const groupChatOps = useGroupChatOperations();
     const chatPersistence = useChatPersistence();
-    return { api, formatting, swipeHelpers, branchHelpers, historyHelpers, contextBuilder, branchOps, groupChatOps, chatPersistence };
+    const streamHandlers = useStreamHandlers();
+    return { api, formatting, swipeHelpers, branchHelpers, historyHelpers, contextBuilder, branchOps, groupChatOps, chatPersistence, streamHandlers };
   },
   props: {
     tabData: {
@@ -1063,86 +1065,30 @@ export default {
       // Create AbortController for this request
       this.abortController = new AbortController();
 
-      // Build macro context
-      let macroContext;
-      if (this.isGroupChat && this.currentSpeaker) {
-        // For group chats, use the speaking character's info
-        const speakingChar = this.groupChatCharacters.find(c => c.filename === this.currentSpeaker);
-        const charData = speakingChar?.data?.data || speakingChar?.data || {};
-        macroContext = {
-          charName: speakingChar?.name || 'Character',
-          charNickname: charData.nickname || '',
-          userName: this.persona?.name || 'User'
-        };
-      } else {
-        // For 1-on-1 chats, use this.character
-        macroContext = {
-          charName: this.character?.data.name || 'Character',
-          charNickname: this.character?.data.nickname || '',
-          userName: this.persona?.name || 'User'
-        };
-      }
+      // Build macro context using composable
+      const macroContext = this.streamHandlers.buildMacroContext({
+        isGroupChat: this.isGroupChat,
+        currentSpeaker: this.currentSpeaker,
+        groupChatCharacters: this.groupChatCharacters,
+        character: this.character,
+        persona: this.persona
+      });
 
-      const requestBody = {
+      // Fetch tool schemas
+      const tools = await this.streamHandlers.fetchToolSchemas({
+        isGroupChat: this.isGroupChat,
+        groupChatCharacters: this.groupChatCharacters,
+        characterFilename: this.characterFilename
+      });
+
+      // Build request body using composable
+      const requestBody = this.streamHandlers.buildStreamRequestBody({
         messages,
-        model: this.settings.model,
-        options: {
-          temperature: this.settings.temperature,
-          max_tokens: this.settings.max_tokens,
-          top_p: this.settings.top_p,
-          top_k: this.settings.top_k
-        },
-        context: macroContext,
-        promptProcessing: this.settings.prompt_processing || 'merge_system',
+        settings: this.settings,
+        macroContext,
         lorebookFilenames: this.selectedLorebookFilenames,
-        stoppingStrings: this.settings.stopping_strings || ['[User]'],
-        debug: true // Always collect debug data for persistence
-      };
-
-      // Check if characters have tools enabled
-      if (this.isGroupChat) {
-        // For group chats, collect tools from all characters
-        try {
-          const allTools = [];
-          for (const char of this.groupChatCharacters) {
-            const toolsResponse = await fetch(`/api/tools/schemas/${encodeURIComponent(char.filename)}`);
-            const toolsData = await toolsResponse.json();
-            if (toolsData.tools && toolsData.tools.length > 0) {
-              allTools.push(...toolsData.tools);
-              console.log(`Tool calling enabled for ${char.name}:`, toolsData.tools.map(t => t.function.name));
-            }
-          }
-
-          // Remove duplicate tools (same function name)
-          const uniqueTools = [];
-          const seenNames = new Set();
-          for (const tool of allTools) {
-            if (!seenNames.has(tool.function.name)) {
-              uniqueTools.push(tool);
-              seenNames.add(tool.function.name);
-            }
-          }
-
-          if (uniqueTools.length > 0) {
-            requestBody.tools = uniqueTools;
-            console.log('Group chat tools enabled:', uniqueTools.map(t => t.function.name));
-          }
-        } catch (error) {
-          console.error('Failed to fetch tool schemas for group chat:', error);
-        }
-      } else if (this.characterFilename) {
-        // For 1-on-1 chats, check single character
-        try {
-          const toolsResponse = await fetch(`/api/tools/schemas/${encodeURIComponent(this.characterFilename)}`);
-          const toolsData = await toolsResponse.json();
-          if (toolsData.tools && toolsData.tools.length > 0) {
-            requestBody.tools = toolsData.tools;
-            console.log(`Tool calling enabled for ${this.characterFilename}:`, toolsData.tools.map(t => t.function.name));
-          }
-        } catch (error) {
-          console.error('Failed to fetch tool schemas:', error);
-        }
-      }
+        tools
+      });
 
       // Update basic debug info before sending
       this.updateBasicDebugInfo(messages);
@@ -1196,39 +1142,20 @@ export default {
 
               // Add new assistant message with swipe
               if (this.isGeneratingSwipe && this.generatingSwipeIndex !== null) {
-                // Add to existing message's swipes
-                const message = this.messages[this.generatingSwipeIndex];
-                message.swipes.push(this.streamingContent);
-                message.swipeIndex = message.swipes.length - 1;
-
-                // Track character for group chat swipes
-                if (this.isGroupChat && this.currentSpeaker) {
-                  if (!message.swipeCharacters) {
-                    // Initialize array with the original character for all existing swipes
-                    const originalCharacter = message.characterFilename || this.currentSpeaker;
-                    message.swipeCharacters = new Array(message.swipes.length - 1).fill(originalCharacter);
-                  }
-                  message.swipeCharacters.push(this.currentSpeaker);
-                }
+                // Add to existing message's swipes using composable
+                this.streamHandlers.addSwipeToMessage(this.messages[this.generatingSwipeIndex], {
+                  content: this.streamingContent,
+                  isGroupChat: this.isGroupChat,
+                  currentSpeaker: this.currentSpeaker
+                });
               } else {
-                // Create new message
-                const newMessage = {
-                  role: 'assistant',
-                  swipes: [this.streamingContent],
-                  swipeIndex: 0
-                };
-
-                // Track character for group chats
-                if (this.isGroupChat && this.currentSpeaker) {
-                  newMessage.characterFilename = this.currentSpeaker;
-                  newMessage.swipeCharacters = [this.currentSpeaker];
-                }
-
-                // Add AI-generated images if present
-                if (this.pendingImages && this.pendingImages.length > 0) {
-                  newMessage.images = this.pendingImages;
-                }
-
+                // Create new message using composable
+                const newMessage = this.streamHandlers.createAssistantMessage({
+                  content: this.streamingContent,
+                  isGroupChat: this.isGroupChat,
+                  currentSpeaker: this.currentSpeaker,
+                  pendingImages: this.pendingImages
+                });
                 this.messages.push(newMessage);
               }
 
@@ -1305,57 +1232,18 @@ export default {
 
                 // Ensure indicator is visible for at least 500ms
                 const elapsedTime = Date.now() - (this.toolCallStartTime || 0);
-                const minDisplayTime = 500; // milliseconds
+                const minDisplayTime = 500;
                 const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
 
                 setTimeout(() => {
-                  this.currentToolCall = null; // Clear tool call indicator
-                  this.stopToolCallTimer(); // Stop the timer
+                  this.currentToolCall = null;
+                  this.stopToolCallTimer();
                 }, remainingTime);
 
-                if (parsed.result.success) {
-                  // Format success message based on which tool was called
-                  let successMessage = '';
-
-                  if (parsed.result.name && parsed.result.filename && parsed.result.details) {
-                    // create_character_card response
-                    successMessage = `\n\n✓ **create_character_card succeeded!**\n\n`;
-                    successMessage += `**Character Name:** ${parsed.result.name}\n`;
-                    successMessage += `**Filename:** \`${parsed.result.filename}\`\n\n`;
-                    successMessage += `*${parsed.result.details}*\n\n`;
-                    this.$root.$notify(`Character created: ${parsed.result.name}`, 'success');
-                  } else if (parsed.result.addedGreetings && parsed.result.characterName) {
-                    // add_greetings response
-                    successMessage = `\n\n✓ **add_greetings succeeded!**\n\n`;
-                    successMessage += `**Character:** ${parsed.result.characterName}\n`;
-                    successMessage += `**Added ${parsed.result.addedCount} greeting(s)** (Total: ${parsed.result.totalGreetings})\n\n`;
-
-                    // Show the full greeting text(s) formatted like regular messages
-                    parsed.result.addedGreetings.forEach((greeting, idx) => {
-                      if (parsed.result.addedCount > 1) {
-                        successMessage += `**Greeting ${idx + 1}:**\n\n`;
-                      }
-                      successMessage += greeting + '\n\n';
-                    });
-
-                    this.$root.$notify(`Added ${parsed.result.addedCount} greeting(s)`, 'success');
-                  } else if (parsed.result.updatedFields && parsed.result.characterName) {
-                    // update_character_card response
-                    successMessage = `\n\n✓ **update_character_card succeeded!**\n\n`;
-                    successMessage += `**Character:** ${parsed.result.characterName}\n`;
-                    successMessage += `**Updated Fields:** ${parsed.result.updatedFields.join(', ')}\n\n`;
-                    this.$root.$notify(`Updated ${parsed.result.characterName}`, 'success');
-                  } else {
-                    // Generic success message
-                    successMessage = `\n\n✓ **Tool succeeded!**\n\n${parsed.result.message || 'Operation completed successfully'}\n\n`;
-                    this.$root.$notify('Tool executed successfully', 'success');
-                  }
-
-                  this.streamingContent += successMessage;
-                } else {
-                  this.streamingContent += `\n\n✗ **Tool failed:** ${parsed.result.error}\n\n`;
-                  this.$root.$notify('Tool execution failed', 'error');
-                }
+                // Use composable to format tool result message
+                const formatted = this.streamHandlers.formatToolResultMessage(parsed.result);
+                this.streamingContent += formatted.message;
+                this.$root.$notify(formatted.notification.text, formatted.notification.type);
                 this.$nextTick(() => this.scrollToBottom());
               } else if (parsed.type === 'tool_error') {
                 // Handle tool execution error
@@ -1394,35 +1282,20 @@ export default {
       // Save partial response only if there's actual content (not just whitespace)
       if (this.streamingContent && this.streamingContent.trim().length > 0) {
         if (this.isGeneratingSwipe && this.generatingSwipeIndex !== null) {
-          // Add partial swipe
-          const message = this.messages[this.generatingSwipeIndex];
-          message.swipes.push(this.streamingContent);
-          message.swipeIndex = message.swipes.length - 1;
-
-          // Track character for group chat swipes
-          if (this.isGroupChat && this.currentSpeaker) {
-            if (!message.swipeCharacters) {
-              // Initialize array with the original character for all existing swipes
-              const originalCharacter = message.characterFilename || this.currentSpeaker;
-              message.swipeCharacters = new Array(message.swipes.length - 1).fill(originalCharacter);
-            }
-            message.swipeCharacters.push(this.currentSpeaker);
-          }
+          // Add partial swipe using composable
+          this.streamHandlers.addSwipeToMessage(this.messages[this.generatingSwipeIndex], {
+            content: this.streamingContent,
+            isGroupChat: this.isGroupChat,
+            currentSpeaker: this.currentSpeaker
+          });
         } else {
-          // Create new message with partial content
-          const newMessage = {
-            role: 'assistant',
-            swipes: [this.streamingContent],
-            swipeIndex: 0,
-            _id: Date.now() + Math.random() // Unique ID for Vue key
-          };
-
-          // Track character for group chats
-          if (this.isGroupChat && this.currentSpeaker) {
-            newMessage.characterFilename = this.currentSpeaker;
-            newMessage.swipeCharacters = [this.currentSpeaker];
-          }
-
+          // Create new message using composable
+          const newMessage = this.streamHandlers.createAssistantMessage({
+            content: this.streamingContent,
+            isGroupChat: this.isGroupChat,
+            currentSpeaker: this.currentSpeaker
+          });
+          newMessage._id = Date.now() + Math.random(); // Unique ID for Vue key
           this.messages.push(newMessage);
         }
       }
@@ -2582,10 +2455,6 @@ export default {
     },
     getLorebook(filename) {
       return this.lorebooks.find(l => l.filename === filename);
-    },
-    estimateTokens(text) {
-      // Rough estimation: ~4 characters per token
-      return Math.ceil(text.length / 4);
     },
     updateBasicDebugInfo(messages) {
       // Count messages by type
