@@ -261,6 +261,23 @@ export function useStreamHandlers() {
     }
   }
 
+  /**
+   * Get default streaming state (for cleanup)
+   */
+  function getCleanupState() {
+    return {
+      streamingContent: '',
+      isStreaming: false,
+      isGeneratingSwipe: false,
+      generatingSwipeIndex: null,
+      currentSpeaker: null,
+      currentToolCall: null,
+      toolCallStartTime: null,
+      nextSpeaker: null,
+      pendingImages: null
+    };
+  }
+
   return {
     buildStreamRequestBody,
     buildMacroContext,
@@ -268,6 +285,7 @@ export function useStreamHandlers() {
     formatToolResultMessage,
     parseStreamEvent,
     createAssistantMessage,
-    addSwipeToMessage
+    addSwipeToMessage,
+    getCleanupState
   };
 }
