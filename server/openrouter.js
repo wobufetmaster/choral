@@ -60,8 +60,8 @@ function streamChatCompletion({ messages, model, options = {}, tools, stoppingSt
     top_p: options.top_p ?? 0.92,
     frequency_penalty: options.frequency_penalty ?? 0,
     presence_penalty: options.presence_penalty ?? 0,
-    reasoning: { exclude: true, enabled: false },
-    ...options
+    ...options,
+    reasoning: { max_tokens: 0, exclude: true },
   };
 
   // Add tools if provided
@@ -323,8 +323,8 @@ function chatCompletion({ messages, model, options = {}, tools }) {
       top_p: options.top_p ?? 0.92,
       frequency_penalty: options.frequency_penalty ?? 0,
       presence_penalty: options.presence_penalty ?? 0,
-      reasoning: { exclude: true, enabled: false },
-      ...options
+      ...options,
+      reasoning: { max_tokens: 0, exclude: true },
     };
 
     // Add tools if provided

@@ -119,16 +119,39 @@
           </div>
           <button @click="addStoppingString" class="add-btn">+ Add Stopping String</button>
 
-          <h4>System Prompts</h4>
+          <div class="prompts-header">
+            <h4>System Prompts</h4>
+            <div class="prompts-actions">
+              <button @click="expandAllPrompts" class="expand-all-btn" title="Expand all">Expand All</button>
+              <button @click="collapseAllPrompts" class="collapse-all-btn" title="Collapse all">Collapse All</button>
+            </div>
+          </div>
           <div class="prompts-list">
-            <div v-for="(prompt, index) in selectedPreset.prompts" :key="index" class="prompt-item">
-              <div class="prompt-header">
-                <input type="checkbox" v-model="prompt.enabled" />
-                <input v-model="prompt.name" class="prompt-name" />
-                <input v-model.number="prompt.injection_order" type="number" class="prompt-order" placeholder="Order" />
-                <button @click="removePrompt(index)" class="remove-btn">×</button>
+            <div
+              v-for="(prompt, index) in selectedPreset.prompts"
+              :key="index"
+              :class="['prompt-item', 'collapsible-prompt', { expanded: isPromptExpanded(index), disabled: !prompt.enabled }]"
+            >
+              <div class="prompt-header" @click="togglePrompt(index)">
+                <span class="collapse-icon">{{ isPromptExpanded(index) ? '▼' : '▶' }}</span>
+                <input type="checkbox" v-model="prompt.enabled" @click.stop />
+                <input
+                  v-model="prompt.name"
+                  class="prompt-name-input"
+                  :class="{ disabled: !prompt.enabled }"
+                  placeholder="Untitled Prompt"
+                  @click.stop
+                  @focus="$event.target.select()"
+                />
+                <div class="prompt-order-control" @click.stop>
+                  <label>Order</label>
+                  <input v-model.number="prompt.injection_order" type="number" class="prompt-order" />
+                </div>
+                <button @click.stop="removePrompt(index)" class="remove-btn" title="Delete prompt">×</button>
               </div>
-              <textarea v-model="prompt.content" rows="3" placeholder="Prompt content..."></textarea>
+              <div class="prompt-content" v-show="isPromptExpanded(index)">
+                <textarea v-model="prompt.content" placeholder="Enter prompt content..."></textarea>
+              </div>
             </div>
           </div>
 
@@ -202,7 +225,9 @@ export default {
       activePresetFilename: null,
       showMacroReference: false,
       showMacroWarningDialog: false,
-      pendingMissingMacros: []
+      pendingMissingMacros: [],
+      // Track which prompts are expanded (by index)
+      expandedPrompts: {}
     }
   },
   computed: {
@@ -217,6 +242,20 @@ export default {
     await this.loadPresets();
   },
   methods: {
+    togglePrompt(index) {
+      this.expandedPrompts[index] = !this.expandedPrompts[index];
+    },
+    isPromptExpanded(index) {
+      return this.expandedPrompts[index] ?? false;
+    },
+    expandAllPrompts() {
+      this.selectedPreset.prompts.forEach((_, index) => {
+        this.expandedPrompts[index] = true;
+      });
+    },
+    collapseAllPrompts() {
+      this.expandedPrompts = {};
+    },
     getMacrosForCategory(categoryKey) {
       return MACRO_DEFINITIONS.filter(m => m.category === categoryKey);
     },
@@ -699,15 +738,10 @@ export default {
   display: flex;
   gap: 8px;
   align-items: center;
-  margin-bottom: 8px;
-}
-
-.prompt-name {
-  flex: 1;
 }
 
 .prompt-order {
-  width: 60px;
+  width: 70px;
 }
 
 .add-prompt-btn {
@@ -780,6 +814,245 @@ export default {
   background: var(--bg-tertiary);
   border-color: var(--accent-color);
   transform: translateY(-1px);
+}
+
+/* Collapsible prompts */
+.prompts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.prompts-header h4 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.prompts-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.expand-all-btn,
+.collapse-all-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted, var(--text-secondary));
+  transition: all 0.15s;
+}
+
+.expand-all-btn:hover,
+.collapse-all-btn:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color-hover, var(--border-color));
+  color: var(--text-primary);
+}
+
+.prompts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collapsible-prompt {
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  transition: all 0.15s ease;
+}
+
+.collapsible-prompt:hover {
+  border-color: var(--border-color-hover, var(--border-color));
+}
+
+.collapsible-prompt.expanded {
+  border-color: var(--border-color-hover, var(--border-color));
+  background: var(--bg-tertiary);
+}
+
+.collapsible-prompt.disabled {
+  opacity: 0.5;
+}
+
+.collapsible-prompt .prompt-header {
+  cursor: pointer;
+  user-select: none;
+  padding: 8px 10px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s;
+}
+
+.collapsible-prompt .prompt-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.collapse-icon {
+  font-size: 9px;
+  color: var(--text-muted, var(--text-secondary));
+  width: 12px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.collapsible-prompt.expanded .collapse-icon {
+  color: var(--text-secondary);
+}
+
+.collapsible-prompt .prompt-header input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.prompt-name-input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: all 0.15s;
+  min-width: 0;
+}
+
+.prompt-name-input:hover {
+  background: var(--bg-primary);
+}
+
+.prompt-name-input:focus {
+  background: var(--bg-primary);
+  border-color: var(--accent-color);
+  outline: none;
+}
+
+.prompt-name-input.disabled {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.prompt-name-input::placeholder {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.prompt-order-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.prompt-order-control label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted, var(--text-secondary));
+  font-weight: 500;
+}
+
+.prompt-order-control .prompt-order {
+  width: 45px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+  transition: border-color 0.15s;
+}
+
+.prompt-order-control .prompt-order:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+}
+
+.collapsible-prompt .remove-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.collapsible-prompt .remove-btn:hover {
+  background: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.3);
+  color: #dc2626;
+}
+
+.prompt-content {
+  padding: 12px;
+  background: var(--bg-secondary);
+}
+
+.prompt-content textarea {
+  width: 100%;
+  min-height: 180px;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  resize: vertical;
+  transition: border-color 0.15s;
+}
+
+.prompt-content textarea:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.prompt-content textarea::placeholder {
+  color: var(--text-muted, var(--text-secondary));
+}
+
+.add-prompt-btn {
+  margin-top: 12px;
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.add-prompt-btn:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
 }
 
 @media (max-width: 900px) {
