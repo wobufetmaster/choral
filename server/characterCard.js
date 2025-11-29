@@ -149,67 +149,77 @@ function addTextChunk(pngBuffer, keyword, text) {
  * Writes a Character Card V3 to a PNG file
  * @param {string} filePath - Path to save the PNG file
  * @param {Object} cardData - The character card V3 data
- * @param {Buffer} [imageBuffer] - Optional PNG image buffer (if not provided, creates a blank image)
+ * @param {Buffer} [imageBuffer] - PNG image buffer. If not provided and file exists, preserves existing image.
+ *                                 Only creates placeholder if file doesn't exist.
  * @returns {Promise<void>}
  */
 async function writeCharacterCard(filePath, cardData, imageBuffer = null) {
-  return new Promise((resolve, reject) => {
-    // Validate that it's a V3 card
-    if (cardData.spec !== 'chara_card_v3') {
-      return reject(new Error('Card must be Character Card V3 format'));
-    }
+  // Validate that it's a V3 card
+  if (cardData.spec !== 'chara_card_v3') {
+    throw new Error('Card must be Character Card V3 format');
+  }
 
-    const cardJson = JSON.stringify(cardData);
-    const encoded = Buffer.from(cardJson, 'utf-8').toString('base64');
+  const cardJson = JSON.stringify(cardData);
+  const encoded = Buffer.from(cardJson, 'utf-8').toString('base64');
 
-    if (imageBuffer) {
-      // Add ccv3 chunk to existing PNG
-      const modified = addTextChunk(imageBuffer, 'ccv3', encoded);
-      fs.writeFile(filePath, modified, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    } else {
-      // Create a new blank PNG
-      const png = new PNG({
-        width: 400,
-        height: 600,
-        filterType: -1
-      });
-
-      // Fill with magenta/black checkerboard (missing texture pattern)
-      const checkSize = 32; // Size of each checker square
-      for (let y = 0; y < png.height; y++) {
-        for (let x = 0; x < png.width; x++) {
-          const idx = (png.width * y + x) << 2;
-
-          // Determine if this pixel should be magenta or black
-          const checkerX = Math.floor(x / checkSize);
-          const checkerY = Math.floor(y / checkSize);
-          const isMagenta = (checkerX + checkerY) % 2 === 0;
-
-          if (isMagenta) {
-            png.data[idx] = 255;   // R
-            png.data[idx + 1] = 0;   // G
-            png.data[idx + 2] = 255; // B
-          } else {
-            png.data[idx] = 0;     // R
-            png.data[idx + 1] = 0;   // G
-            png.data[idx + 2] = 0;   // B
-          }
-          png.data[idx + 3] = 255; // A
-        }
+  // If no image buffer provided, try to preserve existing image
+  if (!imageBuffer) {
+    try {
+      imageBuffer = await fs.promises.readFile(filePath);
+      console.log(`[characterCard] Preserving existing image for ${filePath}`);
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        throw err;
       }
-
-      const buffer = PNG.sync.write(png);
-      const modified = addTextChunk(buffer, 'ccv3', encoded);
-
-      fs.writeFile(filePath, modified, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
+      // File doesn't exist, will create placeholder below
     }
+  }
+
+  if (imageBuffer) {
+    // Add ccv3 chunk to existing PNG
+    const modified = addTextChunk(imageBuffer, 'ccv3', encoded);
+    await fs.promises.writeFile(filePath, modified);
+    return;
+  }
+
+  // Only create placeholder for NEW files (file doesn't exist)
+  console.warn(`[characterCard] Creating placeholder image for NEW character: ${filePath}`);
+
+  // Create a new blank PNG
+  const png = new PNG({
+    width: 400,
+    height: 600,
+    filterType: -1
   });
+
+  // Fill with magenta/black checkerboard (missing texture pattern)
+  const checkSize = 32; // Size of each checker square
+  for (let y = 0; y < png.height; y++) {
+    for (let x = 0; x < png.width; x++) {
+      const idx = (png.width * y + x) << 2;
+
+      // Determine if this pixel should be magenta or black
+      const checkerX = Math.floor(x / checkSize);
+      const checkerY = Math.floor(y / checkSize);
+      const isMagenta = (checkerX + checkerY) % 2 === 0;
+
+      if (isMagenta) {
+        png.data[idx] = 255;   // R
+        png.data[idx + 1] = 0;   // G
+        png.data[idx + 2] = 255; // B
+      } else {
+        png.data[idx] = 0;     // R
+        png.data[idx + 1] = 0;   // G
+        png.data[idx + 2] = 0;   // B
+      }
+      png.data[idx + 3] = 255; // A
+    }
+  }
+
+  const buffer = PNG.sync.write(png);
+  const modified = addTextChunk(buffer, 'ccv3', encoded);
+
+  await fs.promises.writeFile(filePath, modified);
 }
 
 /**

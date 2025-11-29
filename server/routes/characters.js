@@ -238,7 +238,9 @@ function createCharacterRouter(deps) {
           return res.status(400).json({ error: 'Invalid character card' });
         }
 
-        await writeCharacterCard(targetPath, card);
+        // Read existing image to preserve it
+        const imageBuffer = await fs.readFile(targetPath);
+        await writeCharacterCard(targetPath, card, imageBuffer);
       } else if (req.body) {
         // Direct JSON body (no new image, just update card data)
         if (!validateCharacterCard(req.body)) {
@@ -246,7 +248,9 @@ function createCharacterRouter(deps) {
         }
 
         card = req.body;
-        await writeCharacterCard(targetPath, card);
+        // Read existing image to preserve it
+        const imageBuffer = await fs.readFile(targetPath);
+        await writeCharacterCard(targetPath, card, imageBuffer);
       } else {
         return res.status(400).json({ error: 'No file or data provided' });
       }
@@ -282,7 +286,9 @@ function createCharacterRouter(deps) {
 
       card.data.tags = finalTags;
 
-      await writeCharacterCard(filePath, card);
+      // Read existing image to preserve it
+      const imageBuffer = await fs.readFile(filePath);
+      await writeCharacterCard(filePath, card, imageBuffer);
 
       // Update global tag registry
       const allTags = await loadTags();
@@ -360,7 +366,9 @@ Return ONLY a comma-separated list of lowercase tags, nothing else.`;
 
       // Update character card
       card.data.tags = mergedTags;
-      await writeCharacterCard(filePath, card);
+      // Read existing image to preserve it
+      const imageBuffer = await fs.readFile(filePath);
+      await writeCharacterCard(filePath, card, imageBuffer);
 
       // Update global tag registry
       const allTags = await loadTags();
@@ -424,7 +432,9 @@ Return ONLY a comma-separated list of lowercase tags, nothing else.`;
           );
 
           card.data.tags = updatedTags;
-          await writeCharacterCard(filePath, card);
+          // Read existing image to preserve it
+          const imageBuffer = await fs.readFile(filePath);
+          await writeCharacterCard(filePath, card, imageBuffer);
 
           results.push({
             filename,
