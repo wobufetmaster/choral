@@ -458,13 +458,14 @@ function createApp(config) {
           res.write(`data: ${JSON.stringify({ type: 'tool_call', toolCall })}\n\n`);
 
           // Determine which tool endpoint to call
+          const port = process.env.PORT || 3003;
           let toolEndpoint;
           if (toolCall.function.name === 'create_character_card') {
-            toolEndpoint = 'http://localhost:3000/api/tools/create-character';
+            toolEndpoint = `http://localhost:${port}/api/tools/create-character`;
           } else if (toolCall.function.name === 'update_character_card') {
-            toolEndpoint = 'http://localhost:3000/api/tools/update-character';
+            toolEndpoint = `http://localhost:${port}/api/tools/update-character`;
           } else if (toolCall.function.name === 'add_greetings') {
-            toolEndpoint = 'http://localhost:3000/api/tools/add-greetings';
+            toolEndpoint = `http://localhost:${port}/api/tools/add-greetings`;
           }
 
           if (toolEndpoint) {
@@ -597,13 +598,14 @@ function createApp(config) {
         console.log('Tool call detected:', JSON.stringify(toolCall, null, 2));
 
         // Determine which tool endpoint to call
+        const port = process.env.PORT || 3003;
         let toolEndpoint;
         if (toolCall.function.name === 'create_character_card') {
-          toolEndpoint = 'http://localhost:3000/api/tools/create-character';
+          toolEndpoint = `http://localhost:${port}/api/tools/create-character`;
         } else if (toolCall.function.name === 'update_character_card') {
-          toolEndpoint = 'http://localhost:3000/api/tools/update-character';
+          toolEndpoint = `http://localhost:${port}/api/tools/update-character`;
         } else if (toolCall.function.name === 'add_greetings') {
-          toolEndpoint = 'http://localhost:3000/api/tools/add-greetings';
+          toolEndpoint = `http://localhost:${port}/api/tools/add-greetings`;
         }
 
         if (toolEndpoint) {

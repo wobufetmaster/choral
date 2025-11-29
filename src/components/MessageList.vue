@@ -40,6 +40,10 @@
           >🗑️↓</button>
         </div>
         <div v-if="editingMessage === index" class="message-edit-container">
+          <div class="edit-inline-actions">
+            <button @click="$emit('save-edit')" class="edit-confirm" title="Save">✓</button>
+            <button @click="$emit('cancel-edit')" class="edit-cancel" title="Cancel">✕</button>
+          </div>
           <div
             :ref="'editTextarea' + index"
             class="message-edit-textarea"
@@ -47,10 +51,6 @@
             @keydown.escape="$emit('cancel-edit')"
             @input="$emit('update-edited-content', $event)"
           ></div>
-          <div class="edit-inline-actions">
-            <button @click="$emit('save-edit')" class="edit-confirm" title="Save">✓</button>
-            <button @click="$emit('cancel-edit')" class="edit-cancel" title="Cancel">✕</button>
-          </div>
         </div>
         <!-- Only show content when: not generating swipe for this message, or there's streaming content -->
         <div v-else-if="!isGeneratingSwipe || generatingSwipeIndex !== index || streamingContent" class="message-content">

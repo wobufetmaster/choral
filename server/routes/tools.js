@@ -57,10 +57,6 @@ const CREATE_CHARACTER_TOOL_SCHEMA = {
         post_history_instructions: {
           type: 'string',
           description: 'Instructions that appear after chat history. Can be added later via update.'
-        },
-        image_prompt: {
-          type: 'string',
-          description: 'Comma-separated tags for generating character image (e.g., "woman,long hair,blue eyes,fantasy,elegant"). Can be added later via update.'
         }
       },
       required: ['name', 'first_mes']
@@ -311,29 +307,8 @@ function createToolRouter({ CHARACTERS_DIR, loadToolSettings }) {
       const filename = await getUniqueFilename(`${params.name}.png`, CHARACTERS_DIR);
       const destPath = path.join(CHARACTERS_DIR, filename);
 
-      // Handle character image
-      let imageBuffer = null;
-      if (params.image_prompt) {
-        try {
-          console.log(`Generating character image with prompt: ${params.image_prompt}`);
-          const imageUrl = `http://192.168.1.100:3000/generate/character/${encodeURIComponent(params.image_prompt)}`;
-          const imageResponse = await fetch(imageUrl);
-
-          if (imageResponse.ok) {
-            const arrayBuffer = await imageResponse.arrayBuffer();
-            imageBuffer = Buffer.from(arrayBuffer);
-            console.log('Character image generated successfully');
-          } else {
-            console.warn('Failed to generate character image, using default');
-          }
-        } catch (err) {
-          console.error('Error generating character image:', err);
-          // Continue with default image
-        }
-      }
-
-      // Write character card
-      await writeCharacterCard(destPath, cardData, imageBuffer);
+      // Write character card (uses default placeholder image)
+      await writeCharacterCard(destPath, cardData, null);
 
       console.log(`Created character card: ${filename}`);
 

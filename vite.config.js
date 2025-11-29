@@ -8,7 +8,8 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3003',
-        changeOrigin: true
+        changeOrigin: true,
+        timeout: 300000 // 5 minute timeout for long-running requests
       }
     },
     // Force reload on file changes
