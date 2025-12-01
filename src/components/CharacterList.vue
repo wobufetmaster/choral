@@ -471,21 +471,23 @@ export default {
       }
     },
     filteredGroupChats() {
-      // First, group chats by conversationGroup and keep only the most recent from each group
-      const groupedByConversation = {};
+      // Group chats by character composition (sorted filenames) to deduplicate
+      // This fixes issues where conversationGroup IDs differ due to random components
+      const groupedByCharacters = {};
 
       for (const chat of this.groupChats) {
-        const conversationId = chat.conversationGroup || chat.filename; // Use filename as fallback
+        // Create a canonical key from sorted character filenames
+        const characterKey = (chat.characterFilenames || []).slice().sort().join('|');
 
-        // If we haven't seen this conversation group, or this chat is newer, keep it
-        if (!groupedByConversation[conversationId] ||
-            (chat.timestamp || 0) > (groupedByConversation[conversationId].timestamp || 0)) {
-          groupedByConversation[conversationId] = chat;
+        // If we haven't seen this character combination, or this chat is newer, keep it
+        if (!groupedByCharacters[characterKey] ||
+            (chat.timestamp || 0) > (groupedByCharacters[characterKey].timestamp || 0)) {
+          groupedByCharacters[characterKey] = chat;
         }
       }
 
-      // Convert back to array (only the most recent from each conversation group)
-      let filtered = Object.values(groupedByConversation);
+      // Convert back to array (only the most recent from each character combination)
+      let filtered = Object.values(groupedByCharacters);
 
       // Filter by selected tags (must have ALL selected tags - case insensitive)
       if (this.selectedTags.length > 0) {
