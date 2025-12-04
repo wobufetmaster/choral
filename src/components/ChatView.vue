@@ -1552,6 +1552,9 @@ export default {
       }, 0);
     },
     closeAvatarMenu() {
+      // Remove document listener explicitly - it may not have fired if click was on menu item
+      // (menu items use @click.stop which prevents bubbling to document)
+      document.removeEventListener('click', this.closeAvatarMenu);
       this.avatarMenu.show = false;
     },
     async viewCharacterCard() {
