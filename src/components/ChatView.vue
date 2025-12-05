@@ -1827,7 +1827,7 @@ export default {
           },
           isGroupChat: this.isGroupChat,
           groupChatCharacters: this.groupChatCharacters,
-          character: this.character
+          characterFilename: this.characterFilename // Pass filename explicitly
         });
 
         const response = await fetch('/api/chat/summarize-and-continue', {
@@ -1852,11 +1852,12 @@ export default {
                 : this.generateUUID();
             }
 
-            const shouldBeGroupChat = chatData.characterFilenames.length > 1;
-            this.isGroupChat = shouldBeGroupChat;
-
             const characters = [];
-            for (const filename of chatData.characterFilenames) {
+            // Filter out null/undefined filenames
+            const validFilenames = (chatData.characterFilenames || []).filter(f => f);
+            const shouldBeGroupChat = validFilenames.length > 1;
+            this.isGroupChat = shouldBeGroupChat;
+            for (const filename of validFilenames) {
               try {
                 const charData = await this.api.getCharacter(filename);
                 characters.push({ filename, name: charData.data.name, data: charData.data });

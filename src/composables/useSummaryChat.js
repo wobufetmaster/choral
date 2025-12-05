@@ -74,7 +74,7 @@ function buildSummaryRequest(options) {
     context,
     isGroupChat,
     groupChatCharacters,
-    character
+    characterFilename // Pass explicitly - character objects don't have filename
   } = options;
 
   const characterFilenames = isGroupChat && groupChatCharacters
@@ -88,7 +88,7 @@ function buildSummaryRequest(options) {
     context,
     isGroupChat,
     characterFilenames,
-    characterFilename: !isGroupChat ? character?.filename : null
+    characterFilename: !isGroupChat ? characterFilename : null
   };
 }
 
