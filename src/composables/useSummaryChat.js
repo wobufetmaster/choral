@@ -27,14 +27,15 @@ async function processSummaryStream(reader, callbacks) {
         try {
           const event = JSON.parse(data);
 
+          // Await callbacks to ensure proper sequencing (onInit must complete before chunks)
           if (event.type === 'init' && callbacks.onInit) {
-            callbacks.onInit(event);
+            await callbacks.onInit(event);
           } else if (event.type === 'chunk' && callbacks.onChunk) {
-            callbacks.onChunk(event);
+            await callbacks.onChunk(event);
           } else if (event.type === 'complete' && callbacks.onComplete) {
-            callbacks.onComplete(event);
+            await callbacks.onComplete(event);
           } else if (event.type === 'error' && callbacks.onError) {
-            callbacks.onError(event);
+            await callbacks.onError(event);
           }
         } catch (err) {
           console.error('Failed to parse SSE event:', err);
