@@ -1877,10 +1877,8 @@ export default {
             streamingMessage = this.summaryChat.createStreamingMessage(narrator, chatData.timestamp);
             this.messages.push(streamingMessage);
 
-            // Add the kept messages (ones that weren't summarized) after the narrator summary
-            if (chatData.keptMessages && chatData.keptMessages.length > 0) {
-              this.messages.push(...chatData.keptMessages);
-            }
+            // Store kept messages to add after summary completes
+            this._keptMessages = chatData.keptMessages || [];
 
             this.narratorInfo = narrator;
             this.updateTabData();
@@ -1897,6 +1895,13 @@ export default {
               streamingMessage.content = event.message.content;
               streamingMessage.swipes = event.message.swipes;
             }
+
+            // Add kept messages after the narrator summary is complete
+            if (this._keptMessages && this._keptMessages.length > 0) {
+              this.messages.push(...this._keptMessages);
+              this._keptMessages = null;
+            }
+
             try {
               if (this.isGroupChat) await this.saveGroupChat(false);
               else await this.saveChat(false);
