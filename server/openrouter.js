@@ -61,7 +61,7 @@ function streamChatCompletion({ messages, model, options = {}, tools, stoppingSt
     frequency_penalty: options.frequency_penalty ?? 0,
     presence_penalty: options.presence_penalty ?? 0,
     ...options,
-    reasoning: { max_tokens: 0, exclude: true },
+    // Don't send reasoning parameter - OpenRouter requires max_tokens >= 1024 if specified
   };
 
   // Add tools if provided
@@ -324,7 +324,7 @@ function chatCompletion({ messages, model, options = {}, tools }) {
       frequency_penalty: options.frequency_penalty ?? 0,
       presence_penalty: options.presence_penalty ?? 0,
       ...options,
-      reasoning: { max_tokens: 0, exclude: true },
+      // Don't send reasoning parameter - OpenRouter requires max_tokens >= 1024 if specified
     };
 
     // Add tools if provided
