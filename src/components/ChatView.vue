@@ -1876,10 +1876,6 @@ export default {
 
             streamingMessage = this.summaryChat.createStreamingMessage(narrator, chatData.timestamp);
             this.messages.push(streamingMessage);
-
-            // Store kept messages to add after summary completes
-            this._keptMessages = chatData.keptMessages || [];
-
             this.narratorInfo = narrator;
             this.updateTabData();
           },
@@ -1895,18 +1891,11 @@ export default {
               streamingMessage.content = event.message.content;
               streamingMessage.swipes = event.message.swipes;
             }
-
-            // Add kept messages after the narrator summary is complete
-            if (this._keptMessages && this._keptMessages.length > 0) {
-              this.messages.push(...this._keptMessages);
-              this._keptMessages = null;
-            }
-
             try {
               if (this.isGroupChat) await this.saveGroupChat(false);
               else await this.saveChat(false);
               this.updateTabData();
-              this.$root.$notify('Summary complete! Chat continued with narrator.', 'success');
+              this.$root.$notify('New chat created with summary!', 'success');
             } catch (saveError) {
               console.error('Failed to save chat:', saveError);
               this.$root.$notify('Summary complete, but failed to save chat', 'warning');

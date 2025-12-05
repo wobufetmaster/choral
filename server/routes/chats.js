@@ -345,16 +345,13 @@ ${messagePreview}`;
       }
 
       const model = preset?.model || 'anthropic/claude-3.5-sonnet';
-      const keepCount = 10; // Keep last 10 messages
-      const oldMessages = messages.slice(0, -keepCount);
-      const keptMessages = messages.slice(-keepCount);
 
-      if (oldMessages.length === 0) {
+      if (messages.length < 2) {
         return res.status(400).json({ error: 'Not enough messages to summarize' });
       }
 
-      // Build summary prompt from old messages
-      const conversationText = oldMessages
+      // Build summary prompt from all messages
+      const conversationText = messages
         .map(m => {
           const charName = m.character || m.role;
           if (typeof m.content === 'string') {
@@ -388,8 +385,7 @@ ${conversationText}`;
       const newChatData = {
         title: `${chatTitle} (Continued)`,
         characterFilenames: isGroupChat ? characterFilenames : [characterFilename],
-        timestamp: Date.now(),
-        keptMessages // Include the messages that weren't summarized
+        timestamp: Date.now()
       };
 
       // Send init event
