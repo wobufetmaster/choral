@@ -347,6 +347,7 @@ ${messagePreview}`;
       const model = preset?.model || 'anthropic/claude-3.5-sonnet';
       const keepCount = 10; // Keep last 10 messages
       const oldMessages = messages.slice(0, -keepCount);
+      const keptMessages = messages.slice(-keepCount);
 
       if (oldMessages.length === 0) {
         return res.status(400).json({ error: 'Not enough messages to summarize' });
@@ -387,7 +388,8 @@ ${conversationText}`;
       const newChatData = {
         title: `${chatTitle} (Continued)`,
         characterFilenames: isGroupChat ? characterFilenames : [characterFilename],
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        keptMessages // Include the messages that weren't summarized
       };
 
       // Send init event

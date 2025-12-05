@@ -1876,6 +1876,12 @@ export default {
 
             streamingMessage = this.summaryChat.createStreamingMessage(narrator, chatData.timestamp);
             this.messages.push(streamingMessage);
+
+            // Add the kept messages (ones that weren't summarized) after the narrator summary
+            if (chatData.keptMessages && chatData.keptMessages.length > 0) {
+              this.messages.push(...chatData.keptMessages);
+            }
+
             this.narratorInfo = narrator;
             this.updateTabData();
           },
