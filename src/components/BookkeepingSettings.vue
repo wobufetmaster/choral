@@ -197,8 +197,15 @@
         </p>
 
         <div class="bulk-operations">
+          <button @click="removeNonCoreTags" class="btn-warning-large">
+            Remove Non-Core Tags from All Characters
+          </button>
+          <p class="info-text">
+            This will remove all tags except core tags from every character card. Core tags will be preserved.
+          </p>
+
           <button @click="removeAllCharacterTags" class="btn-danger-large">
-            Remove Tags from All Characters
+            Remove All Tags from All Characters
           </button>
           <p class="warning-text">
             ⚠️ This will remove all tags from every character card. This operation cannot be undone.
@@ -355,15 +362,24 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
         await this.api.saveCoreTags(tags);
 
         // Also update the tag colors in the global tags file
-        const tagColors = {};
+        // Preserve existing tag data (like character associations) while updating colors
+        const updatedTags = { ...this.allTags };
         this.coreTags.forEach(tag => {
           if (tag.name.trim()) {
             const normalized = tag.name.toLowerCase().trim();
-            tagColors[normalized] = tag.color;
+            const existingData = updatedTags[normalized];
+
+            if (existingData && typeof existingData === 'object') {
+              // Update color on existing tag object
+              updatedTags[normalized] = { ...existingData, color: tag.color };
+            } else {
+              // Simple color string format
+              updatedTags[normalized] = tag.color;
+            }
           }
         });
 
-        await this.api.saveTags({ ...this.allTags, ...tagColors });
+        await this.api.saveTags(updatedTags);
 
         this.$root.$notify('Core tags saved successfully', 'success');
         await this.loadAllTags(); // Reload to get updated colors
@@ -385,6 +401,12 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
     removeTag(index) {
       this.coreTags.splice(index, 1);
     },
+    getTagColorFromData(tagData) {
+      // Extract color from either string or object format
+      if (!tagData) return '#6b7280';
+      if (typeof tagData === 'string') return tagData;
+      return tagData.color || '#6b7280';
+    },
     async importFromExisting() {
       // Import all existing tags from the global tags list
       const existingTagNames = Object.keys(this.allTags);
@@ -397,16 +419,18 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
       // Add tags that aren't already in core tags
       const coreTagNames = new Set(this.coreTags.map(t => t.name.toLowerCase().trim()));
 
+      let importedCount = 0;
       existingTagNames.forEach(tagName => {
         if (!coreTagNames.has(tagName)) {
           this.coreTags.push({
             name: tagName,
-            color: this.allTags[tagName] || '#6b7280'
+            color: this.getTagColorFromData(this.allTags[tagName])
           });
+          importedCount++;
         }
       });
 
-      this.$root.$notify(`Imported ${existingTagNames.length} tags`, 'success');
+      this.$root.$notify(`Imported ${importedCount} tags`, 'success');
     },
     deleteAllTags() {
       if (this.coreTags.length === 0) {
@@ -417,6 +441,56 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
       if (confirm(`Are you sure you want to delete all ${this.coreTags.length} core tags? This action cannot be undone.`)) {
         this.coreTags = [];
         this.$root.$notify('All tags deleted', 'success');
+      }
+    },
+    async removeNonCoreTags() {
+      if (this.coreTags.length === 0) {
+        this.$root.$notify('No core tags defined. Define core tags first or use "Remove All Tags" instead.', 'warning');
+        return;
+      }
+
+      const coreTagNames = this.coreTags.map(t => t.name.trim()).filter(Boolean);
+      const confirmed = confirm(
+        `Are you sure you want to remove all non-core tags from every character card?\n\n` +
+        `Core tags that will be preserved (${coreTagNames.length}):\n` +
+        `${coreTagNames.slice(0, 10).join(', ')}${coreTagNames.length > 10 ? '...' : ''}\n\n` +
+        'This will:\n' +
+        '• Remove all tags except core tags from all character cards\n' +
+        '• Save the updated cards immediately\n' +
+        '• This operation CANNOT be undone\n\n' +
+        'Do you want to continue?'
+      );
+
+      if (!confirmed) return;
+
+      try {
+        const response = await fetch('/api/characters/bulk-remove-non-core-tags', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to remove non-core tags from characters');
+        }
+
+        const result = await response.json();
+
+        // Build detailed message
+        let message = `Processed ${result.totalFiles} character(s): ${result.updatedCount} updated, ${result.skippedCount} skipped`;
+
+        if (result.errors && result.errors.length > 0) {
+          message += `, ${result.errors.length} errors`;
+          console.error('Errors during bulk non-core tag removal:', result.errors);
+          this.$root.$notify(message, 'warning', 5000);
+        } else {
+          this.$root.$notify(message, 'success', 4000);
+        }
+
+        // Trigger a refresh of the character list if we're on that tab
+        window.dispatchEvent(new Event('characters-updated'));
+      } catch (error) {
+        console.error('Failed to remove non-core tags:', error);
+        this.$root.$notify('Failed to remove non-core tags from characters', 'error');
       }
     },
     async removeAllCharacterTags() {
@@ -743,6 +817,35 @@ Generate 5-10 relevant tags with colors. For new tags, assign meaningful CSS col
   background-color: rgba(251, 191, 36, 0.1);
   border-left: 3px solid #fbbf24;
   border-radius: 4px;
+}
+
+.info-text {
+  font-size: 13px;
+  color: #60a5fa;
+  line-height: 1.5;
+  margin: 0;
+  padding: 8px 12px;
+  background-color: rgba(96, 165, 250, 0.1);
+  border-left: 3px solid #60a5fa;
+  border-radius: 4px;
+}
+
+.btn-warning-large {
+  padding: 12px 24px;
+  background-color: #f59e0b;
+  color: white;
+  border: 2px solid #d97706;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-warning-large:hover {
+  background-color: #d97706;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
 
 .prompt-textarea {

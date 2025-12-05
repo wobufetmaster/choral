@@ -85,7 +85,8 @@ function createConfigRouter(deps) {
   // POST /api/core-tags - Save core tags
   router.post('/core-tags', async (req, res, next) => {
     try {
-      const coreTags = req.body;
+      // Handle both { tags: [...] } and direct array formats
+      const coreTags = Array.isArray(req.body) ? req.body : (req.body.tags || []);
       await saveCoreTags(coreTags);
       res.json({ success: true });
     } catch (error) {

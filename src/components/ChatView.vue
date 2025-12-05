@@ -49,11 +49,21 @@
       @set-next-speaker="setNextSpeaker"
     />
 
-    <!-- Character Card Modal -->
+    <!-- Character Card Modal (read-only, legacy) -->
     <CharacterCardModal
       :show="showCharacterCard"
       :character="viewingCharacter"
       @close="showCharacterCard = false"
+    />
+
+    <!-- Character Quick Edit Modal -->
+    <CharacterQuickEditModal
+      :show="showQuickEdit"
+      :character="quickEditCharacter"
+      :characterFilename="quickEditFilename"
+      @close="showQuickEdit = false"
+      @open-full-editor="openFullCharacterEditor"
+      @character-updated="onCharacterUpdated"
     />
 
     <!-- Chat History Sidebar -->
@@ -234,6 +244,7 @@ import ChatHistorySidebar from './ChatHistorySidebar.vue';
 import LorebookSelectorModal from './LorebookSelectorModal.vue';
 import MessageList from './MessageList.vue';
 import CharacterCardModal from './CharacterCardModal.vue';
+import CharacterQuickEditModal from './CharacterQuickEditModal.vue';
 import AvatarMenu from './AvatarMenu.vue';
 import MemoryModal from './MemoryModal.vue';
 
@@ -251,6 +262,7 @@ export default {
     LorebookSelectorModal,
     MessageList,
     CharacterCardModal,
+    CharacterQuickEditModal,
     AvatarMenu,
     MemoryModal
   },
@@ -324,6 +336,9 @@ export default {
       currentBranch: null,
       showCharacterCard: false,
       viewingCharacter: null,
+      showQuickEdit: false,
+      quickEditCharacter: null,
+      quickEditFilename: '',
       chatHistory: [],
       lorebooks: [],
       selectedLorebookFilenames: [],
@@ -1529,20 +1544,36 @@ export default {
         this.$root.$notify(`Failed to delete branch: ${error.message}`, 'error');
       }
     },
-    showAvatarMenu(event, message, index) {
+    async showAvatarMenu(event, message, index) {
+      // For assistant messages, open quick edit modal directly
+      if (message.role === 'assistant') {
+        const characterFilename = message.characterFilename || this.characterFilename;
+
+        // Don't allow editing narrator
+        if (characterFilename === '__narrator__') {
+          this.$root.$notify('Narrator has no character card', 'info');
+          return;
+        }
+
+        try {
+          this.quickEditFilename = characterFilename;
+          this.quickEditCharacter = await this.api.getCharacter(characterFilename);
+          this.showQuickEdit = true;
+        } catch (error) {
+          console.error('Error loading character:', error);
+          this.$root.$notify('Error loading character', 'error');
+        }
+        return;
+      }
+
+      // For user messages, show the avatar menu (for persona options)
       const rect = event.target.getBoundingClientRect();
       this.avatarMenu.x = rect.right + 10;
       this.avatarMenu.y = rect.top;
       this.avatarMenu.message = message;
       this.avatarMenu.messageIndex = index;
-
-      if (message.role === 'assistant') {
-        this.avatarMenu.characterName = this.getMessageCharacterName(message);
-        this.avatarMenu.characterFilename = message.characterFilename || this.characterFilename;
-      } else {
-        this.avatarMenu.characterName = this.persona.nickname || this.persona.name;
-        this.avatarMenu.characterFilename = null;
-      }
+      this.avatarMenu.characterName = this.persona.nickname || this.persona.name;
+      this.avatarMenu.characterFilename = null;
 
       this.avatarMenu.show = true;
 
@@ -1621,6 +1652,39 @@ export default {
         this.$root.$notify(`Next speaker: ${this.avatarMenu.characterName}`, 'success');
       }
       this.closeAvatarMenu();
+    },
+    async openFullCharacterEditor() {
+      // Close quick edit modal and open full editor in a new tab
+      this.showQuickEdit = false;
+
+      if (this.quickEditFilename && this.quickEditCharacter) {
+        this.$emit('open-tab', 'character-editor', {
+          character: {
+            ...this.quickEditCharacter,
+            filename: this.quickEditFilename,
+            image: `/api/characters/${this.quickEditFilename}/image`
+          }
+        }, `Edit: ${this.quickEditCharacter.data.name}`, false);
+      }
+    },
+    onCharacterUpdated(updatedCharacter) {
+      // Update local character data if it matches
+      if (this.character && this.quickEditFilename === this.characterFilename) {
+        this.character = updatedCharacter;
+        this.characterName = updatedCharacter.data.name;
+      }
+
+      // Update group chat character if applicable
+      if (this.isGroupChat) {
+        const index = this.groupChatCharacters.findIndex(c => c.filename === this.quickEditFilename);
+        if (index !== -1) {
+          this.groupChatCharacters[index] = {
+            ...this.groupChatCharacters[index],
+            name: updatedCharacter.data.name,
+            data: updatedCharacter
+          };
+        }
+      }
     },
     async loadAvailablePresets() {
       try {

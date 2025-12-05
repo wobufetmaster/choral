@@ -769,7 +769,11 @@ export default {
     },
     getTagColor(tag) {
       const normalized = this.normalizeTag(tag);
-      return this.tagColors[normalized] || '#6b7280'; // Default gray color
+      const tagData = this.tagColors[normalized];
+      // Handle both formats: { tag: "#color" } and { tag: { color: "#color", ... } }
+      if (!tagData) return '#6b7280'; // Default gray color
+      if (typeof tagData === 'string') return tagData;
+      return tagData.color || '#6b7280';
     },
     editTags(character) {
       this.characterBeingTagged = character;

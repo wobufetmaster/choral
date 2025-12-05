@@ -62,7 +62,11 @@ function createApp(config) {
   const saveTags = (tags) => saveJSON(TAGS_FILE, tags);
 
   // Core tags management (global tags that can't be removed from characters)
-  const loadCoreTags = () => loadJSON(CORE_TAGS_FILE, []);
+  const loadCoreTags = async () => {
+    const data = await loadJSON(CORE_TAGS_FILE, []);
+    // Handle legacy format where tags might be wrapped in { tags: [...] }
+    return Array.isArray(data) ? data : (data.tags || []);
+  };
   const saveCoreTags = (coreTags) => saveJSON(CORE_TAGS_FILE, coreTags);
 
   // Bookkeeping settings management
@@ -313,7 +317,11 @@ function createApp(config) {
   // Mount tool routes
   const toolRouter = createToolRouter({
     CHARACTERS_DIR,
-    loadToolSettings
+    loadToolSettings,
+    loadTags,
+    saveTags,
+    loadCoreTags,
+    normalizeTag
   });
   app.use('/api/tools', toolRouter);
 

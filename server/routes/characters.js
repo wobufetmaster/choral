@@ -293,8 +293,17 @@ function createCharacterRouter(deps) {
       // Update global tag registry
       const allTags = await loadTags();
       finalTags.forEach(tag => {
-        if (!allTags[tag]) {
-          allTags[tag] = { characters: [] };
+        // Handle both formats: { tag: "#color" } and { tag: { characters: [], color: "#color" } }
+        const existingData = allTags[tag];
+        if (!existingData || typeof existingData === 'string') {
+          // Convert color-only format to full format, preserving color if present
+          allTags[tag] = {
+            characters: [],
+            color: typeof existingData === 'string' ? existingData : undefined
+          };
+        } else if (!existingData.characters) {
+          // Ensure characters array exists
+          allTags[tag].characters = [];
         }
         if (!allTags[tag].characters.includes(req.params.filename)) {
           allTags[tag].characters.push(req.params.filename);
@@ -303,6 +312,10 @@ function createCharacterRouter(deps) {
 
       // Remove character from tags it no longer has
       for (const [tag, data] of Object.entries(allTags)) {
+        // Skip if data is just a color string (no characters to remove)
+        if (typeof data === 'string' || !data.characters) {
+          continue;
+        }
         if (!finalTags.includes(tag) && data.characters.includes(req.params.filename)) {
           data.characters = data.characters.filter(f => f !== req.params.filename);
           if (data.characters.length === 0 && !normalizedCoreTags.includes(tag)) {
@@ -373,8 +386,15 @@ Return ONLY a comma-separated list of lowercase tags, nothing else.`;
       // Update global tag registry
       const allTags = await loadTags();
       mergedTags.forEach(tag => {
-        if (!allTags[tag]) {
-          allTags[tag] = { characters: [] };
+        // Handle both formats: { tag: "#color" } and { tag: { characters: [], color: "#color" } }
+        const existingData = allTags[tag];
+        if (!existingData || typeof existingData === 'string') {
+          allTags[tag] = {
+            characters: [],
+            color: typeof existingData === 'string' ? existingData : undefined
+          };
+        } else if (!existingData.characters) {
+          allTags[tag].characters = [];
         }
         if (!allTags[tag].characters.includes(req.params.filename)) {
           allTags[tag].characters.push(req.params.filename);
@@ -456,18 +476,85 @@ Return ONLY a comma-separated list of lowercase tags, nothing else.`;
       // Update global tag registry
       const allTags = await loadTags();
       for (const tag of normalizedTagsToRemove) {
-        if (allTags[tag]) {
-          allTags[tag].characters = allTags[tag].characters.filter(
-            filename => !characterFilenames.includes(filename)
+        const tagData = allTags[tag];
+        // Skip if tag doesn't exist or is just a color string
+        if (!tagData || typeof tagData === 'string' || !tagData.characters) {
+          continue;
+        }
+        tagData.characters = tagData.characters.filter(
+          filename => !characterFilenames.includes(filename)
+        );
+        if (tagData.characters.length === 0) {
+          delete allTags[tag];
+        }
+      }
+      await saveTags(allTags);
+
+      res.json({ results });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // POST /api/characters/bulk-remove-non-core-tags - Remove all non-core tags from all characters
+  router.post('/bulk-remove-non-core-tags', async (req, res, next) => {
+    try {
+      // Get core tags
+      const coreTags = await loadCoreTags();
+      const normalizedCoreTags = coreTags.map(normalizeTag);
+
+      // Get all character files
+      const files = await fs.readdir(CHARACTERS_DIR);
+      const pngFiles = files.filter(f => f.endsWith('.png'));
+
+      const results = {
+        totalFiles: pngFiles.length,
+        updatedCount: 0,
+        skippedCount: 0,
+        errors: []
+      };
+
+      for (const filename of pngFiles) {
+        try {
+          const filePath = path.join(CHARACTERS_DIR, filename);
+          const card = await readCharacterCard(filePath);
+
+          const currentTags = card.data.tags || [];
+          // Keep only tags that are in the core tags list
+          const updatedTags = currentTags.filter(tag =>
+            normalizedCoreTags.includes(normalizeTag(tag))
           );
-          if (allTags[tag].characters.length === 0) {
+
+          // Check if any tags were removed
+          if (currentTags.length !== updatedTags.length) {
+            card.data.tags = updatedTags;
+            const imageBuffer = await fs.readFile(filePath);
+            await writeCharacterCard(filePath, card, imageBuffer);
+            results.updatedCount++;
+          } else {
+            results.skippedCount++;
+          }
+        } catch (error) {
+          results.errors.push({
+            filename,
+            error: error.message
+          });
+        }
+      }
+
+      // Update global tag registry - remove non-core tags
+      const allTags = await loadTags();
+      for (const [tag, data] of Object.entries(allTags)) {
+        if (!normalizedCoreTags.includes(tag)) {
+          // Remove non-core tag entirely, but preserve the color if it's just a color string
+          if (typeof data !== 'string') {
             delete allTags[tag];
           }
         }
       }
       await saveTags(allTags);
 
-      res.json({ results });
+      res.json(results);
     } catch (error) {
       next(error);
     }
@@ -601,13 +688,17 @@ Return ONLY a comma-separated list of lowercase tags, nothing else.`;
 
       // Update global tag registry
       const allTags = await loadTags();
+      const coreTags = await loadCoreTags();
+      const normalizedCoreTags = coreTags.map(normalizeTag);
+
       for (const [tag, data] of Object.entries(allTags)) {
+        // Skip if data is just a color string (no characters to remove)
+        if (typeof data === 'string' || !data.characters) {
+          continue;
+        }
         data.characters = data.characters.filter(f => f !== req.params.filename);
-        if (data.characters.length === 0) {
-          const coreTags = await loadCoreTags();
-          if (!coreTags.map(normalizeTag).includes(tag)) {
-            delete allTags[tag];
-          }
+        if (data.characters.length === 0 && !normalizedCoreTags.includes(tag)) {
+          delete allTags[tag];
         }
       }
       await saveTags(allTags);

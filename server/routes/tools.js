@@ -183,9 +183,13 @@ async function getUniqueFilename(desiredFilename, directory) {
  * @param {Object} dependencies
  * @param {string} dependencies.CHARACTERS_DIR
  * @param {Function} dependencies.loadToolSettings
+ * @param {Function} dependencies.loadTags
+ * @param {Function} dependencies.saveTags
+ * @param {Function} dependencies.loadCoreTags
+ * @param {Function} dependencies.normalizeTag
  * @returns {Router}
  */
-function createToolRouter({ CHARACTERS_DIR, loadToolSettings }) {
+function createToolRouter({ CHARACTERS_DIR, loadToolSettings, loadTags, saveTags, loadCoreTags, normalizeTag }) {
   const router = express.Router();
 
   // Get all available tools (for settings UI)
@@ -280,6 +284,12 @@ function createToolRouter({ CHARACTERS_DIR, loadToolSettings }) {
         });
       }
 
+      // Process tags: normalize and ensure core tags are included
+      const coreTags = await loadCoreTags();
+      const normalizedCoreTags = coreTags.map(normalizeTag);
+      const providedTags = (params.tags || []).map(normalizeTag);
+      const finalTags = [...new Set([...normalizedCoreTags, ...providedTags])];
+
       // Build Character Card V3 object
       const cardData = {
         spec: 'chara_card_v3',
@@ -294,7 +304,7 @@ function createToolRouter({ CHARACTERS_DIR, loadToolSettings }) {
           creator_notes: params.creator_notes || '',
           system_prompt: params.system_prompt || '',
           post_history_instructions: params.post_history_instructions || '',
-          tags: params.tags || [],
+          tags: finalTags,
           creator: 'Character Card Builder',
           character_version: '1.0',
           alternate_greetings: params.alternate_greetings || [],
@@ -309,6 +319,24 @@ function createToolRouter({ CHARACTERS_DIR, loadToolSettings }) {
 
       // Write character card (uses default placeholder image)
       await writeCharacterCard(destPath, cardData, null);
+
+      // Update global tag registry
+      const allTags = await loadTags();
+      finalTags.forEach(tag => {
+        const existingData = allTags[tag];
+        if (!existingData || typeof existingData === 'string') {
+          allTags[tag] = {
+            characters: [],
+            color: typeof existingData === 'string' ? existingData : undefined
+          };
+        } else if (!existingData.characters) {
+          allTags[tag].characters = [];
+        }
+        if (!allTags[tag].characters.includes(filename)) {
+          allTags[tag].characters.push(filename);
+        }
+      });
+      await saveTags(allTags);
 
       console.log(`Created character card: ${filename}`);
 
@@ -411,6 +439,7 @@ function createToolRouter({ CHARACTERS_DIR, loadToolSettings }) {
 
       // Read existing character card
       const card = await readCharacterCard(filePath);
+      const oldTags = card.data.tags || [];
 
       // Update only provided fields (merge semantics)
       if (params.description !== undefined) card.data.description = params.description;
@@ -419,10 +448,53 @@ function createToolRouter({ CHARACTERS_DIR, loadToolSettings }) {
       if (params.first_mes !== undefined) card.data.first_mes = params.first_mes;
       if (params.mes_example !== undefined) card.data.mes_example = params.mes_example;
       if (params.alternate_greetings !== undefined) card.data.alternate_greetings = params.alternate_greetings;
-      if (params.tags !== undefined) card.data.tags = params.tags;
       if (params.creator_notes !== undefined) card.data.creator_notes = params.creator_notes;
       if (params.system_prompt !== undefined) card.data.system_prompt = params.system_prompt;
       if (params.post_history_instructions !== undefined) card.data.post_history_instructions = params.post_history_instructions;
+
+      // Handle tags update with core tag enforcement
+      let finalTags = oldTags;
+      if (params.tags !== undefined) {
+        const coreTags = await loadCoreTags();
+        const normalizedCoreTags = coreTags.map(normalizeTag);
+        const providedTags = params.tags.map(normalizeTag);
+        finalTags = [...new Set([...normalizedCoreTags, ...providedTags])];
+        card.data.tags = finalTags;
+
+        // Update global tag registry
+        const allTags = await loadTags();
+
+        // Add character to new tags
+        finalTags.forEach(tag => {
+          const existingData = allTags[tag];
+          if (!existingData || typeof existingData === 'string') {
+            allTags[tag] = {
+              characters: [],
+              color: typeof existingData === 'string' ? existingData : undefined
+            };
+          } else if (!existingData.characters) {
+            allTags[tag].characters = [];
+          }
+          if (!allTags[tag].characters.includes(params.filename)) {
+            allTags[tag].characters.push(params.filename);
+          }
+        });
+
+        // Remove character from old tags it no longer has
+        for (const [tag, data] of Object.entries(allTags)) {
+          if (typeof data === 'string' || !data.characters) {
+            continue;
+          }
+          if (!finalTags.includes(tag) && data.characters.includes(params.filename)) {
+            data.characters = data.characters.filter(f => f !== params.filename);
+            if (data.characters.length === 0 && !normalizedCoreTags.includes(tag)) {
+              delete allTags[tag];
+            }
+          }
+        }
+
+        await saveTags(allTags);
+      }
 
       // Handle image update if requested
       let imageBuffer = null;
